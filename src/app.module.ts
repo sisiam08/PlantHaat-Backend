@@ -17,11 +17,13 @@ import { AddressesModule } from "./modules/addresses/addresses.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { CartModule } from "./modules/cart/cart.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LocationsModule } from "./modules/locations/locations.module";
 import { MailModule } from "./modules/mail/mail.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { OrdersModule } from "./modules/orders/orders.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { SellersModule } from "./modules/sellers/sellers.module";
@@ -59,6 +61,8 @@ import { PrismaModule } from "./prisma/prisma.module";
     SettingsModule,
     SellersModule,
     ProductsModule,
+    CartModule,
+    OrdersModule,
     AdminModule,
     AuthModule,
     HealthModule,

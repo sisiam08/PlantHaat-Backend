@@ -70,7 +70,7 @@ describe("Products (e2e)", () => {
     return { agent, userId, shop, profileId: profile.id };
   }
 
-  async function createActiveProduct(agent: request.SuperAgentTest) {
+  async function createActiveProduct(agent: ReturnType<typeof request.agent>) {
     const category = await prisma.category.create({
       data: { name: "Indoor Plants", slug: `indoor-${Date.now()}`, isActive: true },
     });

@@ -26,6 +26,20 @@ export interface ProductModeratedEvent {
   status: "ACTIVE" | "REJECTED";
 }
 
+export interface OrderPlacedEvent {
+  orderId: string;
+  customerId: string;
+  sellerUserIds: string[];
+}
+
+export interface OrderStatusChangedEvent {
+  shopOrderId: string;
+  orderId: string;
+  customerId: string;
+  sellerUserId: string;
+  status: string;
+}
+
 @Injectable()
 export class NotificationsListener {
   private readonly logger = new Logger(NotificationsListener.name);
@@ -73,6 +87,30 @@ export class NotificationsListener {
       title: approved ? "Product approved" : "Product rejected",
       body: `"${payload.productName}" was ${approved ? "approved" : "rejected"}.`,
       data: { productId: payload.productId },
+    });
+  }
+
+  @OnEvent("order.placed", { async: true })
+  async handleOrderPlaced(payload: OrderPlacedEvent): Promise<void> {
+    for (const userId of payload.sellerUserIds) {
+      await this.notifications.create({
+        userId,
+        type: "ORDER_PLACED",
+        title: "New order",
+        body: "You have a new order to confirm.",
+        data: { orderId: payload.orderId },
+      });
+    }
+  }
+
+  @OnEvent("order.status_changed", { async: true })
+  async handleOrderStatusChanged(payload: OrderStatusChangedEvent): Promise<void> {
+    await this.notifications.create({
+      userId: payload.customerId,
+      type: payload.status === "CANCELLED" ? "ORDER_CANCELLED" : "ORDER_STATUS_CHANGED",
+      title: "Order update",
+      body: `Your order is now ${payload.status.replace(/_/g, " ").toLowerCase()}.`,
+      data: { shopOrderId: payload.shopOrderId, orderId: payload.orderId },
     });
   }
 
