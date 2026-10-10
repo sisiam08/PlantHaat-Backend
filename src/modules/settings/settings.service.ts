@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
 
+import { AppException } from "../../common/errors/app.exception";
+import { ErrorCode } from "../../common/errors/error-codes";
+import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
 export const SETTING_DEFAULTS: Record<string, unknown> = {
@@ -33,6 +36,33 @@ export class SettingsService {
 
   async getNumber(key: string): Promise<number> {
     return Number(await this.get<unknown>(key));
+  }
+
+  async getAll(): Promise<Record<string, unknown>> {
+    return Object.fromEntries(await this.ensureCache());
+  }
+
+  async update(
+    values: Record<string, unknown>,
+    updatedById: string,
+  ): Promise<Record<string, unknown>> {
+    const allowed = new Set(Object.keys(SETTING_DEFAULTS));
+    for (const key of Object.keys(values)) {
+      if (!allowed.has(key)) {
+        throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, `Unknown setting: ${key}`);
+      }
+    }
+    await this.prisma.$transaction(
+      Object.entries(values).map(([key, value]) =>
+        this.prisma.systemSetting.upsert({
+          where: { key },
+          update: { value: value as Prisma.InputJsonValue, updatedById },
+          create: { key, value: value as Prisma.InputJsonValue, updatedById },
+        }),
+      ),
+    );
+    this.invalidate();
+    return this.getAll();
   }
 
   invalidate(): void {

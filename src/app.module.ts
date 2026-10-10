@@ -15,12 +15,15 @@ import { AppConfigService } from "./config/app-config.service";
 import { AppConfigModule } from "./config/config.module";
 import { AddressesModule } from "./modules/addresses/addresses.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { AnnouncementsModule } from "./modules/announcements/announcements.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CartModule } from "./modules/cart/cart.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommissionsModule } from "./modules/commissions/commissions.module";
 import { ComplaintsModule } from "./modules/complaints/complaints.module";
+import { ContentModule } from "./modules/content/content.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { LocationsModule } from "./modules/locations/locations.module";
@@ -77,6 +80,9 @@ import { PrismaModule } from "./prisma/prisma.module";
     WishlistModule,
     ReviewsModule,
     ComplaintsModule,
+    ContentModule,
+    AnnouncementsModule,
+    AnalyticsModule,
     AdminModule,
     AuthModule,
     HealthModule,
