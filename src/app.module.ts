@@ -19,13 +19,17 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CartModule } from "./modules/cart/cart.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { CommissionsModule } from "./modules/commissions/commissions.module";
 import { HealthModule } from "./modules/health/health.module";
+import { LedgerModule } from "./modules/ledger/ledger.module";
 import { LocationsModule } from "./modules/locations/locations.module";
 import { MailModule } from "./modules/mail/mail.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
+import { PayoutsModule } from "./modules/payouts/payouts.module";
 import { ProductsModule } from "./modules/products/products.module";
+import { RefundsModule } from "./modules/refunds/refunds.module";
 import { SellersModule } from "./modules/sellers/sellers.module";
 import { SettingsModule } from "./modules/settings/settings.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
@@ -63,6 +67,10 @@ import { PrismaModule } from "./prisma/prisma.module";
     ProductsModule,
     CartModule,
     OrdersModule,
+    CommissionsModule,
+    LedgerModule,
+    PayoutsModule,
+    RefundsModule,
     AdminModule,
     AuthModule,
     HealthModule,

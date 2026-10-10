@@ -12,6 +12,7 @@ import { Prisma } from "../../generated/prisma/client";
 import type { OrderStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CommissionsService } from "../commissions/commissions.service";
+import { LedgerService } from "../ledger/ledger.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { SettingsService } from "../settings/settings.service";
 import { resolveDeliveryZone, type ResolvedDelivery } from "./delivery-zone.resolver";
@@ -55,6 +56,7 @@ export class OrdersService {
     private readonly commissions: CommissionsService,
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
+    private readonly ledger: LedgerService,
     private readonly events: EventEmitter2,
   ) {}
 
@@ -617,8 +619,8 @@ export class OrdersService {
       include: {
         items: true,
         payments: true,
-        order: { select: { id: true, customerId: true } },
-        shop: { include: { sellerProfile: { select: { userId: true } } } },
+        order: { select: { id: true, customerId: true, paymentMethod: true } },
+        shop: { include: { sellerProfile: { select: { id: true, userId: true } } } },
       },
     });
     if (!shopOrder) {
@@ -724,6 +726,17 @@ export class OrdersService {
             });
           }
         }
+        const isCod = shopOrder.order.paymentMethod === "COD";
+        await this.ledger.record(tx, {
+          sellerProfileId: shopOrder.shop.sellerProfile.id,
+          shopOrderId,
+          type: isCod ? "COD_COMMISSION_DUE" : "ORDER_EARNING",
+          amount: isCod ? shopOrder.commissionAmount.negated() : shopOrder.sellerNetAmount,
+          description: isCod
+            ? "COD commission due to platform"
+            : "Order earning (platform-collected payment)",
+          createdById: actorId,
+        });
         await this.recomputeOrderPaymentStatus(tx, shopOrder.order.id);
       }
     });

@@ -4,12 +4,16 @@ import type { PrismaService } from "../src/prisma/prisma.service";
 export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.auditLog.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.refund.deleteMany();
+  await prisma.ledgerEntry.deleteMany();
+  await prisma.payout.deleteMany();
   await prisma.cancellationRequest.deleteMany();
   await prisma.orderStatusHistory.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.shopOrder.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.commissionRule.deleteMany();
   await prisma.cartItem.deleteMany();
   await prisma.cart.deleteMany();
   await prisma.shopDeliveryZone.deleteMany();
