@@ -19,6 +19,13 @@ export interface SellerRejectedEvent {
   reason: string;
 }
 
+export interface ProductModeratedEvent {
+  productId: string;
+  userId: string;
+  productName: string;
+  status: "ACTIVE" | "REJECTED";
+}
+
 @Injectable()
 export class NotificationsListener {
   private readonly logger = new Logger(NotificationsListener.name);
@@ -55,6 +62,18 @@ export class NotificationsListener {
     await this.sendEmail(payload.userId, (name) =>
       buildSellerRejectedEmail({ name, reason: payload.reason }),
     );
+  }
+
+  @OnEvent("product.moderated", { async: true })
+  async handleProductModerated(payload: ProductModeratedEvent): Promise<void> {
+    const approved = payload.status === "ACTIVE";
+    await this.notifications.create({
+      userId: payload.userId,
+      type: approved ? "PRODUCT_APPROVED" : "PRODUCT_REJECTED",
+      title: approved ? "Product approved" : "Product rejected",
+      body: `"${payload.productName}" was ${approved ? "approved" : "rejected"}.`,
+      data: { productId: payload.productId },
+    });
   }
 
   private async sendEmail(

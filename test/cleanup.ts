@@ -8,6 +8,10 @@ export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.zoneDistrict.deleteMany();
   await prisma.sellerDocument.deleteMany();
   await prisma.sellerPayoutAccount.deleteMany();
+  await prisma.inventoryLog.deleteMany();
+  await prisma.productImage.deleteMany();
+  await prisma.productVariant.deleteMany();
+  await prisma.product.deleteMany();
   await prisma.shop.deleteMany();
   await prisma.sellerProfile.deleteMany();
   await prisma.refreshSession.deleteMany();
@@ -16,4 +20,6 @@ export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.user.deleteMany();
   await prisma.category.deleteMany();
   await prisma.district.deleteMany();
+  await prisma.banner.deleteMany();
+  await prisma.homepageSection.deleteMany();
 }

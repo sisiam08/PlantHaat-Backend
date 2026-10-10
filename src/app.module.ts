@@ -23,7 +23,9 @@ import { LocationsModule } from "./modules/locations/locations.module";
 import { MailModule } from "./modules/mail/mail.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
+import { ProductsModule } from "./modules/products/products.module";
 import { SellersModule } from "./modules/sellers/sellers.module";
+import { SettingsModule } from "./modules/settings/settings.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
 import { UsersModule } from "./modules/users/users.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -54,7 +56,9 @@ import { PrismaModule } from "./prisma/prisma.module";
     UsersModule,
     AddressesModule,
     NotificationsModule,
+    SettingsModule,
     SellersModule,
+    ProductsModule,
     AdminModule,
     AuthModule,
     HealthModule,
