@@ -74,6 +74,11 @@ export const envSchema = z.object({
 
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
+
+  REALTIME_PUBLIC_URL: z.string().min(1).default("http://localhost:5000"),
+  REALTIME_TICKET_TTL_SECONDS: z.coerce.number().int().positive().default(30),
+  REALTIME_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(900),
+  REALTIME_MAX_CONNECTIONS_PER_USER: z.coerce.number().int().positive().default(5),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === "production" && !value.BFF_SHARED_SECRET) {
     ctx.addIssue({

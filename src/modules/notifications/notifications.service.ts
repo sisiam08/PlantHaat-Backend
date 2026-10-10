@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { resolvePagination } from "../../common/dto/pagination-query.dto";
 import { AppException } from "../../common/errors/app.exception";
@@ -26,10 +27,13 @@ export interface AdminNotificationInput {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   async create(input: CreateNotificationInput): Promise<void> {
-    await this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId: input.userId,
         type: input.type,
@@ -37,6 +41,12 @@ export class NotificationsService {
         body: input.body,
         data: toInputJson(input.data),
       },
+    });
+    const unreadCount = await this.countUnread(input.userId);
+    this.events.emit("notification.created", {
+      userId: input.userId,
+      notification,
+      unreadCount,
     });
   }
 
@@ -48,18 +58,23 @@ export class NotificationsService {
     if (admins.length === 0) {
       return;
     }
+    const userIds = admins.map((admin) => admin.id);
     await this.prisma.notification.createMany({
-      data: admins.map((admin) => ({
-        userId: admin.id,
+      data: userIds.map((userId) => ({
+        userId,
         type: input.type,
         title: input.title,
         body: input.body,
         data: toInputJson(input.data),
       })),
     });
+    this.events.emit("notifications.bulk_created", { userIds });
   }
 
-  async list(userId: string, query: QueryNotificationsDto): Promise<PaginatedResult<unknown>> {
+  async list(
+    userId: string,
+    query: QueryNotificationsDto,
+  ): Promise<PaginatedResult<unknown>> {
     const { page, limit, skip } = resolvePagination(query);
     const where = {
       userId,
@@ -78,10 +93,7 @@ export class NotificationsService {
   }
 
   async unreadCount(userId: string): Promise<{ count: number }> {
-    const count = await this.prisma.notification.count({
-      where: { userId, readAt: null },
-    });
-    return { count };
+    return { count: await this.countUnread(userId) };
   }
 
   async markRead(userId: string, id: string): Promise<{ read: true }> {
@@ -96,6 +108,10 @@ export class NotificationsService {
       where: { id },
       data: { readAt: new Date() },
     });
+    this.events.emit("notification.read", {
+      userId,
+      unreadCount: await this.countUnread(userId),
+    });
     return { read: true };
   }
 
@@ -104,6 +120,11 @@ export class NotificationsService {
       where: { userId, readAt: null },
       data: { readAt: new Date() },
     });
+    this.events.emit("notification.read_all", { userId, unreadCount: 0 });
     return { updated: result.count };
+  }
+
+  private countUnread(userId: string): Promise<number> {
+    return this.prisma.notification.count({ where: { userId, readAt: null } });
   }
 }

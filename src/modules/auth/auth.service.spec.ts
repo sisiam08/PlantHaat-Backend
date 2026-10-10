@@ -1,4 +1,5 @@
 import { jest } from "@jest/globals";
+import type { EventEmitter2 } from "@nestjs/event-emitter";
 import type { JwtService } from "@nestjs/jwt";
 
 import { ErrorCode } from "../../common/errors/error-codes";
@@ -70,7 +71,8 @@ function createService(prisma: ReturnType<typeof createPrismaMock>): AuthService
     signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed-access-token"),
   } as unknown as JwtService;
   const mail = { queue: jest.fn() } as unknown as MailService;
-  return new AuthService(prisma as unknown as PrismaService, config, jwt, mail);
+  const events = { emit: jest.fn() } as unknown as EventEmitter2;
+  return new AuthService(prisma as unknown as PrismaService, config, jwt, mail, events);
 }
 
 describe("AuthService", () => {

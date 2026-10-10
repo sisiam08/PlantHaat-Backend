@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Injectable, Logger } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { JwtService } from "@nestjs/jwt";
 import { Cron, CronExpression } from "@nestjs/schedule";
 
@@ -81,6 +82,7 @@ export class AuthService {
     private readonly config: AppConfigService,
     private readonly jwt: JwtService,
     private readonly mail: MailService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<AuthResult> {
@@ -300,15 +302,20 @@ export class AuthService {
     }
     const session = await this.prisma.refreshSession.findUnique({
       where: { id: parsed.sessionId },
-      select: { familyId: true },
+      select: { familyId: true, userId: true },
     });
     if (session) {
       await this.revokeFamily(session.familyId, "LOGOUT");
+      this.events.emit("auth.session_revoked", {
+        userId: session.userId,
+        sid: parsed.sessionId,
+      });
     }
   }
 
   async logoutAll(userId: string): Promise<void> {
     await this.revokeAllSessions(userId, "LOGOUT_ALL");
+    this.events.emit("auth.session_revoked", { userId });
   }
 
   async listSessions(userId: string, currentSessionId: string): Promise<SessionSummary[]> {
@@ -338,6 +345,7 @@ export class AuthService {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Session not found");
     }
     await this.revokeSession(sessionId, "REVOKED_BY_USER");
+    this.events.emit("auth.session_revoked", { userId, sid: sessionId });
   }
 
   async verifyEmail(token: string): Promise<{ verified: true }> {
@@ -419,6 +427,7 @@ export class AuthService {
         data: { revokedAt: now, revokedReason: "PASSWORD_RESET" },
       }),
     ]);
+    this.events.emit("auth.session_revoked", { userId: record.userId });
     return { reset: true };
   }
 
@@ -446,6 +455,7 @@ export class AuthService {
         data: { revokedAt: new Date(), revokedReason: "PASSWORD_CHANGED" },
       }),
     ]);
+    this.events.emit("auth.session_revoked", { userId });
     return { changed: true };
   }
 

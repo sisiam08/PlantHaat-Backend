@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { resolvePagination } from "../../common/dto/pagination-query.dto";
 import { AppException } from "../../common/errors/app.exception";
@@ -29,6 +30,7 @@ export class AdminUsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async list(query: QueryUsersDto): Promise<PaginatedResult<unknown>> {
@@ -85,6 +87,7 @@ export class AdminUsersService {
       after: { status: "SUSPENDED" },
       ...meta,
     });
+    this.events.emit("user.suspended", { userId: id });
     return { id, status: "SUSPENDED" };
   }
 

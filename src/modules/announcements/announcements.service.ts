@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { resolvePagination } from "../../common/dto/pagination-query.dto";
 import { AppException } from "../../common/errors/app.exception";
@@ -17,6 +18,7 @@ export class AnnouncementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async list(query: QueryAnnouncementsDto): Promise<PaginatedResult<unknown>> {
@@ -99,6 +101,7 @@ export class AnnouncementsService {
         data: { announcementId: announcement.id },
       })),
     });
+    this.events.emit("notifications.bulk_created", { userIds: users.map((user) => user.id) });
   }
 
   private async getOrThrow(id: string) {

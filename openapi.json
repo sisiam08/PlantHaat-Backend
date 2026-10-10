@@ -3560,6 +3560,21 @@
         ]
       }
     },
+    "/api/v1/realtime/ticket": {
+      "post": {
+        "operationId": "RealtimeController_ticket",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Issue a one-time WebSocket connection ticket",
+        "tags": [
+          "Realtime"
+        ]
+      }
+    },
     "/api/v1/admin/banners": {
       "get": {
         "operationId": "AdminContentController_listBanners",

@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 import type { INestApplication } from "@nestjs/common";
+import { IoAdapter } from "@nestjs/platform-socket.io";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cookieParser from "cookie-parser";
 import express from "express";
@@ -15,6 +16,7 @@ export interface AppSetupOptions {
   cors?: boolean;
   swagger?: boolean;
   staticFiles?: boolean;
+  websockets?: boolean;
 }
 
 export function configureApp(
@@ -22,7 +24,17 @@ export function configureApp(
   config: AppConfigService,
   options: AppSetupOptions = {},
 ): void {
-  const { helmet: useHelmet = true, cors = true, swagger = true, staticFiles = true } = options;
+  const {
+    helmet: useHelmet = true,
+    cors = true,
+    swagger = true,
+    staticFiles = true,
+    websockets = true,
+  } = options;
+
+  if (websockets) {
+    app.useWebSocketAdapter(new IoAdapter(app));
+  }
 
   if (useHelmet) {
     app.use(helmet());

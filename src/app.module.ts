@@ -34,6 +34,7 @@ import { OrdersModule } from "./modules/orders/orders.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { PayoutsModule } from "./modules/payouts/payouts.module";
 import { ProductsModule } from "./modules/products/products.module";
+import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RefundsModule } from "./modules/refunds/refunds.module";
 import { ReviewsModule } from "./modules/reviews/reviews.module";
 import { SellersModule } from "./modules/sellers/sellers.module";
@@ -82,6 +83,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     WishlistModule,
     ReviewsModule,
     ComplaintsModule,
+    RealtimeModule,
     ContentModule,
     AnnouncementsModule,
     AnalyticsModule,
