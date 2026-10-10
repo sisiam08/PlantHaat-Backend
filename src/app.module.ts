@@ -14,12 +14,16 @@ import { ResponseEnvelopeInterceptor } from "./common/interceptors/response-enve
 import { AppConfigService } from "./config/app-config.service";
 import { AppConfigModule } from "./config/config.module";
 import { AddressesModule } from "./modules/addresses/addresses.module";
+import { AdminModule } from "./modules/admin/admin.module";
+import { AuditModule } from "./modules/audit/audit.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LocationsModule } from "./modules/locations/locations.module";
 import { MailModule } from "./modules/mail/mail.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
+import { SellersModule } from "./modules/sellers/sellers.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
 import { UsersModule } from "./modules/users/users.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -43,11 +47,15 @@ import { PrismaModule } from "./prisma/prisma.module";
       }),
     }),
     MailModule,
+    AuditModule,
     LocationsModule,
     CategoriesModule,
     UploadsModule,
     UsersModule,
     AddressesModule,
+    NotificationsModule,
+    SellersModule,
+    AdminModule,
     AuthModule,
     HealthModule,
     PaymentsModule,

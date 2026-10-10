@@ -9,6 +9,7 @@ import { configureApp } from "../src/app.setup";
 import { AppConfigService } from "../src/config/app-config.service";
 import { MailService } from "../src/modules/mail/mail.service";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { resetDatabase } from "./cleanup";
 
 const API = "/api/v1";
 
@@ -73,7 +74,7 @@ describe("Auth (e2e)", () => {
   });
 
   beforeEach(async () => {
-    await prisma.user.deleteMany();
+    await resetDatabase(prisma);
   });
 
   it("registers a customer, sets auth cookies and returns the current user", async () => {

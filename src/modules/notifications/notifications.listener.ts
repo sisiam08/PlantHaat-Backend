@@ -1,0 +1,72 @@
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+
+import { PrismaService } from "../../prisma/prisma.service";
+import { MailService } from "../mail/mail.service";
+import { buildSellerApprovedEmail, buildSellerRejectedEmail } from "../mail/mail.templates";
+import { NotificationsService } from "./notifications.service";
+
+export interface SellerApprovedEvent {
+  sellerProfileId: string;
+  userId: string;
+  businessName: string;
+}
+
+export interface SellerRejectedEvent {
+  sellerProfileId: string;
+  userId: string;
+  businessName: string;
+  reason: string;
+}
+
+@Injectable()
+export class NotificationsListener {
+  private readonly logger = new Logger(NotificationsListener.name);
+
+  constructor(
+    private readonly notifications: NotificationsService,
+    private readonly mail: MailService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @OnEvent("seller.approved", { async: true })
+  async handleSellerApproved(payload: SellerApprovedEvent): Promise<void> {
+    await this.notifications.create({
+      userId: payload.userId,
+      type: "SELLER_APPROVED",
+      title: "Seller application approved",
+      body: `Your seller application for "${payload.businessName}" has been approved.`,
+      data: { sellerProfileId: payload.sellerProfileId },
+    });
+    await this.sendEmail(payload.userId, (name) =>
+      buildSellerApprovedEmail({ name, shopName: payload.businessName }),
+    );
+  }
+
+  @OnEvent("seller.rejected", { async: true })
+  async handleSellerRejected(payload: SellerRejectedEvent): Promise<void> {
+    await this.notifications.create({
+      userId: payload.userId,
+      type: "SELLER_REJECTED",
+      title: "Seller application needs attention",
+      body: `Your seller application was rejected: ${payload.reason}`,
+      data: { sellerProfileId: payload.sellerProfileId },
+    });
+    await this.sendEmail(payload.userId, (name) =>
+      buildSellerRejectedEmail({ name, reason: payload.reason }),
+    );
+  }
+
+  private async sendEmail(
+    userId: string,
+    build: (name: string) => { subject: string; text: string },
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true },
+    });
+    if (user) {
+      this.mail.queue({ ...build(user.name), to: user.email });
+    }
+  }
+}

@@ -6,12 +6,7 @@ export const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"
 export type AllowedImageMime = (typeof ALLOWED_IMAGE_MIME_TYPES)[number];
 
 export function detectImageMime(buffer: Buffer): AllowedImageMime | undefined {
-  if (
-    buffer.length >= 3 &&
-    buffer[0] === 0xff &&
-    buffer[1] === 0xd8 &&
-    buffer[2] === 0xff
-  ) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return "image/jpeg";
   }
   if (

@@ -5,6 +5,12 @@ import { Inject, Injectable } from "@nestjs/common";
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import {
+  documentContentType,
+  documentExtension,
+  detectDocumentKind,
+  MAX_DOCUMENT_BYTES,
+} from "./document.util";
+import {
   ALLOWED_IMAGE_MIME_TYPES,
   detectImageMime,
   MAX_IMAGE_BYTES,
@@ -42,7 +48,10 @@ export class UploadsService {
     try {
       processed = await reencodeImage(file.buffer);
     } catch {
-      throw AppException.badRequest(ErrorCode.UPLOAD_INVALID_TYPE, "The image could not be processed");
+      throw AppException.badRequest(
+        ErrorCode.UPLOAD_INVALID_TYPE,
+        "The image could not be processed",
+      );
     }
 
     const key = `images/${purpose}/${ownerId}/${randomUUID()}.webp`;
@@ -52,5 +61,36 @@ export class UploadsService {
       contentType: "image/webp",
       visibility: "public",
     });
+  }
+
+  async uploadDocument(
+    file: Express.Multer.File | undefined,
+    ownerId: string,
+  ): Promise<{ key: string }> {
+    if (!file) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "A file is required");
+    }
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      throw AppException.badRequest(
+        ErrorCode.UPLOAD_TOO_LARGE,
+        "Document must be 10 MB or smaller",
+      );
+    }
+    const kind = detectDocumentKind(file.buffer);
+    if (!kind) {
+      throw AppException.badRequest(
+        ErrorCode.UPLOAD_INVALID_TYPE,
+        "Only PDF, JPEG, PNG and WebP documents are allowed",
+      );
+    }
+
+    const key = `documents/${ownerId}/${randomUUID()}.${documentExtension(kind)}`;
+    await this.storage.put({
+      key,
+      buffer: file.buffer,
+      contentType: documentContentType(kind),
+      visibility: "private",
+    });
+    return { key };
   }
 }

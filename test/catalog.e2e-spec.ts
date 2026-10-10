@@ -8,6 +8,7 @@ import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { AppConfigService } from "../src/config/app-config.service";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { resetDatabase } from "./cleanup";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
@@ -51,10 +52,7 @@ describe("Catalog & addresses (e2e)", () => {
   });
 
   beforeEach(async () => {
-    await prisma.address.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.district.deleteMany();
+    await resetDatabase(prisma);
   });
 
   it("serves the district list", async () => {
