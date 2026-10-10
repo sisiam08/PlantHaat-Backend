@@ -21,3 +21,24 @@ tmp/
 .env.*
 !.env.example
 !.env.test.example
+
+# ── Editor / OS noise ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ── AI-tool / agent folders (tooling, not part of the product) ──────
+.agents/
+skills-lock.json
+.claude/
+.cursor/
+.cline/
+.codex/
+.windsurf/
+.opencode/
+.gemini/
+.aider*
+.continue/
