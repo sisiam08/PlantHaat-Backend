@@ -1518,6 +1518,30 @@
         ]
       }
     },
+    "/api/v1/products/{id}/view": {
+      "post": {
+        "operationId": "PublicProductsController_recordView",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Record a product view (deduplicated per IP, 30-minute window)",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
     "/api/v1/shops": {
       "get": {
         "operationId": "PublicProductsController_listShops",

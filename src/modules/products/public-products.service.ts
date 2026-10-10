@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 
 import { resolvePagination } from "../../common/dto/pagination-query.dto";
 import { AppException } from "../../common/errors/app.exception";
@@ -26,8 +26,6 @@ const LIST_ITEM_INCLUDE = {
 
 @Injectable()
 export class PublicProductsService {
-  private readonly logger = new Logger(PublicProductsService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   async list(query: QueryProductsDto, shopId?: string): Promise<PaginatedResult<unknown>> {
@@ -92,12 +90,8 @@ export class PublicProductsService {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Product not found");
     }
 
-    void this.prisma.product
-      .update({ where: { id: product.id }, data: { viewCount: { increment: 1 } } })
-      .catch((error: unknown) => {
-        this.logger.warn(`Failed to increment viewCount for ${product.id}: ${String(error)}`);
-      });
-
+    // View counting moved to POST /products/:id/view (deduped per IP+window) so
+    // cached/prerendered pages do not inflate counts.
     return product;
   }
 

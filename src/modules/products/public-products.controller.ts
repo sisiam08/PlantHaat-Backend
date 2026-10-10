@@ -1,5 +1,7 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
+import type { Request } from "express";
 
 import { PaginationQueryDto } from "../../common/dto/pagination-query.dto";
 import { Public } from "../../common/decorators/public.decorator";
@@ -11,12 +13,16 @@ import { HomeResponseDto } from "./dto/home-response.dto";
 import { ProductDetailDto, ProductListItemDto } from "./dto/product-response.dto";
 import { QueryProductsDto } from "./dto/query-products.dto";
 import { ShopDetailDto, ShopListItemDto } from "./dto/shop-response.dto";
+import { ProductViewsService } from "./product-views.service";
 import { PublicProductsService } from "./public-products.service";
 
 @ApiTags("Catalog")
 @Controller()
 export class PublicProductsController {
-  constructor(private readonly products: PublicProductsService) {}
+  constructor(
+    private readonly products: PublicProductsService,
+    private readonly views: ProductViewsService,
+  ) {}
 
   @Public()
   @Get("products")
@@ -32,6 +38,15 @@ export class PublicProductsController {
   @ApiEnvelopeResponse(ProductDetailDto)
   get(@Param("slug") slug: string) {
     return this.products.getBySlug(slug);
+  }
+
+  @Public()
+  @Post("products/:id/view")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 60, ttl: 60 * 1000 } })
+  @ApiOperation({ summary: "Record a product view (deduplicated per IP, 30-minute window)" })
+  recordView(@Param("id") id: string, @Req() request: Request): void {
+    this.views.record(id, (request as Request & { clientIp?: string }).clientIp);
   }
 
   @Public()

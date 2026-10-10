@@ -205,6 +205,29 @@ describe("Products (e2e)", () => {
     expect(listed.body.data.some((p: { slug: string }) => p.slug === slug)).toBe(false);
   });
 
+  it("counts at most one product view per IP within the window", async () => {
+    const seller = await approvedSeller();
+    const { productId } = await createActiveProduct(seller.agent);
+
+    await request(server).post(`${API}/products/${productId}/view`).expect(204);
+    await request(server).post(`${API}/products/${productId}/view`).expect(204);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+    expect(product.viewCount).toBe(1);
+  });
+
+  it("does not increment viewCount on GET /products/:slug", async () => {
+    const seller = await approvedSeller();
+    const { productId, slug } = await createActiveProduct(seller.agent);
+
+    await request(server).get(`${API}/products/${slug}`).expect(200);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+    expect(product.viewCount).toBe(0);
+  });
+
   it("does not expose another seller's product", async () => {
     const first = await approvedSeller();
     const { productId } = await createActiveProduct(first.agent);
