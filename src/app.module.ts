@@ -13,10 +13,14 @@ import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { ResponseEnvelopeInterceptor } from "./common/interceptors/response-envelope.interceptor";
 import { AppConfigService } from "./config/app-config.service";
 import { AppConfigModule } from "./config/config.module";
+import { AddressesModule } from "./modules/addresses/addresses.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { CategoriesModule } from "./modules/categories/categories.module";
 import { HealthModule } from "./modules/health/health.module";
+import { LocationsModule } from "./modules/locations/locations.module";
 import { MailModule } from "./modules/mail/mail.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
+import { UploadsModule } from "./modules/uploads/uploads.module";
 import { UsersModule } from "./modules/users/users.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
@@ -39,7 +43,11 @@ import { PrismaModule } from "./prisma/prisma.module";
       }),
     }),
     MailModule,
+    LocationsModule,
+    CategoriesModule,
+    UploadsModule,
     UsersModule,
+    AddressesModule,
     AuthModule,
     HealthModule,
     PaymentsModule,

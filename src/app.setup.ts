@@ -1,6 +1,10 @@
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
+
 import type { INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cookieParser from "cookie-parser";
+import express from "express";
 import helmet from "helmet";
 
 import type { AppConfigService } from "./config/app-config.service";
@@ -9,6 +13,7 @@ export interface AppSetupOptions {
   helmet?: boolean;
   cors?: boolean;
   swagger?: boolean;
+  staticFiles?: boolean;
 }
 
 export function configureApp(
@@ -16,12 +21,18 @@ export function configureApp(
   config: AppConfigService,
   options: AppSetupOptions = {},
 ): void {
-  const { helmet: useHelmet = true, cors = true, swagger = true } = options;
+  const { helmet: useHelmet = true, cors = true, swagger = true, staticFiles = true } = options;
 
   if (useHelmet) {
     app.use(helmet());
   }
   app.use(cookieParser());
+
+  if (staticFiles) {
+    const publicDir = resolve(process.cwd(), config.values.UPLOAD_DIR, "public");
+    mkdirSync(publicDir, { recursive: true });
+    app.use("/uploads", express.static(publicDir, { index: false }));
+  }
 
   if (cors) {
     app.enableCors({

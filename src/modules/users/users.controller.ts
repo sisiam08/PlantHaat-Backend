@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Patch } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, Patch, Post, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { MAX_IMAGE_BYTES } from "../uploads/image.util";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { UsersService } from "./users.service";
 
@@ -20,5 +22,23 @@ export class UsersController {
   @ApiOperation({ summary: "Update the current user's profile" })
   updateMe(@CurrentUser("id") userId: string, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, dto);
+  }
+
+  @Post("me/avatar")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_IMAGE_BYTES } }))
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: { file: { type: "string", format: "binary" } },
+      required: ["file"],
+    },
+  })
+  @ApiOperation({ summary: "Upload/replace the current user's avatar" })
+  uploadAvatar(
+    @CurrentUser("id") userId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    return this.usersService.updateAvatar(userId, file);
   }
 }

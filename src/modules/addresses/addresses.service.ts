@@ -1,0 +1,137 @@
+import { Injectable } from "@nestjs/common";
+
+import { AppException } from "../../common/errors/app.exception";
+import { ErrorCode } from "../../common/errors/error-codes";
+import { normalizeBdPhone } from "../../common/utils/phone";
+import { Prisma, type PrismaClient } from "../../generated/prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { toAddressView, type AddressView } from "./address.mapper";
+import type { CreateAddressDto } from "./dto/create-address.dto";
+import type { UpdateAddressDto } from "./dto/update-address.dto";
+
+const ADDRESS_INCLUDE = {
+  district: { select: { id: true, name: true, nameBn: true, division: true } },
+} satisfies Prisma.AddressInclude;
+
+@Injectable()
+export class AddressesService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async list(userId: string): Promise<AddressView[]> {
+    const addresses = await this.prisma.address.findMany({
+      where: { userId },
+      include: ADDRESS_INCLUDE,
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+    });
+    return addresses.map(toAddressView);
+  }
+
+  async create(userId: string, dto: CreateAddressDto): Promise<AddressView> {
+    await this.assertDistrict(dto.districtId);
+    const count = await this.prisma.address.count({ where: { userId } });
+    const isDefault = dto.isDefault ?? count === 0;
+
+    const address = await this.prisma.$transaction(async (tx) => {
+      if (isDefault) {
+        await this.clearDefault(tx, userId);
+      }
+      return tx.address.create({
+        data: {
+          userId,
+          label: dto.label ?? null,
+          recipientName: dto.recipientName.trim(),
+          phone: this.normalizePhone(dto.phone),
+          districtId: dto.districtId,
+          area: dto.area.trim(),
+          addressLine: dto.addressLine.trim(),
+          postalCode: dto.postalCode ?? null,
+          isDefault,
+        },
+        include: ADDRESS_INCLUDE,
+      });
+    });
+    return toAddressView(address);
+  }
+
+  async update(userId: string, id: string, dto: UpdateAddressDto): Promise<AddressView> {
+    await this.assertOwned(userId, id);
+    if (dto.districtId !== undefined) {
+      await this.assertDistrict(dto.districtId);
+    }
+
+    const data: Prisma.AddressUpdateInput = {};
+    if (dto.label !== undefined) data.label = dto.label;
+    if (dto.recipientName !== undefined) data.recipientName = dto.recipientName.trim();
+    if (dto.phone !== undefined) data.phone = this.normalizePhone(dto.phone);
+    if (dto.districtId !== undefined) data.district = { connect: { id: dto.districtId } };
+    if (dto.area !== undefined) data.area = dto.area.trim();
+    if (dto.addressLine !== undefined) data.addressLine = dto.addressLine.trim();
+    if (dto.postalCode !== undefined) data.postalCode = dto.postalCode;
+    if (dto.isDefault !== undefined) data.isDefault = dto.isDefault;
+
+    const address = await this.prisma.$transaction(async (tx) => {
+      if (dto.isDefault === true) {
+        await this.clearDefault(tx, userId, id);
+      }
+      return tx.address.update({ where: { id }, data, include: ADDRESS_INCLUDE });
+    });
+    return toAddressView(address);
+  }
+
+  async remove(userId: string, id: string): Promise<void> {
+    await this.assertOwned(userId, id);
+    await this.prisma.address.delete({ where: { id } });
+  }
+
+  async setDefault(userId: string, id: string): Promise<AddressView> {
+    await this.assertOwned(userId, id);
+    await this.prisma.$transaction(async (tx) => {
+      await this.clearDefault(tx, userId, id);
+      await tx.address.update({ where: { id }, data: { isDefault: true } });
+    });
+    const address = await this.prisma.address.findUniqueOrThrow({
+      where: { id },
+      include: ADDRESS_INCLUDE,
+    });
+    return toAddressView(address);
+  }
+
+  private clearDefault(
+    client: Prisma.TransactionClient | PrismaClient,
+    userId: string,
+    exceptId?: string,
+  ): Promise<{ count: number }> {
+    return client.address.updateMany({
+      where: { userId, isDefault: true, ...(exceptId ? { id: { not: exceptId } } : {}) },
+      data: { isDefault: false },
+    });
+  }
+
+  private async assertOwned(userId: string, id: string): Promise<void> {
+    const address = await this.prisma.address.findFirst({
+      where: { id, userId },
+      select: { id: true },
+    });
+    if (!address) {
+      throw AppException.notFound(ErrorCode.ADDRESS_NOT_FOUND, "Address not found");
+    }
+  }
+
+  private async assertDistrict(districtId: number): Promise<void> {
+    const district = await this.prisma.district.findUnique({
+      where: { id: districtId },
+      select: { id: true },
+    });
+    if (!district) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Unknown district");
+    }
+  }
+
+  private normalizePhone(phone: string): string {
+    try {
+      return normalizeBdPhone(phone);
+    } catch {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Invalid phone number");
+    }
+  }
+}

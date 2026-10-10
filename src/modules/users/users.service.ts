@@ -5,6 +5,8 @@ import { ErrorCode } from "../../common/errors/error-codes";
 import { normalizeBdPhone } from "../../common/utils/phone";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { UploadPurpose } from "../uploads/dto/upload-image.dto";
+import { UploadsService } from "../uploads/uploads.service";
 import type { UpdateProfileDto } from "./dto/update-profile.dto";
 import { toPublicUser, type PublicUser } from "./user.mapper";
 
@@ -29,7 +31,10 @@ const USER_PROFILE_SELECT = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploads: UploadsService,
+  ) {}
 
   async getProfile(userId: string): Promise<PublicUser> {
     const user = await this.prisma.user.findFirst({
@@ -66,6 +71,15 @@ export class UsersService {
     }
 
     await this.prisma.user.update({ where: { id: userId }, data });
+    return this.getProfile(userId);
+  }
+
+  async updateAvatar(userId: string, file: Express.Multer.File | undefined): Promise<PublicUser> {
+    const stored = await this.uploads.uploadImage(file, UploadPurpose.AVATAR, userId);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: stored.url },
+    });
     return this.getProfile(userId);
   }
 }

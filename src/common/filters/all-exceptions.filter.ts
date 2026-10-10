@@ -123,6 +123,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
     }
 
+    if (exception instanceof Error && exception.name === "MulterError") {
+      const multerCode = (exception as { code?: string }).code;
+      return multerCode === "LIMIT_FILE_SIZE"
+        ? {
+            status: HttpStatus.BAD_REQUEST,
+            code: ErrorCode.UPLOAD_TOO_LARGE,
+            message: "Uploaded file is too large",
+          }
+        : {
+            status: HttpStatus.BAD_REQUEST,
+            code: ErrorCode.UPLOAD_INVALID_TYPE,
+            message: "Invalid upload",
+          };
+    }
+
     if (exception instanceof HttpException) {
       return this.resolveHttpException(exception);
     }

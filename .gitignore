@@ -9,8 +9,9 @@ coverage/
 src/generated/
 
 # ── Local runtime data (uploads, logs) ──────────────────────────────
-uploads/
-private-uploads/
+/uploads/
+/uploads-test/
+/private-uploads/
 *.log
 logs/
 tmp/

@@ -6,7 +6,7 @@
     "outDir": "dist",
     "sourceMap": true,
     "declaration": false,
-    "types": ["node"]
+    "types": ["node", "multer"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts", "node_modules", "dist", "test"]

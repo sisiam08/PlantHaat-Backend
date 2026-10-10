@@ -15,7 +15,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "noEmit": true,
-    "types": ["node", "jest"]
+    "types": ["node", "jest", "multer"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "prisma/**/*.ts", "scripts/**/*.ts"]
 }
