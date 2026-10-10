@@ -15,11 +15,20 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { SellerApprovedGuard } from "../../common/guards/seller-approved.guard";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
 import { Role } from "../../generated/prisma/enums";
 import { AdjustStockDto } from "./dto/adjust-stock.dto";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { CreateVariantDto } from "./dto/create-variant.dto";
 import { CreateProductImageDto, UpdateProductImageDto } from "./dto/product-image.dto";
+import {
+  SellerProductDetailDto,
+  SellerProductListItemDto,
+  VariantStockDto,
+} from "./dto/seller-product-response.dto";
 import { SetProductStatusDto } from "./dto/set-product-status.dto";
 import { UpdateProductDto } from "./dto/update-product.dto";
 import { UpdateVariantDto } from "./dto/update-variant.dto";
@@ -34,24 +43,28 @@ export class SellerProductsController {
 
   @Get("products")
   @ApiOperation({ summary: "List the seller's products" })
+  @ApiPaginatedResponse(SellerProductListItemDto)
   list(@CurrentUser("id") userId: string) {
     return this.productsService.list(userId);
   }
 
   @Post("products")
   @ApiOperation({ summary: "Create a product (starts as DRAFT)" })
+  @ApiEnvelopeResponse(SellerProductDetailDto, { status: 201 })
   create(@CurrentUser("id") userId: string, @Body() dto: CreateProductDto) {
     return this.productsService.create(userId, dto);
   }
 
   @Get("products/:id")
   @ApiOperation({ summary: "Get one of the seller's products" })
+  @ApiEnvelopeResponse(SellerProductDetailDto)
   get(@CurrentUser("id") userId: string, @Param("id") id: string) {
     return this.productsService.get(userId, id);
   }
 
   @Patch("products/:id")
   @ApiOperation({ summary: "Update a product" })
+  @ApiEnvelopeResponse(SellerProductDetailDto)
   update(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,
@@ -70,6 +83,7 @@ export class SellerProductsController {
   @Post("products/:id/status")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Activate/submit or deactivate a product" })
+  @ApiEnvelopeResponse(SellerProductDetailDto)
   setStatus(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,
@@ -80,6 +94,7 @@ export class SellerProductsController {
 
   @Post("products/:id/variants")
   @ApiOperation({ summary: "Add a variant" })
+  @ApiEnvelopeResponse(SellerProductDetailDto, { status: 201 })
   addVariant(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,
@@ -90,6 +105,7 @@ export class SellerProductsController {
 
   @Patch("products/:id/variants/:variantId")
   @ApiOperation({ summary: "Update a variant" })
+  @ApiEnvelopeResponse(SellerProductDetailDto)
   updateVariant(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,
@@ -113,6 +129,7 @@ export class SellerProductsController {
   @Post("variants/:variantId/stock")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Adjust stock (delta or set) and log the change" })
+  @ApiEnvelopeResponse(VariantStockDto)
   adjustStock(
     @CurrentUser("id") userId: string,
     @Param("variantId") variantId: string,
@@ -123,6 +140,7 @@ export class SellerProductsController {
 
   @Post("products/:id/images")
   @ApiOperation({ summary: "Add a product image" })
+  @ApiEnvelopeResponse(SellerProductDetailDto, { status: 201 })
   addImage(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,
@@ -133,6 +151,7 @@ export class SellerProductsController {
 
   @Patch("products/:id/images/:imageId")
   @ApiOperation({ summary: "Update a product image" })
+  @ApiEnvelopeResponse(SellerProductDetailDto)
   updateImage(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,
@@ -145,6 +164,7 @@ export class SellerProductsController {
   @Delete("products/:id/images/:imageId")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Delete a product image" })
+  @ApiEnvelopeResponse(SellerProductDetailDto)
   deleteImage(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,

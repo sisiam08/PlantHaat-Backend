@@ -7,6 +7,7 @@ import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorator
 import { Role } from "../../generated/prisma/enums";
 import { AnalyticsService } from "./analytics.service";
 import {
+  AdminAnalyticsOverviewDto,
   AnalyticsOverviewDto,
   SellerDashboardDto,
 } from "./dto/analytics-response.dto";
@@ -41,7 +42,7 @@ export class AdminAnalyticsController {
 
   @Get("overview")
   @ApiOperation({ summary: "Admin analytics overview" })
-  @ApiEnvelopeResponse(AnalyticsOverviewDto)
+  @ApiEnvelopeResponse(AdminAnalyticsOverviewDto)
   overview(@Query() query: AnalyticsRangeDto) {
     return this.analytics.adminOverview(query);
   }
