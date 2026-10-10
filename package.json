@@ -4,7 +4,7 @@
   "packageManager": "npm@11.17.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "node scripts/dev.mjs",
     "build": "tsc -p tsconfig.build.json",
     "start": "node --import tsx dist/main.js",
     "typecheck": "tsc --noEmit",
@@ -21,7 +21,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "docs:export": "tsx scripts/export-openapi.ts",
+    "db:seed:demo": "tsx ./prisma/seed-demo.ts",
+    "docs:export": "npm run build && node --import tsx dist/openapi.export.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {

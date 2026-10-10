@@ -6,10 +6,13 @@ import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
-import { AppModule } from "../src/app.module";
+import { AppModule } from "./app.module";
 
 async function exportOpenApi(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { logger: false });
+  const app = await NestFactory.create(AppModule, {
+    logger: ["error", "warn"],
+    abortOnError: false,
+  });
   app.setGlobalPrefix("api/v1");
 
   const documentConfig = new DocumentBuilder()
@@ -28,5 +31,5 @@ async function exportOpenApi(): Promise<void> {
 
 exportOpenApi().catch((error: unknown) => {
   new Logger("OpenAPI").error("Failed to export OpenAPI document", error as Error);
-  process.exit(1);
+  process.exitCode = 1;
 });

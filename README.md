@@ -11,10 +11,15 @@ for the working rules, progress log and decisions.
 - JWT auth in httpOnly cookies (access + rotating refresh token)
 - Jest + supertest
 
-> The app and its generated Prisma client are ESM. Source is run through `tsx`
-> (the generated client uses `import.meta` and extensionless relative imports,
-> so `node dist/main.js` cannot resolve modules directly — `npm start` loads the
-> `tsx` ESM loader via `node --import tsx`).
+> The app and its generated Prisma client are ESM. The generated client uses
+> `import.meta` and extensionless relative imports, so plain `node dist/main.js`
+> cannot resolve modules — every runtime command loads the `tsx` ESM loader via
+> `node --import tsx`.
+>
+> `tsx` on the TypeScript source is **not** used for running the app: esbuild
+> (tsx's transpiler) does not emit NestJS decorator metadata correctly here, so
+> `npm run dev` compiles with `tsc --watch` and runs the emitted `dist/` with
+> `node --watch`. This keeps DI working exactly as in production.
 
 ## Requirements
 
@@ -41,7 +46,7 @@ openssl rand -base64 32   # DATA_ENCRYPTION_KEY (must decode to 32 bytes)
 
 | Script | Description |
 |---|---|
-| `npm run dev` | Start the API in watch mode (`tsx watch`) |
+| `npm run dev` | Start the API in watch mode (`tsc --watch` + `node --watch` on `dist/`) |
 | `npm run build` | Type-check and emit `dist/` (`tsc -p tsconfig.build.json`) |
 | `npm start` | Run the built app (`node --import tsx dist/main.js`) |
 | `npm run typecheck` | `tsc --noEmit` |
@@ -52,8 +57,9 @@ openssl rand -base64 32   # DATA_ENCRYPTION_KEY (must decode to 32 bytes)
 | `npm run db:generate` | `prisma generate` |
 | `npm run db:migrate` | `prisma migrate dev` |
 | `npm run db:deploy` | `prisma migrate deploy` |
-| `npm run db:seed` | Seed the database |
-| `npm run docs:export` | Write the OpenAPI document to `openapi.json` |
+| `npm run db:seed` | Seed the database (districts, categories, admin, settings) |
+| `npm run db:seed:demo` | Dev-only demo data (3 sellers, 40 plants, 5 customers, a sample order) |
+| `npm run docs:export` | Build and write the OpenAPI document to `openapi.json` |
 
 ## Environment
 
