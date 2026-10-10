@@ -20,6 +20,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { CartModule } from "./modules/cart/cart.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommissionsModule } from "./modules/commissions/commissions.module";
+import { ComplaintsModule } from "./modules/complaints/complaints.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { LocationsModule } from "./modules/locations/locations.module";
@@ -30,10 +31,12 @@ import { PaymentsModule } from "./modules/payments/payments.module";
 import { PayoutsModule } from "./modules/payouts/payouts.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { RefundsModule } from "./modules/refunds/refunds.module";
+import { ReviewsModule } from "./modules/reviews/reviews.module";
 import { SellersModule } from "./modules/sellers/sellers.module";
 import { SettingsModule } from "./modules/settings/settings.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
 import { UsersModule } from "./modules/users/users.module";
+import { WishlistModule } from "./modules/wishlist/wishlist.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
@@ -71,6 +74,9 @@ import { PrismaModule } from "./prisma/prisma.module";
     LedgerModule,
     PayoutsModule,
     RefundsModule,
+    WishlistModule,
+    ReviewsModule,
+    ComplaintsModule,
     AdminModule,
     AuthModule,
     HealthModule,
