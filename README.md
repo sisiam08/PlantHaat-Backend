@@ -1,0 +1,87 @@
+# PlantHaat Backend
+
+NestJS + Prisma API for PlantHaat, a multi-vendor online plant marketplace for
+Bangladesh. See `../BACKEND_DESIGN.md` for the full design and `../AI_CONTEXT.md`
+for the working rules, progress log and decisions.
+
+## Stack
+
+- NestJS 11 (TypeScript, strict) — ESM
+- PostgreSQL + Prisma 7 (`prisma-client` generator, driver adapter `@prisma/adapter-pg`)
+- JWT auth in httpOnly cookies (access + rotating refresh token)
+- Jest + supertest
+
+> The app and its generated Prisma client are ESM. Source is run through `tsx`
+> (the generated client uses `import.meta` and extensionless relative imports,
+> so `node dist/main.js` cannot resolve modules directly — `npm start` loads the
+> `tsx` ESM loader via `node --import tsx`).
+
+## Requirements
+
+- Node.js LTS (tested with Node 24) and npm
+- A PostgreSQL database (the local `.env` points at the developer's database)
+
+## Setup
+
+```bash
+npm install            # also runs `prisma generate` (postinstall)
+cp .env.example .env   # then fill in real values (never commit .env)
+npm run db:deploy      # apply committed migrations
+npm run db:seed        # districts, categories, settings, admin, global commission
+```
+
+Generate secrets locally:
+
+```bash
+openssl rand -base64 48   # JWT_ACCESS_SECRET
+openssl rand -base64 32   # DATA_ENCRYPTION_KEY (must decode to 32 bytes)
+```
+
+## Scripts
+
+| Script | Description |
+|---|---|
+| `npm run dev` | Start the API in watch mode (`tsx watch`) |
+| `npm run build` | Type-check and emit `dist/` (`tsc -p tsconfig.build.json`) |
+| `npm start` | Run the built app (`node --import tsx dist/main.js`) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` / `lint:fix` | ESLint (flat config) |
+| `npm run format` / `format:check` | Prettier |
+| `npm test` | Unit tests (Jest, ESM) |
+| `npm run test:e2e` | E2E tests (separate test database) |
+| `npm run db:generate` | `prisma generate` |
+| `npm run db:migrate` | `prisma migrate dev` |
+| `npm run db:deploy` | `prisma migrate deploy` |
+| `npm run db:seed` | Seed the database |
+| `npm run docs:export` | Write the OpenAPI document to `openapi.json` |
+
+## Environment
+
+All variables are listed in `.env.example` and validated at boot with a `zod`
+schema (`src/config/`). The app fails fast with a readable message if any
+required variable is missing or invalid. Tests use a separate `.env.test`
+(see `.env.test.example`) pointing at a **separate** database.
+
+## Database
+
+- Schema: `prisma/schema.prisma` (authoritative data model — do not diverge).
+- Migrations: `prisma/migrations/` (committed; never edit an applied migration).
+- The `20261010043000_custom_constraints` migration adds what Prisma cannot
+  express: the `pg_trgm` extension + GIN trigram indexes on `Product`, `CHECK`
+  constraints (stock/price/quantity/rating) and partial unique indexes (one
+  default address per user, one pending cancellation request per shop order).
+
+## API
+
+- Base path: `/api/v1`
+- Swagger UI: `/api/docs` (enabled when `ENABLE_SWAGGER=true`, disabled in
+  production unless explicitly enabled)
+- Ops: `GET /api/v1/health`, `GET /api/v1/health/ready`
+- Success envelope: `{ "success": true, "data": ..., "meta"? }`
+- Error envelope: `{ "success": false, "statusCode", "error": { "code", "message", "details"? }, "path", "timestamp" }`
+
+## Out of scope in v1 (by design)
+
+Online payment gateways and messaging are **schema-only**. See
+`src/modules/payments` (`PaymentProvider` interface) and
+`src/modules/messaging/README.md`.

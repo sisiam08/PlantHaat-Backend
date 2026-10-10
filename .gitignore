@@ -1,0 +1,22 @@
+# ── Node / Nest build output ────────────────────────────────────────
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# ── Prisma generated client (regenerate with `prisma generate`) ─────
+src/generated/
+
+# ── Local runtime data (uploads, logs) ──────────────────────────────
+uploads/
+private-uploads/
+*.log
+logs/
+tmp/
+
+# ── Env (commit only the examples) ──────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.test.example
