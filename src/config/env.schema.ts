@@ -87,6 +87,25 @@ export const envSchema = z.object({
       message: "BFF_SHARED_SECRET is required when NODE_ENV=production",
     });
   }
+  if (value.STORAGE_DRIVER === "s3") {
+    const required = ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const;
+    for (const key of required) {
+      if (!value[key]) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required when STORAGE_DRIVER=s3`,
+        });
+      }
+    }
+    if (!value.S3_REGION && !value.S3_ENDPOINT) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["S3_REGION"],
+        message: "S3_REGION or S3_ENDPOINT is required when STORAGE_DRIVER=s3",
+      });
+    }
+  }
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

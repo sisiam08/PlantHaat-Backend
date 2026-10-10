@@ -207,6 +207,49 @@ describe("Checkout & orders (e2e)", () => {
     expect(await prisma.order.count()).toBe(1);
   });
 
+  it("exposes payments to admins (list + detail)", async () => {
+    const shop = await createShopWithProduct(500, 3);
+    const customer = await createCustomer();
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shop.variant.id, quantity: 1 })
+      .expect(200);
+    const order = await customer.agent
+      .post(`${API}/checkout`)
+      .set("Origin", ORIGIN)
+      .set("Idempotency-Key", randomUUID())
+      .send({ addressId: customer.addressId })
+      .expect(200);
+    const orderNumber = order.body.data.orderNumber as string;
+
+    const adminEmail = `admin_${suffix()}@example.com`;
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        name: "Admin",
+        passwordHash: await hashPassword("AdminStr0ng1"),
+        role: "ADMIN",
+        emailVerifiedAt: new Date(),
+      },
+    });
+    const admin = request.agent(server);
+    await admin
+      .post(`${API}/auth/login`)
+      .send({ email: adminEmail, password: "AdminStr0ng1" })
+      .expect(200);
+
+    const list = await admin.get(`${API}/admin/payments?order=${orderNumber}`).expect(200);
+    expect(list.body.data).toHaveLength(1);
+    expect(list.body.data[0].orderNumber).toBe(orderNumber);
+    expect(list.body.data[0].method).toBe("COD");
+
+    const one = await admin
+      .get(`${API}/admin/payments/${list.body.data[0].id}`)
+      .expect(200);
+    expect(one.body.data.shopOrderNumber).not.toBeNull();
+  });
+
   it("lets exactly one of two concurrent buyers win the last unit", async () => {
     const shop = await createShopWithProduct(300, 1);
     const buyerA = await createCustomer();

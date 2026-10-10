@@ -3,6 +3,8 @@ import { Module } from "@nestjs/common";
 import { AdminAuditController } from "./admin-audit.controller";
 import { AdminCategoriesController } from "./admin-categories.controller";
 import { AdminCategoriesService } from "./admin-categories.service";
+import { AdminPaymentsController } from "./admin-payments.controller";
+import { AdminPaymentsService } from "./admin-payments.service";
 import { AdminProductsController } from "./admin-products.controller";
 import { AdminProductsService } from "./admin-products.service";
 import { AdminSellersController } from "./admin-sellers.controller";
@@ -19,6 +21,7 @@ import { AdminUsersService } from "./admin-users.service";
     AdminShopsController,
     AdminProductsController,
     AdminCategoriesController,
+    AdminPaymentsController,
     AdminAuditController,
   ],
   providers: [
@@ -27,6 +30,7 @@ import { AdminUsersService } from "./admin-users.service";
     AdminShopsService,
     AdminProductsService,
     AdminCategoriesService,
+    AdminPaymentsService,
   ],
 })
 export class AdminModule {}

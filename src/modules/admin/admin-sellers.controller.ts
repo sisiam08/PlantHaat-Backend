@@ -80,7 +80,13 @@ export class AdminSellersController {
     @Param("docId") docId: string,
     @Res() response: Response,
   ) {
-    const filePath = await this.adminSellers.getDocumentPath(id, docId);
-    response.sendFile(filePath);
+    const location = await this.adminSellers.getDocumentPath(id, docId);
+    // Local driver returns an absolute path (streamed); an S3-compatible driver
+    // returns a short-lived presigned URL (redirected to).
+    if (/^https?:\/\//.test(location)) {
+      response.redirect(location);
+      return;
+    }
+    response.sendFile(location);
   }
 }

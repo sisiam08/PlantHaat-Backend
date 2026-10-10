@@ -4678,6 +4678,122 @@
         ]
       }
     },
+    "/api/v1/admin/payments": {
+      "get": {
+        "operationId": "AdminPaymentsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PAID",
+                "FAILED",
+                "CANCELLED",
+                "REFUNDED",
+                "PARTIALLY_REFUNDED"
+              ]
+            }
+          },
+          {
+            "name": "method",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COD",
+                "PIPRAPAY",
+                "BKASH",
+                "NAGAD",
+                "CARD",
+                "BANK_TRANSFER"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "Order id or order number",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List payments (filters: status, method, order, from, to)",
+        "tags": [
+          "Admin: payments"
+        ]
+      }
+    },
+    "/api/v1/admin/payments/{id}": {
+      "get": {
+        "operationId": "AdminPaymentsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a payment",
+        "tags": [
+          "Admin: payments"
+        ]
+      }
+    },
     "/api/v1/admin/audit-logs": {
       "get": {
         "operationId": "AdminAuditController_list",
