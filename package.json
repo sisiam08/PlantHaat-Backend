@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@nestjs/testing": "^11.2.7",
     "@prisma/compute-sdk": "latest",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
