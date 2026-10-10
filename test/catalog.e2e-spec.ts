@@ -134,6 +134,28 @@ describe("Catalog & addresses (e2e)", () => {
     expect(res.body.data.avatarUrl).toContain("/uploads/images/avatar/");
   });
 
+  it("merges notification preferences via PATCH /users/me", async () => {
+    const agent = request.agent(server);
+    await agent.post(`${API}/auth/register`).send(registerPayload()).expect(201);
+
+    await agent
+      .patch(`${API}/users/me`)
+      .set("Origin", ORIGIN)
+      .send({ notificationPrefs: { email: { marketing: true } } })
+      .expect(200);
+    await agent
+      .patch(`${API}/users/me`)
+      .set("Origin", ORIGIN)
+      .send({ notificationPrefs: { email: { orderUpdates: true }, inApp: { orderUpdates: false } } })
+      .expect(200);
+
+    const me = await agent.get(`${API}/users/me`).expect(200);
+    expect(me.body.data.notificationPrefs).toMatchObject({
+      email: { marketing: true, orderUpdates: true },
+      inApp: { orderUpdates: false },
+    });
+  });
+
   describe("addresses", () => {
     it("creates, lists, updates, defaults and deletes addresses", async () => {
       const district = await prisma.district.create({

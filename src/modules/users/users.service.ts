@@ -21,6 +21,7 @@ const USER_PROFILE_SELECT = {
   emailVerifiedAt: true,
   phoneVerifiedAt: true,
   createdAt: true,
+  notificationPrefs: true,
   sellerProfile: {
     select: {
       status: true,
@@ -70,6 +71,17 @@ export class UsersService {
       data.phone = phone;
     }
 
+    if (dto.notificationPrefs !== undefined) {
+      const current = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { notificationPrefs: true },
+      });
+      data.notificationPrefs = mergeNotificationPrefs(
+        current?.notificationPrefs,
+        dto.notificationPrefs,
+      ) as Prisma.InputJsonValue;
+    }
+
     await this.prisma.user.update({ where: { id: userId }, data });
     return this.getProfile(userId);
   }
@@ -82,4 +94,21 @@ export class UsersService {
     });
     return this.getProfile(userId);
   }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Shallow-merges top-level keys, deep-merging one nested object level. */
+function mergeNotificationPrefs(
+  base: unknown,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = isPlainObject(base) ? { ...base } : {};
+  for (const [key, value] of Object.entries(patch)) {
+    const existing = result[key];
+    result[key] = isPlainObject(existing) && isPlainObject(value) ? { ...existing, ...value } : value;
+  }
+  return result;
 }

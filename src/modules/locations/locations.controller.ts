@@ -2,6 +2,8 @@ import { Controller, Get } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { Public } from "../../common/decorators/public.decorator";
+import { ApiEnvelopeArrayResponse } from "../../common/swagger/api-response.decorators";
+import { DistrictDto } from "./dto/district.dto";
 import { LocationsService } from "./locations.service";
 
 @ApiTags("Locations")
@@ -12,6 +14,7 @@ export class LocationsController {
   @Public()
   @Get("districts")
   @ApiOperation({ summary: "List all 64 districts (with division and Bangla name)" })
+  @ApiEnvelopeArrayResponse(DistrictDto)
   listDistricts() {
     return this.locationsService.listDistricts();
   }

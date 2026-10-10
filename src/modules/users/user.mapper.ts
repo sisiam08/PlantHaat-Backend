@@ -11,6 +11,7 @@ export interface PublicUserSource {
   emailVerifiedAt: Date | null;
   phoneVerifiedAt: Date | null;
   createdAt: Date;
+  notificationPrefs: unknown;
 }
 
 export interface PublicUser {
@@ -24,6 +25,7 @@ export interface PublicUser {
   emailVerifiedAt: Date | null;
   phoneVerifiedAt: Date | null;
   createdAt: Date;
+  notificationPrefs: unknown;
   sellerStatus: SellerStatus | null;
   shopId: string | null;
 }
@@ -44,6 +46,7 @@ export function toPublicUser(
     emailVerifiedAt: user.emailVerifiedAt,
     phoneVerifiedAt: user.phoneVerifiedAt,
     createdAt: user.createdAt,
+    notificationPrefs: user.notificationPrefs,
     sellerStatus,
     shopId,
   };

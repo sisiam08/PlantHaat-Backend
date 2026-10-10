@@ -13,9 +13,11 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
 import { Role } from "../../generated/prisma/enums";
 import { CartService } from "./cart.service";
 import { CartQueryDto } from "./dto/cart-query.dto";
+import { CartViewDto } from "./dto/cart-response.dto";
 import { PutCartItemDto } from "./dto/put-cart-item.dto";
 
 @ApiTags("Cart")
@@ -26,6 +28,7 @@ export class CartController {
 
   @Get()
   @ApiOperation({ summary: "Get the cart grouped by shop (live prices and issues)" })
+  @ApiEnvelopeResponse(CartViewDto)
   get(@CurrentUser("id") userId: string, @Query() query: CartQueryDto) {
     return this.cartService.getCart(userId, query.districtId);
   }

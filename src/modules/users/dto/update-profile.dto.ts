@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsObject, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 import { BD_PHONE_REGEX } from "../../auth/dto/register.dto";
 
@@ -16,4 +16,11 @@ export class UpdateProfileDto {
   @IsString()
   @Matches(BD_PHONE_REGEX, { message: "phone must be a valid Bangladeshi mobile number" })
   phone?: string;
+
+  @ApiPropertyOptional({
+    example: { email: { orderUpdates: true, marketing: false }, inApp: { orderUpdates: true } },
+  })
+  @IsOptional()
+  @IsObject()
+  notificationPrefs?: Record<string, unknown>;
 }

@@ -14,9 +14,11 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { SellerApprovedGuard } from "../../common/guards/seller-approved.guard";
+import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { Role } from "../../generated/prisma/enums";
 import { RespondCancellationDto } from "./dto/cancellation-request.dto";
+import { OrderDetailDto } from "./dto/order-response.dto";
 import { QueryOrdersDto } from "./dto/query-orders.dto";
 import { TransitionOrderDto } from "./dto/transition-order.dto";
 import { OrdersService } from "./orders.service";
@@ -36,6 +38,7 @@ export class SellerOrdersController {
 
   @Get("orders/:id")
   @ApiOperation({ summary: "Get one of the seller's shop orders" })
+  @ApiEnvelopeResponse(OrderDetailDto)
   get(@CurrentUser("id") sellerUserId: string, @Param("id") id: string) {
     return this.ordersService.getSellerOrder(sellerUserId, id);
   }

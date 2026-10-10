@@ -12,6 +12,9 @@ import {
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+
+import { ApiEnvelopeResponse, ApiErrorResponses } from "../../common/swagger/api-response.decorators";
+import { AuthSessionResponseDto, PublicUserDto } from "../users/dto/public-user.dto";
 import type { Request, Response } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -60,6 +63,8 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 5, ttl: HOUR_MS } })
   @ApiOperation({ summary: "Register a customer account" })
+  @ApiEnvelopeResponse(AuthSessionResponseDto, { status: 201 })
+  @ApiErrorResponses([400, 409, 429])
   async register(
     @Body() dto: RegisterDto,
     @Req() request: Request,
@@ -75,6 +80,8 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 5, ttl: HOUR_MS } })
   @ApiOperation({ summary: "Register a seller account (creates a draft seller profile)" })
+  @ApiEnvelopeResponse(AuthSessionResponseDto, { status: 201 })
+  @ApiErrorResponses([400, 409, 429])
   async registerSeller(
     @Body() dto: RegisterSellerDto,
     @Req() request: Request,
@@ -90,6 +97,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
   @ApiOperation({ summary: "Log in and set the auth cookies" })
+  @ApiEnvelopeResponse(AuthSessionResponseDto)
+  @ApiErrorResponses([400, 401, 423, 429])
   async login(
     @Body() dto: LoginDto,
     @Req() request: Request,
@@ -105,6 +114,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 30, ttl: 60 * 1000 } })
   @ApiOperation({ summary: "Rotate the refresh token and issue a new access token" })
+  @ApiEnvelopeResponse(AuthSessionResponseDto)
+  @ApiErrorResponses([401, 403, 429])
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     try {
       const result = await this.auth.refresh(readRefreshCookie(request), toSessionMeta(request));
@@ -137,6 +148,8 @@ export class AuthController {
 
   @Get("me")
   @ApiOperation({ summary: "Get the current user (used to bootstrap the frontend)" })
+  @ApiEnvelopeResponse(PublicUserDto)
+  @ApiErrorResponses([401, 403])
   getMe(@CurrentUser("id") userId: string) {
     return this.users.getProfile(userId);
   }

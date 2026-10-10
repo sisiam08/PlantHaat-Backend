@@ -2,6 +2,11 @@ import { Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
+import { NotificationItemDto, UnreadCountDto } from "./dto/notification.dto";
 import { QueryNotificationsDto } from "./dto/query-notifications.dto";
 import { NotificationsService } from "./notifications.service";
 
@@ -12,12 +17,14 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: "List the current user's notifications" })
+  @ApiPaginatedResponse(NotificationItemDto)
   list(@CurrentUser("id") userId: string, @Query() query: QueryNotificationsDto) {
     return this.notificationsService.list(userId, query);
   }
 
   @Get("unread-count")
   @ApiOperation({ summary: "Count the current user's unread notifications" })
+  @ApiEnvelopeResponse(UnreadCountDto)
   unreadCount(@CurrentUser("id") userId: string) {
     return this.notificationsService.unreadCount(userId);
   }

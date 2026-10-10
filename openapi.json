@@ -7,7 +7,30 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DistrictDto"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List all 64 districts (with division and Bangla name)",
@@ -22,7 +45,30 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CategoryNodeDto"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get the active category tree (two levels)",
@@ -109,7 +155,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PublicUserDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get the current user's profile",
@@ -132,10 +198,30 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PublicUserDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
-        "summary": "Update the current user's profile",
+        "summary": "Update the current user's profile (name, phone, notificationPrefs)",
         "tags": [
           "Users"
         ]
@@ -328,7 +414,34 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NotificationItemDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List the current user's notifications",
@@ -343,7 +456,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UnreadCountDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Count the current user's unread notifications",
@@ -1305,7 +1438,34 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProductListItemDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Search/filter public products",
@@ -1329,7 +1489,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ProductDetailDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get a public product by slug (increments view count)",
@@ -1364,7 +1544,34 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ShopListItemDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List public shops",
@@ -1388,7 +1595,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ShopDetailDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get a public shop by slug",
@@ -1551,7 +1778,34 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProductListItemDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List a shop's public products",
@@ -1566,7 +1820,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HomeResponseDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Resolved homepage (banners + sections)",
@@ -1591,7 +1865,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CartViewDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get the cart grouped by shop (live prices and issues)",
@@ -1688,7 +1982,27 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OrderDetailDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Place an order from the cart (COD only in v1)",
@@ -1764,7 +2078,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OrderDetailDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get one of the current customer's orders",
@@ -1908,7 +2242,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OrderDetailDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get one of the seller's shop orders",
@@ -2104,7 +2458,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OrderDetailDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get any shop order",
@@ -2555,7 +2929,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SellerEarningsDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Seller balance, ledger and payouts",
@@ -3900,7 +4294,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AnalyticsOverviewDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Seller analytics overview",
@@ -3915,7 +4329,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SellerDashboardDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Seller dashboard counters",
@@ -3947,7 +4381,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AnalyticsOverviewDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Admin analytics overview",
@@ -4761,7 +5215,34 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PaymentDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List payments (filters: status, method, order, from, to)",
@@ -4785,7 +5266,27 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PaymentDto"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get a payment",
@@ -4869,7 +5370,57 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthSessionResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
           }
         },
         "summary": "Register a customer account",
@@ -4894,7 +5445,57 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthSessionResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
           }
         },
         "summary": "Register a seller account (creates a draft seller profile)",
@@ -4919,7 +5520,67 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthSessionResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
           }
         },
         "summary": "Log in and set the auth cookies",
@@ -4934,7 +5595,57 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthSessionResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
           }
         },
         "summary": "Rotate the refresh token and issue a new access token",
@@ -4979,7 +5690,47 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PublicUserDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
           }
         },
         "summary": "Get the current user (used to bootstrap the frontend)",
@@ -5190,6 +5941,160 @@
       }
     },
     "schemas": {
+      "DistrictDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameBn": {
+            "type": "string"
+          },
+          "division": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nameBn",
+          "division"
+        ]
+      },
+      "CategoryNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameBn": {
+            "type": "string",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryNodeDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nameBn",
+          "slug",
+          "imageUrl",
+          "parentId",
+          "sortOrder",
+          "children"
+        ]
+      },
+      "PublicUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SELLER",
+              "ADMIN"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "DEACTIVATED"
+            ]
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "phoneVerifiedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notificationPrefs": {
+            "type": "object",
+            "description": "Per-user notification preferences"
+          },
+          "sellerStatus": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PENDING",
+              "APPROVED",
+              "REJECTED",
+              "SUSPENDED"
+            ],
+            "nullable": true
+          },
+          "shopId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "phone",
+          "avatarUrl",
+          "role",
+          "status",
+          "emailVerifiedAt",
+          "phoneVerifiedAt",
+          "createdAt",
+          "notificationPrefs",
+          "sellerStatus",
+          "shopId"
+        ]
+      },
       "UpdateProfileDto": {
         "type": "object",
         "properties": {
@@ -5200,6 +6105,18 @@
           "phone": {
             "type": "string",
             "example": "01712345678"
+          },
+          "notificationPrefs": {
+            "type": "object",
+            "example": {
+              "email": {
+                "orderUpdates": true,
+                "marketing": false
+              },
+              "inApp": {
+                "orderUpdates": true
+              }
+            }
           }
         }
       },
@@ -5283,6 +6200,99 @@
             "example": false
           }
         }
+      },
+      "NotificationItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ORDER_PLACED",
+              "ORDER_STATUS_CHANGED",
+              "ORDER_CANCELLED",
+              "CANCELLATION_REQUESTED",
+              "CANCELLATION_RESPONDED",
+              "NEW_MESSAGE",
+              "SELLER_APPROVED",
+              "SELLER_REJECTED",
+              "SHOP_SUSPENDED",
+              "SHOP_REACTIVATED",
+              "PRODUCT_APPROVED",
+              "PRODUCT_REJECTED",
+              "LOW_STOCK",
+              "REVIEW_RECEIVED",
+              "COMPLAINT_UPDATED",
+              "PAYOUT_PROCESSED",
+              "ANNOUNCEMENT",
+              "SYSTEM"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "body",
+          "data",
+          "readAt",
+          "createdAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "UnreadCountDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count"
+        ]
       },
       "UpdateSettingsDto": {
         "type": "object",
@@ -5846,6 +6856,462 @@
           }
         }
       },
+      "ImageSummaryDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "altText": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "url",
+          "altText"
+        ]
+      },
+      "ShopSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ]
+      },
+      "CategorySummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameBn": {
+            "type": "string",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nameBn",
+          "slug"
+        ]
+      },
+      "ProductListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameBn": {
+            "type": "string",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string"
+          },
+          "minPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal as string",
+            "example": "850.00"
+          },
+          "maxPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal as string"
+          },
+          "inStock": {
+            "type": "boolean"
+          },
+          "ratingAvg": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "ratingCount": {
+            "type": "number"
+          },
+          "soldCount": {
+            "type": "number"
+          },
+          "image": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImageSummaryDto"
+              }
+            ]
+          },
+          "shop": {
+            "$ref": "#/components/schemas/ShopSummaryDto"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategorySummaryDto"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nameBn",
+          "slug",
+          "minPrice",
+          "maxPrice",
+          "inStock",
+          "ratingAvg",
+          "ratingCount",
+          "soldCount",
+          "image",
+          "shop",
+          "category"
+        ]
+      },
+      "ProductDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameBn": {
+            "type": "string",
+            "nullable": true
+          },
+          "scientificName": {
+            "type": "string",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "careInstructions": {
+            "type": "string",
+            "nullable": true
+          },
+          "lightRequirement": {
+            "type": "string",
+            "nullable": true
+          },
+          "wateringFrequency": {
+            "type": "string",
+            "nullable": true
+          },
+          "careDifficulty": {
+            "type": "string",
+            "nullable": true
+          },
+          "isIndoor": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isPetSafe": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "matureHeightCm": {
+            "type": "number",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "careDetails": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "minPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal as string"
+          },
+          "maxPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal as string"
+          },
+          "inStock": {
+            "type": "boolean"
+          },
+          "ratingAvg": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "ratingCount": {
+            "type": "number"
+          },
+          "soldCount": {
+            "type": "number"
+          },
+          "viewCount": {
+            "type": "number"
+          },
+          "publishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "shop": {
+            "type": "object"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategorySummaryDto"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nameBn",
+          "scientificName",
+          "slug",
+          "description",
+          "careInstructions",
+          "lightRequirement",
+          "wateringFrequency",
+          "careDifficulty",
+          "isIndoor",
+          "isPetSafe",
+          "matureHeightCm",
+          "tags",
+          "careDetails",
+          "status",
+          "minPrice",
+          "maxPrice",
+          "inStock",
+          "ratingAvg",
+          "ratingCount",
+          "soldCount",
+          "viewCount",
+          "publishedAt",
+          "createdAt",
+          "variants",
+          "images",
+          "shop",
+          "category"
+        ]
+      },
+      "ShopListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "ratingAvg": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "ratingCount": {
+            "type": "number"
+          },
+          "isOnVacation": {
+            "type": "boolean"
+          },
+          "productCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "logoUrl",
+          "district",
+          "ratingAvg",
+          "ratingCount",
+          "isOnVacation",
+          "productCount"
+        ]
+      },
+      "ShopDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "bannerUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "ratingAvg": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "ratingCount": {
+            "type": "number"
+          },
+          "isOnVacation": {
+            "type": "boolean"
+          },
+          "vacationMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description",
+          "logoUrl",
+          "bannerUrl",
+          "phone",
+          "district",
+          "address",
+          "ratingAvg",
+          "ratingCount",
+          "isOnVacation",
+          "vacationMessage",
+          "createdAt"
+        ]
+      },
+      "HomeResponseDto": {
+        "type": "object",
+        "properties": {
+          "banners": {
+            "description": "Active hero banners",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "sections": {
+            "description": "Resolved homepage sections",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "banners",
+          "sections"
+        ]
+      },
+      "CartViewDto": {
+        "type": "object",
+        "properties": {
+          "shops": {
+            "description": "Items grouped by shop with per-item issues",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "subtotal": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "deliveryTotal": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "grandTotal": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "itemCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "shops",
+          "subtotal",
+          "deliveryTotal",
+          "grandTotal",
+          "itemCount"
+        ]
+      },
       "PutCartItemDto": {
         "type": "object",
         "properties": {
@@ -5862,6 +7328,101 @@
         "required": [
           "variantId",
           "quantity"
+        ]
+      },
+      "OrderDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "overallStatus": {
+            "type": "string",
+            "nullable": true,
+            "example": "PENDING"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal as string"
+          },
+          "subtotal": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "deliveryTotal": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "grandTotal": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "placedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "shopOrders": {
+            "description": "Shop orders with items, status history and payments",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "statusHistory": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "orderNumber",
+          "overallStatus",
+          "status",
+          "subtotal",
+          "deliveryTotal",
+          "grandTotal",
+          "paymentMethod",
+          "paymentStatus",
+          "placedAt",
+          "createdAt",
+          "shopOrders",
+          "items",
+          "statusHistory",
+          "payments"
         ]
       },
       "CheckoutDto": {
@@ -6120,6 +7681,32 @@
         "required": [
           "amount",
           "note"
+        ]
+      },
+      "SellerEarningsDto": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "string",
+            "description": "Decimal as string (positive = owed to seller)"
+          },
+          "ledger": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "payouts": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "balance",
+          "ledger",
+          "payouts"
         ]
       },
       "RejectRefundDto": {
@@ -6540,6 +8127,47 @@
           }
         }
       },
+      "AnalyticsOverviewDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Aggregated metrics (shape varies by audience)"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "metrics"
+        ]
+      },
+      "SellerDashboardDto": {
+        "type": "object",
+        "properties": {
+          "pendingOrders": {
+            "type": "number"
+          },
+          "unreadNotifications": {
+            "type": "number"
+          },
+          "lowStockVariants": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pendingOrders",
+          "unreadNotifications",
+          "lowStockVariants"
+        ]
+      },
       "CreateAdminUserDto": {
         "type": "object",
         "properties": {
@@ -6634,6 +8262,166 @@
             "type": "boolean"
           }
         }
+      },
+      "PaymentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "shopOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "shopOrderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "description": "Decimal as string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "COD",
+              "PIPRAPAY",
+              "BKASH",
+              "NAGAD",
+              "CARD",
+              "BANK_TRANSFER"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "FAILED",
+              "CANCELLED",
+              "REFUNDED",
+              "PARTIALLY_REFUNDED"
+            ]
+          },
+          "providerTxnId": {
+            "type": "string",
+            "nullable": true
+          },
+          "paidAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "orderId",
+          "orderNumber",
+          "shopOrderId",
+          "shopOrderNumber",
+          "amount",
+          "currency",
+          "method",
+          "provider",
+          "status",
+          "providerTxnId",
+          "paidAt",
+          "failedAt",
+          "failureReason",
+          "createdAt"
+        ]
+      },
+      "ErrorBodyDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "INSUFFICIENT_STOCK"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "ErrorEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "statusCode": {
+            "type": "number",
+            "example": 422
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBodyDto"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/v1/checkout"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "statusCode",
+          "error",
+          "path",
+          "timestamp"
+        ]
+      },
+      "AuthSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/PublicUserDto"
+          },
+          "accessTokenExpiresAt": {
+            "type": "number",
+            "example": 1750000000000,
+            "description": "Access token expiry (epoch ms)"
+          }
+        },
+        "required": [
+          "user",
+          "accessTokenExpiresAt"
+        ]
       },
       "RegisterDto": {
         "type": "object",

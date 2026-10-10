@@ -3,9 +3,11 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { Role } from "../../generated/prisma/enums";
 import { RespondCancellationDto } from "./dto/cancellation-request.dto";
+import { OrderDetailDto } from "./dto/order-response.dto";
 import { QueryOrdersDto } from "./dto/query-orders.dto";
 import { TransitionOrderDto } from "./dto/transition-order.dto";
 import { OrdersService } from "./orders.service";
@@ -24,6 +26,7 @@ export class AdminOrdersController {
 
   @Get("orders/:id")
   @ApiOperation({ summary: "Get any shop order" })
+  @ApiEnvelopeResponse(OrderDetailDto)
   get(@Param("id") id: string) {
     return this.ordersService.getAdminOrder(id);
   }

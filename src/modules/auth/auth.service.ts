@@ -41,6 +41,7 @@ const PUBLIC_USER_SELECT = {
   emailVerifiedAt: true,
   phoneVerifiedAt: true,
   createdAt: true,
+  notificationPrefs: true,
 } satisfies Prisma.UserSelect;
 
 export interface SessionMeta {

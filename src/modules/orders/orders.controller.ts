@@ -3,8 +3,10 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
 import { Role } from "../../generated/prisma/enums";
 import { CancelOrderDto } from "./dto/cancel-order.dto";
+import { OrderDetailDto } from "./dto/order-response.dto";
 import { CancellationRequestDto } from "./dto/cancellation-request.dto";
 import { QueryOrdersDto } from "./dto/query-orders.dto";
 import { OrdersService } from "./orders.service";
@@ -23,6 +25,7 @@ export class OrdersController {
 
   @Get(":id")
   @ApiOperation({ summary: "Get one of the current customer's orders" })
+  @ApiEnvelopeResponse(OrderDetailDto)
   get(@CurrentUser("id") customerId: string, @Param("id") id: string) {
     return this.ordersService.getCustomerOrder(customerId, id);
   }
