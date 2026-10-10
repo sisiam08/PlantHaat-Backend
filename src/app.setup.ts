@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
 
+import { createClientIpMiddleware } from "./common/client-ip/client-ip";
 import type { AppConfigService } from "./config/app-config.service";
 
 export interface AppSetupOptions {
@@ -27,6 +28,7 @@ export function configureApp(
     app.use(helmet());
   }
   app.use(cookieParser());
+  app.use(createClientIpMiddleware(config.values.BFF_SHARED_SECRET));
 
   if (staticFiles) {
     const publicDir = resolve(process.cwd(), config.values.UPLOAD_DIR, "public");

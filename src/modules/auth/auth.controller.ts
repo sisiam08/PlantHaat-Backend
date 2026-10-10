@@ -39,12 +39,10 @@ const HOUR_MS = 60 * 60 * 1000;
 
 function toSessionMeta(request: Request): SessionMeta {
   const userAgent = request.headers["user-agent"];
-  const forwarded = request.headers["x-forwarded-for"];
-  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const ipAddress = forwardedValue?.split(",")[0]?.trim() || request.ip;
+  const clientIp = (request as Request & { clientIp?: string }).clientIp;
   return {
     userAgent: typeof userAgent === "string" ? userAgent : undefined,
-    ipAddress,
+    ipAddress: clientIp ?? request.ip,
   };
 }
 

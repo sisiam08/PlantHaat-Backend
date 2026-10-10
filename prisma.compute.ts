@@ -4,7 +4,7 @@ export default defineComputeConfig({
   app: {
     name: "backend",
     framework: "nestjs",
-    httpPort: 3000,
+    httpPort: 5000,
     env: ".env",
   },
 });

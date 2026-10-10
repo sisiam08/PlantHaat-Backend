@@ -25,4 +25,9 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   protected override shouldSkip(_context: ExecutionContext): Promise<boolean> {
     return Promise.resolve(this.config.isTest);
   }
+
+  protected override getTracker(request: Record<string, unknown>): Promise<string> {
+    const req = request as { clientIp?: string; ip?: string };
+    return Promise.resolve(req.clientIp ?? req.ip ?? "unknown");
+  }
 }

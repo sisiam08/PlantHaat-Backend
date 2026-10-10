@@ -7,10 +7,9 @@ export interface RequestMeta {
 
 export function getRequestMeta(request: Request): RequestMeta {
   const userAgent = request.headers["user-agent"];
-  const forwarded = request.headers["x-forwarded-for"];
-  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const clientIp = (request as Request & { clientIp?: string }).clientIp;
   return {
-    ipAddress: forwardedValue?.split(",")[0]?.trim() || request.ip,
+    ipAddress: clientIp ?? request.ip,
     userAgent: typeof userAgent === "string" ? userAgent : undefined,
   };
 }

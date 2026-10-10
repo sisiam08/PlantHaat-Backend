@@ -4,6 +4,10 @@ const emptyToUndefined = (value: unknown): unknown =>
   typeof value === "string" && value.trim() === "" ? undefined : value;
 
 const optionalString = z.preprocess(emptyToUndefined, z.string().min(1).optional());
+const optionalSecret = z.preprocess(
+  emptyToUndefined,
+  z.string().min(32, "BFF_SHARED_SECRET must be at least 32 characters").optional(),
+);
 const optionalNumber = z.preprocess(
   emptyToUndefined,
   z.coerce.number().int().positive().optional(),
@@ -35,6 +39,7 @@ export const envSchema = z.object({
   API_URL: z.string().url().default("http://localhost:5000"),
   CORS_ORIGINS: csvList("http://localhost:3000"),
   COOKIE_DOMAIN: optionalString,
+  BFF_SHARED_SECRET: optionalSecret,
 
   JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
   JWT_ACCESS_TTL: z.coerce.number().int().positive().default(900),
@@ -69,6 +74,14 @@ export const envSchema = z.object({
 
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
+}).superRefine((value, ctx) => {
+  if (value.NODE_ENV === "production" && !value.BFF_SHARED_SECRET) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["BFF_SHARED_SECRET"],
+      message: "BFF_SHARED_SECRET is required when NODE_ENV=production",
+    });
+  }
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
