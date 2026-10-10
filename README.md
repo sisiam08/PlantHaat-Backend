@@ -97,6 +97,23 @@ required variable is missing or invalid. Tests use a separate `.env.test`
   constraints (stock/price/quantity/rating) and partial unique indexes (one
   default address per user, one pending cancellation request per shop order).
 
+## Realtime (WebSocket)
+
+Notifications are pushed over a Socket.IO namespace `/realtime` (ticket auth,
+no cookies). `POST /api/v1/realtime/ticket` returns a short-lived one-time
+ticket; the browser connects with `auth: { ticket }`. See `docs/REALTIME.md` for
+the full contract (handshake rules, events, revocation, limits, env). The
+transport is designed to be reused by the future messaging module.
+
+## Behind a BFF (Next.js)
+
+When the Next.js server calls this API, set `BFF_SHARED_SECRET` and send it as
+`X-BFF-Key` together with `X-Forwarded-For` so throttling/sessions/audit use the
+real client IP. The BFF authenticates with `Authorization: Bearer <access token>`
+(no browser `Origin`), and the refresh token is sent to `/auth/refresh` and
+`/auth/logout` as the `ph_rt` cookie. `BFF_SHARED_SECRET` is required in
+production.
+
 ## File storage
 
 `STORAGE_DRIVER=local` (default) writes to `${UPLOAD_DIR}/public` (served at
