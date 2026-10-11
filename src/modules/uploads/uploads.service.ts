@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
@@ -12,16 +12,25 @@ import {
 } from "./document.util";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
+  DEFAULT_IMAGE_MAX_EDGE,
   detectImageMime,
   MAX_IMAGE_BYTES,
+  PRODUCT_IMAGE_MAX_EDGE,
+  PRODUCT_IMAGE_QUALITY,
   reencodeImage,
 } from "./image.util";
 import { STORAGE_SERVICE, type StorageService, type StoredObject } from "./storage/storage.types";
-import type { UploadPurpose } from "./dto/upload-image.dto";
+import { UploadPurpose } from "./dto/upload-image.dto";
 
 @Injectable()
 export class UploadsService {
-  constructor(@Inject(STORAGE_SERVICE) private readonly storage: StorageService) {}
+  private readonly logger = new Logger(UploadsService.name);
+
+  constructor(@Inject(STORAGE_SERVICE) private readonly storage: StorageService) {
+    this.logger.log(
+      `Image long edge: product=${PRODUCT_IMAGE_MAX_EDGE}px, other purposes=${DEFAULT_IMAGE_MAX_EDGE}px`,
+    );
+  }
 
   async uploadImage(
     file: Express.Multer.File | undefined,
@@ -46,7 +55,12 @@ export class UploadsService {
 
     let processed: Buffer;
     try {
-      processed = await reencodeImage(file.buffer);
+      processed = await reencodeImage(
+        file.buffer,
+        purpose === UploadPurpose.PRODUCT
+          ? { maxEdge: PRODUCT_IMAGE_MAX_EDGE, quality: PRODUCT_IMAGE_QUALITY }
+          : undefined,
+      );
     } catch {
       throw AppException.badRequest(
         ErrorCode.UPLOAD_INVALID_TYPE,

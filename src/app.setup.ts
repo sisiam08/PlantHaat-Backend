@@ -45,7 +45,19 @@ export function configureApp(
   if (staticFiles) {
     const publicDir = resolve(process.cwd(), config.values.UPLOAD_DIR, "public");
     mkdirSync(publicDir, { recursive: true });
-    app.use("/uploads", express.static(publicDir, { index: false }));
+    // Public upload keys are random UUIDs, so objects never change in place:
+    // serve them with long-lived immutable caching.
+    app.use(
+      "/uploads",
+      express.static(publicDir, {
+        index: false,
+        immutable: true,
+        maxAge: "365d",
+        setHeaders: (res) => {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        },
+      }),
+    );
   }
 
   if (cors) {

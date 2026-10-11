@@ -3,6 +3,19 @@ import sharp from "sharp";
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
+/** Long-edge cap for every upload purpose except product images. */
+export const DEFAULT_IMAGE_MAX_EDGE = 1600;
+/** Product images keep more resolution so the product page can zoom. */
+export const PRODUCT_IMAGE_MAX_EDGE = 2000;
+export const DEFAULT_IMAGE_QUALITY = 82;
+export const PRODUCT_IMAGE_QUALITY = 80;
+
+export interface ReencodeOptions {
+  /** Long edge in pixels; never upscales smaller images. */
+  maxEdge?: number;
+  quality?: number;
+}
+
 export type AllowedImageMime = (typeof ALLOWED_IMAGE_MIME_TYPES)[number];
 
 export function detectImageMime(buffer: Buffer): AllowedImageMime | undefined {
@@ -32,10 +45,14 @@ export function detectImageMime(buffer: Buffer): AllowedImageMime | undefined {
   return undefined;
 }
 
-export async function reencodeImage(buffer: Buffer): Promise<Buffer> {
+export async function reencodeImage(
+  buffer: Buffer,
+  options: ReencodeOptions = {},
+): Promise<Buffer> {
+  const { maxEdge = DEFAULT_IMAGE_MAX_EDGE, quality = DEFAULT_IMAGE_QUALITY } = options;
   return sharp(buffer)
     .rotate()
-    .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 82 })
+    .resize({ width: maxEdge, height: maxEdge, fit: "inside", withoutEnlargement: true })
+    .webp({ quality })
     .toBuffer();
 }

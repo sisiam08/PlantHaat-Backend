@@ -1,6 +1,11 @@
 import sharp from "sharp";
 
-import { detectImageMime, reencodeImage } from "./image.util";
+import {
+  DEFAULT_IMAGE_MAX_EDGE,
+  detectImageMime,
+  PRODUCT_IMAGE_MAX_EDGE,
+  reencodeImage,
+} from "./image.util";
 
 describe("image.util", () => {
   it("detects PNG magic bytes", () => {
@@ -35,5 +40,47 @@ describe("image.util", () => {
 
     const webp = await reencodeImage(png);
     expect(detectImageMime(webp)).toBe("image/webp");
+  });
+
+  it("caps the long edge at the default limit for non-product purposes", async () => {
+    const wide = await sharp({
+      create: { width: 3200, height: 1600, channels: 3, background: { r: 5, g: 5, b: 5 } },
+    })
+      .png()
+      .toBuffer();
+
+    const metadata = await sharp(await reencodeImage(wide)).metadata();
+    expect(metadata.format).toBe("webp");
+    expect(metadata.width).toBe(DEFAULT_IMAGE_MAX_EDGE);
+    expect(metadata.height).toBeLessThanOrEqual(DEFAULT_IMAGE_MAX_EDGE);
+  });
+
+  it("keeps product images up to the higher 2000px long edge", async () => {
+    const wide = await sharp({
+      create: { width: 3200, height: 1600, channels: 3, background: { r: 5, g: 5, b: 5 } },
+    })
+      .png()
+      .toBuffer();
+
+    const metadata = await sharp(
+      await reencodeImage(wide, { maxEdge: PRODUCT_IMAGE_MAX_EDGE }),
+    ).metadata();
+    expect(metadata.format).toBe("webp");
+    expect(metadata.width).toBe(PRODUCT_IMAGE_MAX_EDGE);
+    expect(metadata.height).toBeLessThanOrEqual(PRODUCT_IMAGE_MAX_EDGE);
+  });
+
+  it("never upscales images smaller than the long-edge cap", async () => {
+    const small = await sharp({
+      create: { width: 400, height: 300, channels: 3, background: { r: 5, g: 5, b: 5 } },
+    })
+      .png()
+      .toBuffer();
+
+    const metadata = await sharp(
+      await reencodeImage(small, { maxEdge: PRODUCT_IMAGE_MAX_EDGE }),
+    ).metadata();
+    expect(metadata.width).toBe(400);
+    expect(metadata.height).toBe(300);
   });
 });
