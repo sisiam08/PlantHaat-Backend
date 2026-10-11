@@ -1,13 +1,24 @@
-import { Injectable } from "@nestjs/common";
+import { createHash } from "node:crypto";
+
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
 
 import { resolvePagination } from "../../common/dto/pagination-query.dto";
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
-import type { PaginatedResult } from "../../common/types/paginated";
+import type { CursorPaginatedResult, PaginatedResult } from "../../common/types/paginated";
 import { paginate } from "../../common/types/paginated";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { QueryProductsDto } from "./dto/query-products.dto";
+import {
+  cursorPage,
+  type CursorPayload,
+  decodeCursor,
+  defaultRandomSeed,
+  InvalidCursorError,
+  rankIds,
+} from "./random-feed";
 
 const PUBLIC_SHOP_FILTER = {
   status: "ACTIVE",
@@ -24,11 +35,39 @@ const LIST_ITEM_INCLUDE = {
   category: { select: { id: true, name: true, nameBn: true, slug: true } },
 } satisfies Prisma.ProductInclude;
 
+const RANDOM_CACHE_TTL_MS = 45 * 1000;
+const RANDOM_CACHE_MAX_ENTRIES = 500;
+
+interface ProductListRow {
+  id: string;
+  name: string;
+  nameBn: string | null;
+  slug: string;
+  minPrice: unknown;
+  maxPrice: unknown;
+  inStock: boolean;
+  ratingAvg: unknown;
+  ratingCount: number;
+  soldCount: number;
+  images: { url: string; altText: string | null }[];
+  shop: { id: string; name: string; slug: string };
+  category: { id: string; name: string; nameBn: string | null; slug: string };
+}
+
 @Injectable()
 export class PublicProductsService {
+  private readonly logger = new Logger(PublicProductsService.name);
+  private readonly randomIdCache = new Map<string, { ids: string[]; expiresAt: number }>();
+
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: QueryProductsDto, shopId?: string): Promise<PaginatedResult<unknown>> {
+  async list(
+    query: QueryProductsDto,
+    shopId?: string,
+  ): Promise<PaginatedResult<unknown> | CursorPaginatedResult<unknown>> {
+    if (query.sort === "random") {
+      return this.listRandom(query, shopId);
+    }
     const { page, limit, skip } = resolvePagination(query);
     const where = await this.buildWhere(query, shopId);
 
@@ -43,7 +82,100 @@ export class PublicProductsService {
       this.prisma.product.count({ where }),
     ]);
 
-    const data = rows.map((product) => ({
+    return paginate(rows.map((product) => this.toListItem(product)), total, page, limit);
+  }
+
+  private async listRandom(
+    query: QueryProductsDto,
+    shopId?: string,
+  ): Promise<CursorPaginatedResult<unknown>> {
+    const limit = query.limit ?? 20;
+    const seed = query.seed ?? defaultRandomSeed();
+
+    let cursor: CursorPayload | undefined;
+    if (query.cursor) {
+      try {
+        cursor = decodeCursor(query.cursor);
+      } catch (error) {
+        if (error instanceof InvalidCursorError) {
+          throw AppException.badRequest(ErrorCode.INVALID_CURSOR, "Invalid cursor");
+        }
+        throw error;
+      }
+    }
+
+    const where = await this.buildWhere(query, shopId);
+    const ids = await this.getMatchingIds(this.randomCacheKey(query, shopId), where);
+    const page = cursorPage(rankIds(seed, ids), limit, cursor);
+
+    let data: unknown[] = [];
+    if (page.ids.length > 0) {
+      const rows = await this.prisma.product.findMany({
+        where: { id: { in: page.ids } },
+        include: LIST_ITEM_INCLUDE,
+      });
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      data = page.ids.flatMap((id) => {
+        const row = byId.get(id);
+        return row ? [this.toListItem(row)] : [];
+      });
+    }
+
+    return { data, meta: { limit, nextCursor: page.nextCursor, hasMore: page.hasMore } };
+  }
+
+  private async getMatchingIds(key: string, where: Prisma.ProductWhereInput): Promise<string[]> {
+    const now = Date.now();
+    const cached = this.randomIdCache.get(key);
+    if (cached && cached.expiresAt > now) {
+      return cached.ids;
+    }
+    const rows = await this.prisma.product.findMany({ where, select: { id: true } });
+    const ids = rows.map((row) => row.id);
+    if (this.randomIdCache.size >= RANDOM_CACHE_MAX_ENTRIES) {
+      this.sweepRandomCache(now);
+    }
+    this.randomIdCache.set(key, { ids, expiresAt: now + RANDOM_CACHE_TTL_MS });
+    return ids;
+  }
+
+  private randomCacheKey(query: QueryProductsDto, shopId?: string): string {
+    return createHash("sha256")
+      .update(
+        JSON.stringify({
+          q: query.q ?? null,
+          category: query.category ?? null,
+          shopSlug: shopId ? null : (query.shop ?? null),
+          shopId: shopId ?? null,
+          minPrice: query.minPrice ?? null,
+          maxPrice: query.maxPrice ?? null,
+          light: query.light ?? null,
+          difficulty: query.difficulty ?? null,
+          isIndoor: query.isIndoor ?? null,
+          isPetSafe: query.isPetSafe ?? null,
+          inStock: query.inStock ?? null,
+          deliversTo: query.deliversTo ?? null,
+        }),
+      )
+      .digest("hex");
+  }
+
+  private sweepRandomCache(now: number): void {
+    for (const [key, entry] of this.randomIdCache) {
+      if (entry.expiresAt <= now) {
+        this.randomIdCache.delete(key);
+      }
+    }
+  }
+
+  @OnEvent("product.changed", { async: true })
+  @OnEvent("product.moderated", { async: true })
+  invalidateRandomCache(): void {
+    this.randomIdCache.clear();
+  }
+
+  private toListItem(product: ProductListRow): unknown {
+    return {
       id: product.id,
       name: product.name,
       nameBn: product.nameBn,
@@ -57,8 +189,7 @@ export class PublicProductsService {
       image: product.images[0] ?? null,
       shop: product.shop,
       category: product.category,
-    }));
-    return paginate(data, total, page, limit);
+    };
   }
 
   async getBySlug(slug: string) {
@@ -151,7 +282,10 @@ export class PublicProductsService {
     return shop;
   }
 
-  async listShopProducts(slug: string, query: QueryProductsDto): Promise<PaginatedResult<unknown>> {
+  async listShopProducts(
+    slug: string,
+    query: QueryProductsDto,
+  ): Promise<PaginatedResult<unknown> | CursorPaginatedResult<unknown>> {
     const shop = await this.prisma.shop.findFirst({
       where: { slug, ...PUBLIC_SHOP_FILTER },
       select: { id: true },

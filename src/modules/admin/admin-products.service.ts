@@ -100,6 +100,7 @@ export class AdminProductsService {
       after: { status: "REMOVED", reason },
       ...meta,
     });
+    this.events.emit("product.changed");
     return { id, status: "REMOVED" };
   }
 

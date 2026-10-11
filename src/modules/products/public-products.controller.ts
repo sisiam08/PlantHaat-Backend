@@ -6,6 +6,7 @@ import type { Request } from "express";
 import { PaginationQueryDto } from "../../common/dto/pagination-query.dto";
 import { Public } from "../../common/decorators/public.decorator";
 import {
+  ApiAdaptivePaginatedResponse,
   ApiEnvelopeResponse,
   ApiPaginatedResponse,
 } from "../../common/swagger/api-response.decorators";
@@ -26,8 +27,14 @@ export class PublicProductsController {
 
   @Public()
   @Get("products")
-  @ApiOperation({ summary: "Search/filter public products" })
-  @ApiPaginatedResponse(ProductListItemDto)
+  @ApiOperation({
+    summary: "Search/filter public products",
+    description:
+      "Default sorts return page-based meta (`page/limit/total/totalPages`). " +
+      "`sort=random` returns cursor meta (`limit/nextCursor/hasMore`) with no total; " +
+      "pass `seed` (1–64 chars `[A-Za-z0-9_-]`) for a stable shuffle and `cursor` to page.",
+  })
+  @ApiAdaptivePaginatedResponse(ProductListItemDto)
   list(@Query() query: QueryProductsDto) {
     return this.products.list(query);
   }

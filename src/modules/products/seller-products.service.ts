@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { resolvePagination } from "../../common/dto/pagination-query.dto";
 import { AppException } from "../../common/errors/app.exception";
@@ -33,6 +34,7 @@ export class SellerProductsService {
     private readonly sellerContext: SellerContextService,
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async list(userId: string): Promise<PaginatedResult<unknown>> {
@@ -80,6 +82,7 @@ export class SellerProductsService {
       },
       include: PRODUCT_DETAIL_INCLUDE,
     });
+    this.events.emit("product.changed");
     return this.toView(product);
   }
 
@@ -123,6 +126,7 @@ export class SellerProductsService {
       data,
       include: PRODUCT_DETAIL_INCLUDE,
     });
+    this.events.emit("product.changed");
     return this.toView(updated);
   }
 
@@ -141,6 +145,7 @@ export class SellerProductsService {
         data: { status: "INACTIVE" },
         include: PRODUCT_DETAIL_INCLUDE,
       });
+      this.events.emit("product.changed");
       return this.toView(updated);
     }
 
@@ -168,6 +173,7 @@ export class SellerProductsService {
       },
       include: PRODUCT_DETAIL_INCLUDE,
     });
+    this.events.emit("product.changed");
     return this.toView(updated);
   }
 
@@ -177,6 +183,7 @@ export class SellerProductsService {
       where: { id: productId },
       data: { deletedAt: new Date(), status: "INACTIVE" },
     });
+    this.events.emit("product.changed");
   }
 
   async addVariant(userId: string, productId: string, dto: CreateVariantDto) {
@@ -215,6 +222,7 @@ export class SellerProductsService {
       await recomputeProductAggregates(tx, productId);
     });
 
+    this.events.emit("product.changed");
     return this.get(userId, productId);
   }
 
@@ -252,6 +260,7 @@ export class SellerProductsService {
       await tx.productVariant.update({ where: { id: variantId }, data });
       await recomputeProductAggregates(tx, productId);
     });
+    this.events.emit("product.changed");
     return this.get(userId, productId);
   }
 
@@ -269,6 +278,7 @@ export class SellerProductsService {
       await tx.productVariant.delete({ where: { id: variantId } });
       await recomputeProductAggregates(tx, productId);
     });
+    this.events.emit("product.changed");
   }
 
   async adjustStock(userId: string, variantId: string, dto: AdjustStockDto) {
@@ -320,6 +330,7 @@ export class SellerProductsService {
       await recomputeProductAggregates(tx, productId);
     });
 
+    this.events.emit("product.changed");
     const updated = await this.prisma.productVariant.findUniqueOrThrow({
       where: { id: variantId },
       select: { id: true, stockQty: true, lowStockThreshold: true },

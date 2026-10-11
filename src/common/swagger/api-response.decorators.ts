@@ -8,6 +8,13 @@ export class PaginationMetaDto {
   @ApiProperty() totalPages!: number;
 }
 
+export class CursorPaginationMetaDto {
+  @ApiProperty() limit!: number;
+  @ApiProperty({ nullable: true, type: String, description: "Opaque cursor for the next page" })
+  nextCursor!: string | null;
+  @ApiProperty() hasMore!: boolean;
+}
+
 export class ErrorBodyDto {
   @ApiProperty({ example: "INSUFFICIENT_STOCK" }) code!: string;
   @ApiProperty() message!: string;
@@ -83,6 +90,60 @@ export function ApiPaginatedResponse<TModel extends Type<unknown>>(
           success: { type: "boolean", example: true },
           data: { type: "array", items: { $ref: getSchemaPath(model) } },
           meta: { $ref: getSchemaPath(PaginationMetaDto) },
+        },
+      },
+    }),
+  );
+}
+
+/** `{ success: true, data: [<model>], meta }` (cursor pagination, no total) */
+export function ApiCursorPaginatedResponse<TModel extends Type<unknown>>(
+  model: TModel,
+  options: { description?: string } = {},
+) {
+  return applyDecorators(
+    ApiExtraModels(model, CursorPaginationMetaDto),
+    ApiResponse({
+      status: 200,
+      description: options.description,
+      schema: {
+        type: "object",
+        required: ["success", "data", "meta"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: { type: "array", items: { $ref: getSchemaPath(model) } },
+          meta: { $ref: getSchemaPath(CursorPaginationMetaDto) },
+        },
+      },
+    }),
+  );
+}
+
+/**
+ * `{ success: true, data: [<model>], meta }` where `meta` is either the page-based
+ * meta (default sorts) or the cursor meta (`sort=random`).
+ */
+export function ApiAdaptivePaginatedResponse<TModel extends Type<unknown>>(
+  model: TModel,
+  options: { description?: string } = {},
+) {
+  return applyDecorators(
+    ApiExtraModels(model, PaginationMetaDto, CursorPaginationMetaDto),
+    ApiResponse({
+      status: 200,
+      description: options.description,
+      schema: {
+        type: "object",
+        required: ["success", "data", "meta"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: { type: "array", items: { $ref: getSchemaPath(model) } },
+          meta: {
+            oneOf: [
+              { $ref: getSchemaPath(PaginationMetaDto) },
+              { $ref: getSchemaPath(CursorPaginationMetaDto) },
+            ],
+          },
         },
       },
     }),

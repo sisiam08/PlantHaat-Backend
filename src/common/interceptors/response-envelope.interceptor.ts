@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { map, type Observable } from "rxjs";
 
-import { isPaginatedResult } from "../types/paginated";
+import { isCursorPaginatedResult, isPaginatedResult } from "../types/paginated";
 
 export interface SuccessEnvelope<T> {
   success: true;
@@ -19,7 +19,7 @@ export class ResponseEnvelopeInterceptor implements NestInterceptor {
   intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
       map((payload: unknown): SuccessEnvelope<unknown> => {
-        if (isPaginatedResult(payload)) {
+        if (isPaginatedResult(payload) || isCursorPaginatedResult(payload)) {
           return { success: true, data: payload.data, meta: payload.meta };
         }
         return { success: true, data: payload === undefined ? null : payload };

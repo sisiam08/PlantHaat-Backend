@@ -27,6 +27,35 @@ export function paginate<T>(
   };
 }
 
+export interface CursorPaginationMeta {
+  limit: number;
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface CursorPaginatedResult<T> {
+  data: T[];
+  meta: CursorPaginationMeta;
+}
+
+export function isCursorPaginatedResult(
+  value: unknown,
+): value is CursorPaginatedResult<unknown> {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as { data?: unknown; meta?: unknown };
+  if (!Array.isArray(candidate.data) || typeof candidate.meta !== "object") {
+    return false;
+  }
+  const meta = candidate.meta as Partial<CursorPaginationMeta>;
+  return (
+    typeof meta.limit === "number" &&
+    (typeof meta.nextCursor === "string" || meta.nextCursor === null) &&
+    typeof meta.hasMore === "boolean"
+  );
+}
+
 export function isPaginatedResult(value: unknown): value is PaginatedResult<unknown> {
   if (typeof value !== "object" || value === null) {
     return false;
