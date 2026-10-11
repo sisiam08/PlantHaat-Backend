@@ -58,7 +58,7 @@ openssl rand -base64 32   # DATA_ENCRYPTION_KEY (must decode to 32 bytes)
 | `npm run db:migrate` | `prisma migrate dev` |
 | `npm run db:deploy` | `prisma migrate deploy` |
 | `npm run db:seed` | Seed the database (districts, categories, admin, settings) |
-| `npm run db:seed:demo` | Dev-only demo data (3 sellers, 40 plants, 5 customers, a sample order) |
+| `npm run db:seed:demo` | Dev-only demo data (3 sellers, 60+ plants across all categories, 5 customers, a sample order) |
 | `npm run docs:export` | Build and write the OpenAPI document to `openapi.json` |
 
 ## Production
@@ -96,6 +96,30 @@ required variable is missing or invalid. Tests use a separate `.env.test`
   express: the `pg_trgm` extension + GIN trigram indexes on `Product`, `CHECK`
   constraints (stock/price/quantity/rating) and partial unique indexes (one
   default address per user, one pending cancellation request per shop order).
+
+## Demo data (dev only)
+
+`npm run db:seed:demo` refuses to run with `NODE_ENV=production` and populates a
+realistic catalog for frontend testing:
+
+- 3 approved sellers/shops in different districts, with different delivery zones
+  (nationwide + one limited to Dhaka/Chattogram/Sylhet) to exercise delivery quotes.
+- 60+ active, in-stock products spread across all 11 seeded categories, with
+  varied prices and multi-variant products.
+- Locally generated placeholder images (sharp from SVG, no network): every
+  category has an image and 10+ products have 3–5 image galleries (≥1200 px long
+  edge, mixed aspect ratios) for the product-page zoom.
+- A few low-stock and out-of-stock variants, 5 customers and a sample PENDING order.
+
+It is idempotent: re-running only adds missing rows (it also replaces legacy
+`picsum.photos` image URLs with locally generated ones).
+
+Demo accounts:
+
+| Role | Emails | Password |
+|---|---|---|
+| Seller | `seller1@planthaat.test`, `seller2@planthaat.test`, `seller3@planthaat.test` | `SellerDemo1` |
+| Customer | `customer1@planthaat.test` … `customer5@planthaat.test` | `CustomerDemo1` |
 
 ## Realtime (WebSocket)
 
