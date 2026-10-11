@@ -7,12 +7,14 @@ import { PaginationQueryDto } from "../../common/dto/pagination-query.dto";
 import { Public } from "../../common/decorators/public.decorator";
 import {
   ApiAdaptivePaginatedResponse,
+  ApiEnvelopeArrayResponse,
   ApiEnvelopeResponse,
   ApiPaginatedResponse,
 } from "../../common/swagger/api-response.decorators";
 import { HomeResponseDto } from "./dto/home-response.dto";
 import { ProductDetailDto, ProductListItemDto } from "./dto/product-response.dto";
 import { QueryProductsDto } from "./dto/query-products.dto";
+import { RelatedProductsQueryDto } from "./dto/related-products.dto";
 import { ShopDetailDto, ShopListItemDto } from "./dto/shop-response.dto";
 import { ProductViewsService } from "./product-views.service";
 import { PublicProductsService } from "./public-products.service";
@@ -37,6 +39,14 @@ export class PublicProductsController {
   @ApiAdaptivePaginatedResponse(ProductListItemDto)
   list(@Query() query: QueryProductsDto) {
     return this.products.list(query);
+  }
+
+  @Public()
+  @Get("products/:slug/related")
+  @ApiOperation({ summary: "Related products for a product (same category first)" })
+  @ApiEnvelopeArrayResponse(ProductListItemDto)
+  related(@Param("slug") slug: string, @Query() query: RelatedProductsQueryDto) {
+    return this.products.getRelated(slug, query.limit ?? 6);
   }
 
   @Public()

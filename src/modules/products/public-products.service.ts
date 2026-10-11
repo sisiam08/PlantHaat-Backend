@@ -226,6 +226,87 @@ export class PublicProductsService {
     return product;
   }
 
+  async getRelated(slug: string, limit: number) {
+    const product = await this.prisma.product.findFirst({
+      where: { slug, status: "ACTIVE", deletedAt: null, shop: PUBLIC_SHOP_FILTER },
+      select: {
+        id: true,
+        categoryId: true,
+        shopId: true,
+        category: { select: { parentId: true } },
+      },
+    });
+    if (!product) {
+      throw AppException.notFound(ErrorCode.NOT_FOUND, "Product not found");
+    }
+
+    const visibleInStock: Prisma.ProductWhereInput = {
+      status: "ACTIVE",
+      deletedAt: null,
+      inStock: true,
+      shop: PUBLIC_SHOP_FILTER,
+      id: { not: product.id },
+    };
+
+    const siblingCategoryIds = await this.siblingCategoryIds(
+      product.categoryId,
+      product.category.parentId,
+    );
+
+    const tiers: string[][] = [];
+    tiers.push(await this.candidateIds({ ...visibleInStock, categoryId: product.categoryId }));
+    if (siblingCategoryIds.length > 0) {
+      tiers.push(
+        await this.candidateIds({ ...visibleInStock, categoryId: { in: siblingCategoryIds } }),
+      );
+    }
+    tiers.push(await this.candidateIds({ ...visibleInStock, shopId: product.shopId }));
+    tiers.push(await this.candidateIds(visibleInStock));
+
+    const seed = `${product.id}:${todayIsoDate()}`;
+    const seen = new Set<string>([product.id]);
+    const orderedIds: string[] = [];
+    for (const tier of tiers) {
+      const ranked = rankIds(seed, tier);
+      for (const item of ranked) {
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        orderedIds.push(item.id);
+        if (orderedIds.length >= limit) break;
+      }
+      if (orderedIds.length >= limit) break;
+    }
+
+    if (orderedIds.length === 0) return [];
+    const rows = await this.prisma.product.findMany({
+      where: { id: { in: orderedIds } },
+      include: LIST_ITEM_INCLUDE,
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return orderedIds.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [this.toListItem(row)] : [];
+    });
+  }
+
+  private async siblingCategoryIds(categoryId: string, parentId: string | null): Promise<string[]> {
+    const siblings = await this.prisma.category.findMany({
+      where: { parentId, id: { not: categoryId }, isActive: true },
+      select: { id: true },
+    });
+    return siblings.map((category) => category.id);
+  }
+
+  private async candidateIds(where: Prisma.ProductWhereInput): Promise<string[]> {
+    const rows = await this.prisma.product.findMany({
+      where,
+      select: { id: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+    return rows.map((row) => row.id);
+  }
+
   async listShops(query: { page?: number; limit?: number }): Promise<PaginatedResult<unknown>> {
     const { page, limit, skip } = resolvePagination(query);
     const where: Prisma.ShopWhereInput = {
@@ -441,4 +522,8 @@ export class PublicProductsService {
         return [{ publishedAt: "desc" }, { createdAt: "desc" }];
     }
   }
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
 }

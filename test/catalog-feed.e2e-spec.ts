@@ -221,4 +221,62 @@ describe("Catalog random feed (e2e)", () => {
     expect(ids).toContain(visible.id);
     expect(ids).toHaveLength(1);
   });
+
+  describe("B2 related products", () => {
+    it("excludes self, prefers the same category, fills to limit and is stable", async () => {
+      const { shop } = await seedShop();
+      const parent = await seedCategory("Parent");
+      const category = await seedCategory("Target", parent.id);
+      const sibling = await seedCategory("Sibling", parent.id);
+      const unrelated = await seedCategory("Unrelated");
+
+      const target = await seedProduct(shop.id, category.id, { name: "Target product" });
+      const sameCategory = [];
+      for (let i = 0; i < 4; i += 1) {
+        sameCategory.push(await seedProduct(shop.id, category.id, { name: `Same ${i}` }));
+      }
+      await seedProduct(shop.id, sibling.id, { name: "Sibling product" });
+      await seedProduct(shop.id, unrelated.id, { name: "Unrelated product" });
+
+      const res = await request(server)
+        .get(`${API}/products/${target.slug}/related?limit=4`)
+        .expect(200);
+      const ids = res.body.data.map((p: { id: string }) => p.id);
+      expect(ids).toHaveLength(4);
+      expect(new Set(ids).size).toBe(4);
+      expect(ids).not.toContain(target.id);
+      expect([...ids].sort()).toEqual(sameCategory.map((p) => p.id).sort());
+
+      const again = await request(server)
+        .get(`${API}/products/${target.slug}/related?limit=4`)
+        .expect(200);
+      expect(again.body.data.map((p: { id: string }) => p.id)).toEqual(ids);
+    });
+
+    it("fills from siblings and shop and hides invisible products", async () => {
+      const { shop } = await seedShop();
+      const parent = await seedCategory("Parent");
+      const category = await seedCategory("Target", parent.id);
+      const sibling = await seedCategory("Sibling", parent.id);
+      const target = await seedProduct(shop.id, category.id, { name: "Target" });
+      await seedProduct(shop.id, category.id, { name: "Inactive", status: "INACTIVE" });
+      const siblingProduct = await seedProduct(shop.id, sibling.id, { name: "Sibling" });
+
+      const res = await request(server)
+        .get(`${API}/products/${target.slug}/related?limit=6`)
+        .expect(200);
+      const ids = res.body.data.map((p: { id: string }) => p.id);
+      expect(ids).toContain(siblingProduct.id);
+      expect(ids).not.toContain(target.id);
+    });
+
+    it("returns 404 for unknown or hidden slugs", async () => {
+      await request(server).get(`${API}/products/does-not-exist/related`).expect(404);
+
+      const { shop } = await seedShop();
+      const category = await seedCategory("Target");
+      const hidden = await seedProduct(shop.id, category.id, { status: "INACTIVE" });
+      await request(server).get(`${API}/products/${hidden.slug}/related`).expect(404);
+    });
+  });
 });
