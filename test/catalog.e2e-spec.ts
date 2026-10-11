@@ -6,12 +6,17 @@ import request from "supertest";
 
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
+import { hashPassword } from "../src/common/utils/password";
 import { AppConfigService } from "../src/config/app-config.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { resetDatabase } from "./cleanup";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
+
+function suffix(): string {
+  return `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+}
 
 function registerPayload() {
   return {
@@ -27,6 +32,77 @@ async function makePng(): Promise<Buffer> {
   })
     .png()
     .toBuffer();
+}
+
+async function adminAgent(server: Server, prisma: PrismaService) {
+  const email = `admin_${suffix()}@example.com`;
+  await prisma.user.create({
+    data: {
+      email,
+      name: "Admin",
+      passwordHash: await hashPassword("AdminStr0ng1"),
+      role: "ADMIN",
+      emailVerifiedAt: new Date(),
+    },
+  });
+  const agent = request.agent(server);
+  await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+  return agent;
+}
+
+async function seedVisibleShop(prisma: PrismaService, overrides: { status?: "ACTIVE" | "SUSPENDED" } = {}) {
+  const user = await prisma.user.create({
+    data: {
+      email: `seller_${suffix()}@example.com`,
+      name: "Seller",
+      passwordHash: "not-a-real-hash",
+      role: "SELLER",
+      emailVerifiedAt: new Date(),
+    },
+  });
+  const profile = await prisma.sellerProfile.create({
+    data: {
+      userId: user.id,
+      businessName: "Green Valley",
+      contactPhone: "01712345678",
+      businessAddress: "x",
+      status: "APPROVED",
+      verifiedAt: new Date(),
+    },
+  });
+  return prisma.shop.create({
+    data: {
+      sellerProfileId: profile.id,
+      name: `Shop ${suffix()}`,
+      slug: `shop-${suffix()}`,
+      status: overrides.status ?? "ACTIVE",
+      approvedAt: new Date(),
+      district: "Dhaka",
+    },
+  });
+}
+
+async function seedProductIn(
+  prisma: PrismaService,
+  shopId: string,
+  categoryId: string,
+  overrides: { status?: "ACTIVE" | "INACTIVE" | "DRAFT"; inStock?: boolean } = {},
+) {
+  return prisma.product.create({
+    data: {
+      shopId,
+      categoryId,
+      name: `Plant ${suffix()}`,
+      slug: `plant-${suffix()}`,
+      description: "A plant.",
+      tags: [],
+      status: overrides.status ?? "ACTIVE",
+      inStock: overrides.inStock ?? true,
+      minPrice: "10",
+      maxPrice: "20",
+      publishedAt: new Date(),
+    },
+  });
 }
 
 describe("Catalog & addresses (e2e)", () => {
@@ -86,6 +162,66 @@ describe("Catalog & addresses (e2e)", () => {
     expect(res.body.data[0].slug).toBe("indoor-plants");
     expect(res.body.data[0].children).toHaveLength(1);
     expect(res.body.data[0].children[0].slug).toBe("succulents");
+  });
+
+  describe("category images & counts (B5)", () => {
+    it("round-trips a category image URL through admin create/update", async () => {
+      const admin = await adminAgent(server, prisma);
+      const created = await admin
+        .post(`${API}/admin/categories`)
+        .set("Origin", ORIGIN)
+        .send({ name: "Indoor Plants", imageUrl: "https://cdn.test/cat/indoor.webp" })
+        .expect(201);
+      expect(created.body.data.imageUrl).toBe("https://cdn.test/cat/indoor.webp");
+
+      const publicTree = await request(server).get(`${API}/categories`).expect(200);
+      expect(publicTree.body.data[0].imageUrl).toBe("https://cdn.test/cat/indoor.webp");
+
+      await admin
+        .patch(`${API}/admin/categories/${created.body.data.id}`)
+        .set("Origin", ORIGIN)
+        .send({ imageUrl: "https://cdn.test/cat/indoor-v2.webp" })
+        .expect(200);
+
+      const updated = await request(server).get(`${API}/categories`).expect(200);
+      expect(updated.body.data[0].imageUrl).toBe("https://cdn.test/cat/indoor-v2.webp");
+    });
+
+    it("counts visible, in-stock products with children rolled into the parent", async () => {
+      const parent = await prisma.category.create({
+        data: { name: "Indoor Plants", slug: "indoor-plants", sortOrder: 0 },
+      });
+      const child = await prisma.category.create({
+        data: { name: "Succulents", slug: "succulents", parentId: parent.id },
+      });
+      const shop = await seedVisibleShop(prisma);
+      await seedProductIn(prisma, shop.id, parent.id, {});
+      await seedProductIn(prisma, shop.id, child.id, {});
+      await seedProductIn(prisma, shop.id, child.id, {});
+      await seedProductIn(prisma, shop.id, child.id, { inStock: false });
+      await seedProductIn(prisma, shop.id, child.id, { status: "INACTIVE" });
+
+      const suspended = await seedVisibleShop(prisma, { status: "SUSPENDED" });
+      await seedProductIn(prisma, suspended.id, child.id, {});
+
+      const res = await request(server).get(`${API}/categories`).expect(200);
+      const parentNode = res.body.data.find((c: { slug: string }) => c.slug === "indoor-plants");
+      const childNode = parentNode.children.find((c: { slug: string }) => c.slug === "succulents");
+      expect(childNode.productCount).toBe(2);
+      expect(parentNode.productCount).toBe(3);
+    });
+
+    it("hides inactive categories from the public tree", async () => {
+      await prisma.category.create({
+        data: { name: "Active", slug: "active", isActive: true },
+      });
+      await prisma.category.create({
+        data: { name: "Hidden", slug: "hidden", isActive: false },
+      });
+
+      const res = await request(server).get(`${API}/categories`).expect(200);
+      expect(res.body.data.map((c: { slug: string }) => c.slug)).toEqual(["active"]);
+    });
   });
 
   it("uploads and re-encodes an image", async () => {

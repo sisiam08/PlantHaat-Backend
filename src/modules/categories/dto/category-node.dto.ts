@@ -8,5 +8,9 @@ export class CategoryNodeDto {
   @ApiProperty({ nullable: true, type: String }) imageUrl!: string | null;
   @ApiProperty({ nullable: true, type: String }) parentId!: string | null;
   @ApiProperty() sortOrder!: number;
+  @ApiProperty({
+    description: "Visible, in-stock products; child categories are counted into the parent",
+  })
+  productCount!: number;
   @ApiProperty({ type: () => [CategoryNodeDto] }) children!: CategoryNodeDto[];
 }
