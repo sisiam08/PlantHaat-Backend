@@ -3,6 +3,7 @@ import type { PrismaService } from "../../prisma/prisma.service";
 
 export interface ResolvedDelivery {
   zoneId: string;
+  name: string;
   charge: Prisma.Decimal;
   freeDeliveryAbove: Prisma.Decimal | null;
   estimatedDaysMin: number;
@@ -35,6 +36,7 @@ export async function resolveDeliveryZone(
 
 function toResolved(zone: {
   id: string;
+  name: string;
   charge: Prisma.Decimal;
   freeDeliveryAbove: Prisma.Decimal | null;
   estimatedDaysMin: number;
@@ -42,6 +44,7 @@ function toResolved(zone: {
 }): ResolvedDelivery {
   return {
     zoneId: zone.id,
+    name: zone.name,
     charge: zone.charge,
     freeDeliveryAbove: zone.freeDeliveryAbove,
     estimatedDaysMin: zone.estimatedDaysMin,

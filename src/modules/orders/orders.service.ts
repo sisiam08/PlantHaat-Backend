@@ -164,6 +164,7 @@ export class OrdersService {
           subtotal: new Prisma.Decimal(0),
           delivery: {
             zoneId: "",
+            name: "",
             charge: new Prisma.Decimal(0),
             freeDeliveryAbove: null,
             estimatedDaysMin: 1,

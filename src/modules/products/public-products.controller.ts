@@ -11,9 +11,11 @@ import {
   ApiEnvelopeResponse,
   ApiPaginatedResponse,
 } from "../../common/swagger/api-response.decorators";
+import { DeliveryQuoteDto } from "./dto/delivery-quote-response.dto";
 import { HomeResponseDto } from "./dto/home-response.dto";
 import { ProductDetailDto, ProductListItemDto } from "./dto/product-response.dto";
 import { QueryProductsDto } from "./dto/query-products.dto";
+import { DeliveryQuoteQueryDto } from "./dto/delivery-quote-query.dto";
 import { RelatedProductsQueryDto } from "./dto/related-products.dto";
 import { ShopDetailDto, ShopListItemDto } from "./dto/shop-response.dto";
 import { ProductViewsService } from "./product-views.service";
@@ -80,6 +82,16 @@ export class PublicProductsController {
   @ApiEnvelopeResponse(ShopDetailDto)
   getShop(@Param("slug") slug: string) {
     return this.products.getShopBySlug(slug);
+  }
+
+  @Public()
+  @Get("shops/:slug/delivery-quote")
+  @ApiOperation({
+    summary: "Delivery quote for a shop + destination district (same zones as checkout)",
+  })
+  @ApiEnvelopeResponse(DeliveryQuoteDto)
+  deliveryQuote(@Param("slug") slug: string, @Query() query: DeliveryQuoteQueryDto) {
+    return this.products.getDeliveryQuote(slug, query.districtId);
   }
 
   @Public()

@@ -6,6 +6,19 @@ export class ShopSummaryDto {
   @ApiProperty() slug!: string;
 }
 
+export class ProductShopSummaryDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty() slug!: string;
+  @ApiProperty({ nullable: true, type: String }) logoUrl!: string | null;
+  @ApiProperty({ nullable: true, type: String, description: "Origin district (ships from)" })
+  district!: string | null;
+  @ApiProperty({ description: "Seller verification badge" }) verified!: boolean;
+  @ApiProperty({ type: String, description: "Decimal as string" }) ratingAvg!: string;
+  @ApiProperty() ratingCount!: number;
+  @ApiProperty() isOnVacation!: boolean;
+}
+
 export class CategorySummaryDto {
   @ApiProperty() id!: string;
   @ApiProperty() name!: string;
@@ -66,6 +79,6 @@ export class ProductDetailDto {
   @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
   @ApiProperty({ type: [Object] }) variants!: Record<string, unknown>[];
   @ApiProperty({ type: [Object] }) images!: Record<string, unknown>[];
-  @ApiProperty({ type: Object }) shop!: Record<string, unknown>;
+  @ApiProperty({ type: ProductShopSummaryDto }) shop!: ProductShopSummaryDto;
   @ApiProperty({ type: CategorySummaryDto }) category!: CategorySummaryDto;
 }

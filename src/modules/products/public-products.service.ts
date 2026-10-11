@@ -10,6 +10,7 @@ import type { CursorPaginatedResult, PaginatedResult } from "../../common/types/
 import { paginate } from "../../common/types/paginated";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { resolveDeliveryZone } from "../orders/delivery-zone.resolver";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import {
   cursorPage,
@@ -210,8 +211,8 @@ export class PublicProductsService {
             ratingAvg: true,
             ratingCount: true,
             district: true,
-            address: true,
             isOnVacation: true,
+            sellerProfile: { select: { verifiedAt: true } },
           },
         },
         category: { select: { id: true, name: true, nameBn: true, slug: true } },
@@ -223,18 +224,27 @@ export class PublicProductsService {
 
     // View counting moved to POST /products/:id/view (deduped per IP+window) so
     // cached/prerendered pages do not inflate counts.
-    return product;
+    const { sellerProfile, ...shop } = product.shop;
+    return {
+      ...product,
+      shop: {
+        id: shop.id,
+        name: shop.name,
+        slug: shop.slug,
+        logoUrl: shop.logoUrl,
+        district: shop.district,
+        verified: sellerProfile.verifiedAt !== null,
+        ratingAvg: shop.ratingAvg,
+        ratingCount: shop.ratingCount,
+        isOnVacation: shop.isOnVacation,
+      },
+    };
   }
 
   async getRelated(slug: string, limit: number) {
     const product = await this.prisma.product.findFirst({
       where: { slug, status: "ACTIVE", deletedAt: null, shop: PUBLIC_SHOP_FILTER },
-      select: {
-        id: true,
-        categoryId: true,
-        shopId: true,
-        category: { select: { parentId: true } },
-      },
+      select: { id: true, categoryId: true, shopId: true, category: { select: { parentId: true } } },
     });
     if (!product) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Product not found");
@@ -248,17 +258,14 @@ export class PublicProductsService {
       id: { not: product.id },
     };
 
-    const siblingCategoryIds = await this.siblingCategoryIds(
-      product.categoryId,
-      product.category.parentId,
-    );
+    const siblingCategoryIds = await this.siblingCategoryIds(product.categoryId, product.category.parentId);
 
     const tiers: string[][] = [];
-    tiers.push(await this.candidateIds({ ...visibleInStock, categoryId: product.categoryId }));
+    tiers.push(
+      await this.candidateIds({ ...visibleInStock, categoryId: product.categoryId }),
+    );
     if (siblingCategoryIds.length > 0) {
-      tiers.push(
-        await this.candidateIds({ ...visibleInStock, categoryId: { in: siblingCategoryIds } }),
-      );
+      tiers.push(await this.candidateIds({ ...visibleInStock, categoryId: { in: siblingCategoryIds } }));
     }
     tiers.push(await this.candidateIds({ ...visibleInStock, shopId: product.shopId }));
     tiers.push(await this.candidateIds(visibleInStock));
@@ -305,6 +312,47 @@ export class PublicProductsService {
       take: 200,
     });
     return rows.map((row) => row.id);
+  }
+
+  async getDeliveryQuote(slug: string, districtId: number) {
+    const shop = await this.prisma.shop.findFirst({
+      where: { slug, ...PUBLIC_SHOP_FILTER },
+      select: { id: true },
+    });
+    if (!shop) {
+      throw AppException.notFound(ErrorCode.NOT_FOUND, "Shop not found");
+    }
+
+    const district = await this.prisma.district.findUnique({
+      where: { id: districtId },
+      select: { id: true },
+    });
+    if (!district) {
+      throw AppException.unprocessable(ErrorCode.VALIDATION_FAILED, "Unknown district");
+    }
+
+    const zone = await resolveDeliveryZone(this.prisma, shop.id, districtId);
+    if (!zone) {
+      return {
+        deliverable: false,
+        charge: null,
+        freeDeliveryAbove: null,
+        estimatedDaysMin: null,
+        estimatedDaysMax: null,
+        zoneName: null,
+        codAvailable: false,
+      };
+    }
+
+    return {
+      deliverable: true,
+      charge: zone.charge.toString(),
+      freeDeliveryAbove: zone.freeDeliveryAbove === null ? null : zone.freeDeliveryAbove.toString(),
+      estimatedDaysMin: zone.estimatedDaysMin,
+      estimatedDaysMax: zone.estimatedDaysMax,
+      zoneName: zone.name,
+      codAvailable: true,
+    };
   }
 
   async listShops(query: { page?: number; limit?: number }): Promise<PaginatedResult<unknown>> {
