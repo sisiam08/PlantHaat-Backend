@@ -36,6 +36,7 @@ export class CartController {
   @Put("items")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Set the quantity of a cart item" })
+  @ApiEnvelopeResponse(CartViewDto)
   putItem(@CurrentUser("id") userId: string, @Body() dto: PutCartItemDto) {
     return this.cartService.putItem(userId, dto);
   }
@@ -43,6 +44,7 @@ export class CartController {
   @Delete("items/:variantId")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Remove a cart item" })
+  @ApiEnvelopeResponse(CartViewDto)
   removeItem(@CurrentUser("id") userId: string, @Param("variantId") variantId: string) {
     return this.cartService.removeItem(userId, variantId);
   }
@@ -50,6 +52,7 @@ export class CartController {
   @Delete()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Clear the cart" })
+  @ApiEnvelopeResponse(CartViewDto)
   clear(@CurrentUser("id") userId: string) {
     return this.cartService.clear(userId);
   }

@@ -164,12 +164,15 @@ export class CartService {
     let deliveryTotal = new Prisma.Decimal(0);
     for (const group of groups.values()) {
       let deliveryCharge: Prisma.Decimal | null = null;
+      let freeDeliveryAbove: string | null = null;
       if (districtId) {
         const zone = await resolveDeliveryZone(this.prisma, group.shopId, districtId);
         if (zone) {
           const free =
             zone.freeDeliveryAbove !== null && group.subtotal.gte(zone.freeDeliveryAbove);
           deliveryCharge = free ? new Prisma.Decimal(0) : zone.charge;
+          freeDeliveryAbove =
+            zone.freeDeliveryAbove === null ? null : zone.freeDeliveryAbove.toString();
         }
       }
       shops.push({
@@ -179,6 +182,7 @@ export class CartService {
         items: group.items,
         subtotal: group.subtotal,
         deliveryCharge,
+        freeDeliveryAbove,
       });
       subtotal = subtotal.plus(group.subtotal);
       if (deliveryCharge) {
