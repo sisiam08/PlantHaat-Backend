@@ -1,7 +1,7 @@
 # PlantHaat Backend
 
 NestJS + Prisma API for PlantHaat, a multi-vendor online plant marketplace for
-Bangladesh. See `../BACKEND_DESIGN.md` for the full design and `../AI_CONTEXT.md`
+Bangladesh. See `../BACKEND_DESIGN.md` for the full design and `../BACKEND_CONTEXT.md`
 for the working rules, progress log and decisions.
 
 ## Stack
