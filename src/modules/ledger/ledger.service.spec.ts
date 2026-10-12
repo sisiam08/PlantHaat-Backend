@@ -3,9 +3,9 @@ import { jest } from "@jest/globals";
 import type { PrismaService } from "../../prisma/prisma.service";
 import { LedgerService } from "./ledger.service";
 
-type PrismaMockFn = jest.Mock<(...args: unknown[]) => unknown>;
+type PrismaMockFn = jest.Mock<(...args: unknown[]) => Promise<unknown>>;
 
-const mockFn = (): PrismaMockFn => jest.fn<(...args: unknown[]) => unknown>();
+const mockFn = (): PrismaMockFn => jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 function createPrismaMock() {
   return {
@@ -77,9 +77,13 @@ describe("LedgerService", () => {
 
   it("lists entries paginated (all types)", async () => {
     const prisma = createPrismaMock();
-    prisma.$transaction.mockImplementation(async (ops: unknown[]) =>
-      Promise.all(ops as Promise<unknown>[]),
-    );
+    prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
+      const op = args[0] as unknown;
+      if (typeof op === "function") {
+        return (op as (tx: unknown) => unknown)(prisma);
+      }
+      return Promise.all(op as Promise<unknown>[]);
+    });
     prisma.ledgerEntry.findMany.mockResolvedValue([{ id: "l-1" }]);
     prisma.ledgerEntry.count.mockResolvedValue(1);
     const service = new LedgerService(prisma as unknown as PrismaService);
@@ -98,9 +102,12 @@ describe("LedgerService", () => {
 
   it("filters by entry type when given", async () => {
     const prisma = createPrismaMock();
-    prisma.$transaction.mockImplementation(async (ops: unknown[]) =>
-      Promise.all(ops as Promise<unknown>[]),
-    );
+    prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
+      const op = args[0] as unknown;
+      return typeof op === "function"
+        ? (op as (tx: unknown) => unknown)(prisma)
+        : Promise.all(op as Promise<unknown>[]);
+    });
     prisma.ledgerEntry.findMany.mockResolvedValue([]);
     prisma.ledgerEntry.count.mockResolvedValue(0);
     const service = new LedgerService(prisma as unknown as PrismaService);

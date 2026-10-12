@@ -69,7 +69,11 @@ function createPrismaMock() {
 }
 
 function createService(prisma: ReturnType<typeof createPrismaMock>): AuthService {
-  prisma.$transaction.mockImplementation(async (op) => { if (typeof op === "function") return op(prisma); return Promise.all(op); });
+  prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
+    const op = args[0] as unknown;
+    if (typeof op === "function") return (op as (tx: unknown) => unknown)(prisma);
+    return Promise.all(op as Promise<unknown>[]);
+  });
   const jwt = {
     signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed-access-token"),
   } as unknown as JwtService;
@@ -236,7 +240,7 @@ describe("AuthService", () => {
         service.login({ email: "a@b.com", password: "Wrong1" } as never, {}),
       ).rejects.toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
       const updateArg = prisma.user.update.mock.calls[0][0] as {
-        data: { failedLoginCount: number };
+        data: { failedLoginCount: number; lockedUntil?: Date | null };
       };
       expect(updateArg.data.failedLoginCount).toBe(1);
       expect(updateArg.data.lockedUntil).toBeUndefined();

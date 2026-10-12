@@ -18,10 +18,14 @@ const { OrdersService } = (await import("./orders.service")) as {
   OrdersService: typeof import("./orders.service").OrdersService;
 };
 const { resolveDeliveryZone } = (await import("./delivery-zone.resolver")) as {
-  resolveDeliveryZone: import("@jest/globals").Mock;
+  resolveDeliveryZone: unknown;
 };
 
-const resolveDeliveryZoneMock = resolveDeliveryZone;
+const resolveDeliveryZoneMock = resolveDeliveryZone as {
+  mock: { calls: unknown[][] };
+  mockResolvedValue: (value: unknown) => void;
+  mockReset: () => void;
+};
 
 type PrismaMockFn = jest.Mock<(...args: unknown[]) => Promise<unknown>>;
 
@@ -175,7 +179,6 @@ function checkoutDto(overrides: Record<string, unknown> = {}) {
 
 const shopOrderId = "so-1";
 
-const actorAdmin = { id: "admin-1", role: "ADMIN" } as unknown as AuthenticatedUser;
 const actorSeller = { id: "user-seller", role: "SELLER" } as unknown as AuthenticatedUser;
 
 const shopOrderFixture = (overrides: Record<string, unknown> = {}): never => ({
@@ -625,7 +628,7 @@ describe("OrdersService", () => {
         where: { shopOrderId: string; method: string; status: string };
       };
       expect(manyArg.where).toEqual({ shopOrderId, method: "COD", status: "PENDING" });
-      const ledgerCall = deps.ledger.record.mock.calls[0][1] as {
+      const ledgerCall = (deps.ledger.record as unknown as jest.Mock).mock.calls[0][1] as {
         type: string;
         amount: Prisma.Decimal;
       };
@@ -648,7 +651,7 @@ describe("OrdersService", () => {
 
       await deps.service.transitionByAdmin(shopOrderId, { status: "DELIVERED" } as never);
 
-      const ledgerCall = deps.ledger.record.mock.calls[0][1] as {
+      const ledgerCall = (deps.ledger.record as unknown as jest.Mock).mock.calls[0][1] as {
         type: string;
         amount: Prisma.Decimal;
       };

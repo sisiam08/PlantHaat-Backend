@@ -57,9 +57,10 @@ function createService(
 describe("RefundsService", () => {
   it("lists refunds through a paginated transaction", async () => {
     const prisma = createPrismaMock();
-    prisma.$transaction.mockImplementation(async (ops: unknown[]) =>
-      Promise.all(ops as Promise<unknown>[]),
-    );
+    prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
+      const op = args[0] as unknown;
+      return Promise.all(op as Promise<unknown>[]);
+    });
     prisma.refund.findMany.mockResolvedValue([{ id: "r-1", shopOrder: { id: "so-1" } }]);
     prisma.refund.count.mockResolvedValue(1);
     const service = createService(prisma);
@@ -165,7 +166,7 @@ describe("RefundsService", () => {
       }),
     );
     expect(ledgerRecord).toHaveBeenCalledTimes(1);
-    const entry = ledgerRecord.mock.calls[0][1] as {
+    const entry = (ledgerRecord as unknown as jest.Mock).mock.calls[0][1] as {
       type: string;
       amount: { toString: () => string };
     };
@@ -188,7 +189,7 @@ describe("RefundsService", () => {
 
     await service.process("r-1", {} as never, actor, {});
 
-    const entry = ledgerRecord.mock.calls[0][1] as {
+    const entry = (ledgerRecord as unknown as jest.Mock).mock.calls[0][1] as {
       type: string;
       amount: { toString: () => string };
     };

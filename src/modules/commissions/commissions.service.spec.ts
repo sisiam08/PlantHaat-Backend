@@ -300,9 +300,10 @@ describe("CommissionsService", () => {
 
     it("lists rules through a paginated transaction", async () => {
       const prisma = createPrismaMock();
-      prisma.$transaction.mockImplementation(async (ops: unknown[]) =>
-        Promise.all(ops as Promise<unknown>[]),
-      );
+      prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
+        const op = args[0] as unknown;
+        return Promise.all(op as Promise<unknown>[]);
+      });
       prisma.commissionRule.findMany.mockResolvedValue([{ id: "rule-1" }]);
       prisma.commissionRule.count.mockResolvedValue(1);
       const service = createService(prisma);

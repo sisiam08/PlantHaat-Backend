@@ -57,9 +57,10 @@ function createService(
 describe("PayoutsService", () => {
   it("lists payouts paginated", async () => {
     const prisma = createPrismaMock();
-    prisma.$transaction.mockImplementation(async (ops: unknown[]) =>
-      Promise.all(ops as Promise<unknown>[]),
-    );
+    prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
+      const op = args[0] as unknown;
+      return Promise.all(op as Promise<unknown>[]);
+    });
     prisma.payout.findMany.mockResolvedValue([{ id: "p-1" }]);
     prisma.payout.count.mockResolvedValue(1);
     const service = createService(prisma);
@@ -111,7 +112,8 @@ describe("PayoutsService", () => {
 
     expect((payout as { id: string }).id).toBe("p-1");
     expect(ledger.record).toHaveBeenCalledTimes(1);
-    const ledgerArg = ledger.record.mock.calls[0][1] as {
+    const recordMock = ledger.record as unknown as jest.Mock;
+    const ledgerArg = recordMock.mock.calls[0][1] as unknown as {
       amount: { negated: () => { toString: () => string } };
       type: string;
     };
@@ -173,8 +175,9 @@ describe("PayoutsService", () => {
 
     expect(result).toEqual({ balance: "77.00" });
     expect(ledger.record).toHaveBeenCalledTimes(1);
-    expect(ledger.record.mock.calls[0][0]).toBe(prisma);
-    const entry = ledger.record.mock.calls[0][1] as { type: string };
+    const recordMock = ledger.record as unknown as jest.Mock;
+    expect(recordMock.mock.calls[0][0]).toBe(prisma);
+    const entry = recordMock.mock.calls[0][1] as unknown as { type: string };
     expect(entry.type).toBe("DUES_PAYMENT");
   });
 
@@ -196,7 +199,8 @@ describe("PayoutsService", () => {
     );
 
     expect(result).toEqual({ balance: "-20.00" });
-    const entry = ledger.record.mock.calls[0][1] as { type: string };
+    const recordMock = ledger.record as unknown as jest.Mock;
+    const entry = recordMock.mock.calls[0][1] as unknown as { type: string };
     expect(entry.type).toBe("ADJUSTMENT");
   });
 
@@ -217,9 +221,10 @@ describe("PayoutsService", () => {
 
   it("returns balance, ledger and payouts for the seller earnings view", async () => {
     const prisma = createPrismaMock();
-    prisma.$transaction.mockImplementation(async (ops: unknown[]) =>
-      Promise.all(ops as Promise<unknown>[]),
-    );
+    prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
+      const op = args[0] as unknown;
+      return Promise.all(op as Promise<unknown>[]);
+    });
     prisma.ledgerEntry.findMany.mockResolvedValue([{ id: "l-1" }]);
     prisma.payout.findMany.mockResolvedValue([{ id: "p-1" }]);
     const ledger = {
