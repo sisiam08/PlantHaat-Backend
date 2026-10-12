@@ -1,5 +1,5 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiNoContentResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 
@@ -64,6 +64,7 @@ export class PublicProductsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ default: { limit: 60, ttl: 60 * 1000 } })
   @ApiOperation({ summary: "Record a product view (deduplicated per IP, 30-minute window)" })
+  @ApiNoContentResponse({ description: "View recorded (or deduplicated)" })
   recordView(@Param("id") id: string, @Req() request: Request): void {
     this.views.record(id, (request as Request & { clientIp?: string }).clientIp);
   }

@@ -50,6 +50,17 @@ export class SellerReviewListItemDto {
   @ApiProperty({ type: ReviewProductRefDto }) product!: ReviewProductRefDto;
 }
 
+export class ReviewAuthorRefDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ nullable: true, type: String }) avatarUrl!: string | null;
+}
+
+export class ProductReviewListItemDto extends ReviewDto {
+  @ApiProperty({ type: [ReviewImageDto] }) images!: ReviewImageDto[];
+  @ApiProperty({ type: ReviewAuthorRefDto }) customer!: ReviewAuthorRefDto;
+}
+
 export class ReviewReportDto {
   @ApiProperty() id!: string;
   @ApiProperty() reviewId!: string;
@@ -59,4 +70,19 @@ export class ReviewReportDto {
   @ApiProperty({ nullable: true, type: String }) resolvedById!: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" }) resolvedAt!: string | null;
   @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
+}
+
+export class AdminReviewReportDto extends ReviewReportDto {
+  @ApiProperty({ type: ReviewDto, description: "The reported review" })
+  review!: ReviewDto;
+}
+
+export class ReviewReportResolveDto {
+  @ApiProperty({ example: true }) resolved!: boolean;
+  @ApiProperty({ description: "Whether the reported review was hidden" }) hidden!: boolean;
+}
+
+export class ReviewModerationResultDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ type: String, description: "Review status after moderation" }) status!: string;
 }

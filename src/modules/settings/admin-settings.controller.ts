@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Req } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { IsObject } from "class-validator";
 import type { Request } from "express";
 
@@ -16,6 +16,21 @@ class UpdateSettingsDto {
   values!: Record<string, unknown>;
 }
 
+/** `{ success: true, data: { "<setting.key>": <json value>, ... } }` */
+const settingsEnvelopeSchema = {
+  type: "object",
+  required: ["success", "data"],
+  properties: {
+    success: { type: "boolean", example: true },
+    data: {
+      type: "object",
+      additionalProperties: true,
+      description: "Setting key to value, merged with defaults (e.g. checkout.maxQtyPerItem: 5)",
+    },
+  },
+};
+
+
 @ApiTags("Admin: settings")
 @Roles(Role.ADMIN)
 @Controller("admin/settings")
@@ -27,6 +42,7 @@ export class AdminSettingsController {
 
   @Get()
   @ApiOperation({ summary: "Get all system settings (merged with defaults)" })
+  @ApiOkResponse({ schema: settingsEnvelopeSchema })
   get() {
     return this.settings.getAll();
   }
@@ -34,6 +50,7 @@ export class AdminSettingsController {
   @Patch()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Update system settings" })
+  @ApiOkResponse({ schema: settingsEnvelopeSchema })
   async update(
     @Body() dto: UpdateSettingsDto,
     @CurrentUser() actor: AuthenticatedUser,

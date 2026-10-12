@@ -3,12 +3,19 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
-import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { Role } from "../../generated/prisma/enums";
 import { RespondCancellationDto } from "./dto/cancellation-request.dto";
 import { OrderDetailDto } from "./dto/order-response.dto";
 import { QueryOrdersDto } from "./dto/query-orders.dto";
+import {
+  CancellationRespondResultDto,
+  SellerShopOrderDto,
+} from "./dto/seller-order-response.dto";
 import { TransitionOrderDto } from "./dto/transition-order.dto";
 import { OrdersService } from "./orders.service";
 
@@ -20,6 +27,7 @@ export class AdminOrdersController {
 
   @Get("orders")
   @ApiOperation({ summary: "List all shop orders" })
+  @ApiPaginatedResponse(SellerShopOrderDto)
   list(@Query() query: QueryOrdersDto) {
     return this.ordersService.listAdminOrders(query);
   }
@@ -34,6 +42,7 @@ export class AdminOrdersController {
   @Post("orders/:id/status")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Override a shop order's status" })
+  @ApiEnvelopeResponse(SellerShopOrderDto)
   setStatus(@Param("id") id: string, @Body() dto: TransitionOrderDto) {
     return this.ordersService.transitionByAdmin(id, dto);
   }
@@ -41,6 +50,7 @@ export class AdminOrdersController {
   @Post("cancellation-requests/:id/respond")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Respond to any cancellation request" })
+  @ApiEnvelopeResponse(CancellationRespondResultDto)
   respond(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") id: string,

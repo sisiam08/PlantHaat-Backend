@@ -10,15 +10,20 @@ import {
   Post,
   Req,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiNoContentResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import {
+  ApiEnvelopeArrayResponse,
+  ApiEnvelopeResponse,
+} from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { getRequestMeta } from "../../common/utils/request-meta";
 import { Role } from "../../generated/prisma/enums";
 import { AuditService } from "../audit/audit.service";
+import { AdminCategoryDto } from "./dto/admin-response.dto";
 import { AdminCategoriesService } from "./admin-categories.service";
 import { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
 
@@ -33,12 +38,14 @@ export class AdminCategoriesController {
 
   @Get()
   @ApiOperation({ summary: "List all categories (including inactive)" })
+  @ApiEnvelopeArrayResponse(AdminCategoryDto)
   list() {
     return this.categories.list();
   }
 
   @Post()
   @ApiOperation({ summary: "Create a category" })
+  @ApiEnvelopeResponse(AdminCategoryDto, { status: 201 })
   async create(
     @Body() dto: CreateCategoryDto,
     @CurrentUser() actor: AuthenticatedUser,
@@ -59,6 +66,7 @@ export class AdminCategoriesController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update a category" })
+  @ApiEnvelopeResponse(AdminCategoryDto)
   async update(
     @Param("id") id: string,
     @Body() dto: UpdateCategoryDto,
@@ -80,6 +88,7 @@ export class AdminCategoriesController {
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a category (must have no products)" })
+  @ApiNoContentResponse({ description: "Category deleted" })
   async remove(
     @Param("id") id: string,
     @CurrentUser() actor: AuthenticatedUser,

@@ -3,11 +3,15 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
-import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
 import { Role } from "../../generated/prisma/enums";
 import { CancelOrderDto } from "./dto/cancel-order.dto";
-import { OrderDetailDto } from "./dto/order-response.dto";
+import { OrderDetailDto, OrderListItemDto } from "./dto/order-response.dto";
 import { CancellationRequestDto } from "./dto/cancellation-request.dto";
+import { SellerCancellationRequestDto, SellerShopOrderDto } from "./dto/seller-order-response.dto";
 import { QueryOrdersDto } from "./dto/query-orders.dto";
 import { OrdersService } from "./orders.service";
 
@@ -19,6 +23,7 @@ export class OrdersController {
 
   @Get()
   @ApiOperation({ summary: "List the current customer's orders" })
+  @ApiPaginatedResponse(OrderListItemDto)
   list(@CurrentUser("id") customerId: string, @Query() query: QueryOrdersDto) {
     return this.ordersService.listCustomerOrders(customerId, query);
   }
@@ -33,6 +38,7 @@ export class OrdersController {
   @Post("shop-orders/:id/cancel")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Cancel a shop order while it is still PENDING" })
+  @ApiEnvelopeResponse(SellerShopOrderDto)
   cancel(
     @CurrentUser("id") customerId: string,
     @Param("id") id: string,
@@ -43,6 +49,7 @@ export class OrdersController {
 
   @Post("shop-orders/:id/cancellation-request")
   @ApiOperation({ summary: "Request cancellation of a CONFIRMED/PACKED shop order" })
+  @ApiEnvelopeResponse(SellerCancellationRequestDto, { status: 201 })
   requestCancellation(
     @CurrentUser("id") customerId: string,
     @Param("id") id: string,

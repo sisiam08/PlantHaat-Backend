@@ -3,8 +3,10 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { AppConfigService } from "../../config/app-config.service";
+import { RealtimeTicketDto } from "./dto/realtime-response.dto";
 import { TicketService } from "./ticket.service";
 
 @ApiTags("Realtime")
@@ -19,6 +21,7 @@ export class RealtimeController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
   @ApiOperation({ summary: "Issue a one-time WebSocket connection ticket" })
+  @ApiEnvelopeResponse(RealtimeTicketDto)
   async ticket(@CurrentUser() user: AuthenticatedUser) {
     const issued = await this.tickets.issue({
       userId: user.id,

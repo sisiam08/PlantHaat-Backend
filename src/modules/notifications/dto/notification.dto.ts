@@ -15,3 +15,11 @@ export class NotificationItemDto {
 export class UnreadCountDto {
   @ApiProperty() count!: number;
 }
+
+export class NotificationReadDto {
+  @ApiProperty({ example: true }) read!: boolean;
+}
+
+export class NotificationReadAllDto {
+  @ApiProperty({ example: 3 }) updated!: number;
+}

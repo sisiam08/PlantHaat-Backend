@@ -11,15 +11,20 @@ import {
   Query,
   Req,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiNoContentResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { getRequestMeta } from "../../common/utils/request-meta";
 import { Role } from "../../generated/prisma/enums";
 import { CommissionsService } from "./commissions.service";
+import { CommissionRuleDto } from "./dto/commission-rule-response.dto";
 import {
   CreateCommissionRuleDto,
   QueryCommissionRulesDto,
@@ -34,12 +39,14 @@ export class AdminCommissionRulesController {
 
   @Get()
   @ApiOperation({ summary: "List commission rules" })
+  @ApiPaginatedResponse(CommissionRuleDto)
   list(@Query() query: QueryCommissionRulesDto) {
     return this.commissions.listRules(query);
   }
 
   @Post()
   @ApiOperation({ summary: "Create a commission rule" })
+  @ApiEnvelopeResponse(CommissionRuleDto, { status: 201 })
   create(
     @Body() dto: CreateCommissionRuleDto,
     @CurrentUser() actor: AuthenticatedUser,
@@ -50,6 +57,7 @@ export class AdminCommissionRulesController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update a commission rule" })
+  @ApiEnvelopeResponse(CommissionRuleDto)
   update(
     @Param("id") id: string,
     @Body() dto: UpdateCommissionRuleDto,
@@ -62,6 +70,7 @@ export class AdminCommissionRulesController {
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a commission rule" })
+  @ApiNoContentResponse({ description: "Rule deleted" })
   async remove(
     @Param("id") id: string,
     @CurrentUser() actor: AuthenticatedUser,

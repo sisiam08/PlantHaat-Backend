@@ -39,6 +39,7 @@ export class UsersController {
     },
   })
   @ApiOperation({ summary: "Upload/replace the current user's avatar" })
+  @ApiEnvelopeResponse(PublicUserDto, { status: 201 })
   uploadAvatar(
     @CurrentUser("id") userId: string,
     @UploadedFile() file: Express.Multer.File | undefined,

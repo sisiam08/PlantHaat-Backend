@@ -9,7 +9,7 @@ import {
   Patch,
   Post,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiNoContentResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -58,6 +58,7 @@ export class SellerApplicationController {
   @Delete("application/documents/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Remove a document from the application" })
+  @ApiNoContentResponse({ description: "Document removed" })
   async removeDocument(@CurrentUser("id") userId: string, @Param("id") id: string) {
     await this.sellersService.removeDocument(userId, id);
   }
@@ -87,6 +88,7 @@ export class SellerApplicationController {
   @Delete("payout-accounts/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Remove a payout account" })
+  @ApiNoContentResponse({ description: "Payout account removed" })
   async removePayoutAccount(@CurrentUser("id") userId: string, @Param("id") id: string) {
     await this.sellersService.removePayoutAccount(userId, id);
   }

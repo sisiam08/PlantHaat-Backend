@@ -10,11 +10,20 @@ import {
   Req,
   Res,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 
-import { ApiEnvelopeResponse, ApiErrorResponses } from "../../common/swagger/api-response.decorators";
+import {
+  ApiEnvelopeArrayResponse,
+  ApiEnvelopeResponse,
+  ApiErrorResponses,
+} from "../../common/swagger/api-response.decorators";
 import { AuthSessionResponseDto, PublicUserDto } from "../users/dto/public-user.dto";
+import { AuthSessionListItemDto } from "./dto/auth-response.dto";
 import type { Request, Response } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -30,6 +39,13 @@ import {
   setRefreshCookie,
 } from "./auth.cookies";
 import { AuthService, type SessionMeta } from "./auth.service";
+import {
+  EmailVerifiedDto,
+  PasswordChangedDoneDto,
+  PasswordResetDoneDto,
+  PasswordResetSentDto,
+  VerificationResentDto,
+} from "./dto/auth-response.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
@@ -134,6 +150,7 @@ export class AuthController {
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Revoke the current session family and clear cookies" })
+  @ApiNoContentResponse({ description: "Logged out; auth cookies cleared" })
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     await this.auth.logout(readRefreshCookie(request));
     clearAuthCookies(response, this.config);
@@ -142,6 +159,7 @@ export class AuthController {
   @Post("logout-all")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Revoke all sessions of the current user" })
+  @ApiNoContentResponse({ description: "All sessions revoked" })
   async logoutAll(@CurrentUser("id") userId: string) {
     await this.auth.logoutAll(userId);
   }
@@ -156,6 +174,7 @@ export class AuthController {
 
   @Get("sessions")
   @ApiOperation({ summary: "List active sessions for the current user" })
+  @ApiEnvelopeArrayResponse(AuthSessionListItemDto)
   listSessions(@CurrentUser() user: AuthenticatedUser) {
     return this.auth.listSessions(user.id, user.sessionId);
   }
@@ -163,6 +182,7 @@ export class AuthController {
   @Delete("sessions/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Revoke one of the current user's sessions" })
+  @ApiNoContentResponse({ description: "Session revoked" })
   async deleteSession(@CurrentUser() user: AuthenticatedUser, @Param("id") sessionId: string) {
     await this.auth.revokeSessionForUser(user.id, sessionId);
   }
@@ -171,6 +191,7 @@ export class AuthController {
   @Post("verify-email")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Verify an email address with a token" })
+  @ApiEnvelopeResponse(EmailVerifiedDto)
   verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.auth.verifyEmail(dto.token);
   }
@@ -179,6 +200,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: HOUR_MS } })
   @ApiOperation({ summary: "Resend the verification email" })
+  @ApiEnvelopeResponse(VerificationResentDto)
   resendVerification(@CurrentUser("id") userId: string) {
     return this.auth.resendVerification(userId);
   }
@@ -188,6 +210,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: HOUR_MS } })
   @ApiOperation({ summary: "Request a password reset email (always succeeds)" })
+  @ApiEnvelopeResponse(PasswordResetSentDto)
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.auth.forgotPassword(dto.email);
   }
@@ -196,6 +219,7 @@ export class AuthController {
   @Post("reset-password")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reset the password with a token and revoke all sessions" })
+  @ApiEnvelopeResponse(PasswordResetDoneDto)
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.auth.resetPassword(dto.token, dto.newPassword);
   }
@@ -203,6 +227,7 @@ export class AuthController {
   @Post("change-password")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Change the current user's password and revoke other sessions" })
+  @ApiEnvelopeResponse(PasswordChangedDoneDto)
   changePassword(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangePasswordDto) {
     return this.auth.changePassword(user.id, user.sessionId, dto);
   }

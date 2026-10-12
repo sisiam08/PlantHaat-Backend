@@ -10,7 +10,7 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiNoContentResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -76,6 +76,7 @@ export class SellerProductsController {
   @Delete("products/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Soft-delete a product" })
+  @ApiNoContentResponse({ description: "Product soft-deleted" })
   async remove(@CurrentUser("id") userId: string, @Param("id") id: string) {
     await this.productsService.remove(userId, id);
   }
@@ -118,6 +119,7 @@ export class SellerProductsController {
   @Delete("products/:id/variants/:variantId")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a variant" })
+  @ApiNoContentResponse({ description: "Variant deleted" })
   async deleteVariant(
     @CurrentUser("id") userId: string,
     @Param("id") id: string,

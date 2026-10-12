@@ -180,6 +180,52 @@ describe("Checkout & orders (e2e)", () => {
     expect(cart.body.data.shops).toHaveLength(0);
   });
 
+  it("returns the free-delivery threshold per shop group", async () => {
+    const shop = await createShopWithProduct(300, 5);
+    await prisma.shopDeliveryZone.updateMany({
+      where: { shopId: shop.shop.id },
+      data: { freeDeliveryAbove: 1000 },
+    });
+    const customer = await createCustomer();
+
+    const withDistrict = await customer.agent
+      .get(`${API}/cart?districtId=${districtId}`)
+      .set("Origin", ORIGIN)
+      .expect(200);
+    const group = withDistrict.body.data.shops[0];
+    expect(group.freeDeliveryAbove).toBe("1000");
+    expect(Number(group.deliveryCharge)).toBe(60);
+
+    const belowThreshold = await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shop.variant.id, quantity: 3 })
+      .expect(200);
+    const stillCharged = belowThreshold.body.data.shops[0];
+    expect(Number(stillCharged.subtotal)).toBe(900);
+    expect(Number(stillCharged.deliveryCharge)).toBe(60);
+    expect(stillCharged.freeDeliveryAbove).toBe("1000");
+
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shop.variant.id, quantity: 4 })
+      .expect(200);
+    const free = await customer.agent
+      .get(`${API}/cart?districtId=${districtId}`)
+      .set("Origin", ORIGIN)
+      .expect(200);
+    expect(Number(free.body.data.shops[0].deliveryCharge)).toBe(0);
+    expect(Number(free.body.data.deliveryTotal)).toBe(0);
+
+    const noDistrict = await customer.agent
+      .get(`${API}/cart`)
+      .set("Origin", ORIGIN)
+      .expect(200);
+    expect(noDistrict.body.data.shops[0].freeDeliveryAbove).toBeNull();
+    expect(noDistrict.body.data.shops[0].deliveryCharge).toBeNull();
+  });
+
   it("is idempotent for the same Idempotency-Key", async () => {
     const shop = await createShopWithProduct(400, 5);
     const customer = await createCustomer();

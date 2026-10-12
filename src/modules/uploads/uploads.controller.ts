@@ -4,9 +4,11 @@ import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
 import { Role } from "../../generated/prisma/enums";
 import { MAX_DOCUMENT_BYTES } from "./document.util";
 import { UploadImageDto } from "./dto/upload-image.dto";
+import { UploadResultDto } from "./dto/upload-result.dto";
 import { MAX_IMAGE_BYTES } from "./image.util";
 import { UploadsService } from "./uploads.service";
 
@@ -29,6 +31,7 @@ export class UploadsController {
     },
   })
   @ApiOperation({ summary: "Upload an image (re-encoded, EXIF stripped)" })
+  @ApiEnvelopeResponse(UploadResultDto, { status: 201 })
   uploadImage(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: UploadImageDto,
@@ -49,6 +52,7 @@ export class UploadsController {
     },
   })
   @ApiOperation({ summary: "Upload a private document (seller onboarding)" })
+  @ApiEnvelopeResponse(UploadResultDto, { status: 201 })
   uploadDocument(
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser("id") userId: string,

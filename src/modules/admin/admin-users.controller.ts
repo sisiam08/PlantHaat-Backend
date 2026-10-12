@@ -14,9 +14,14 @@ import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { getRequestMeta } from "../../common/utils/request-meta";
 import { Role } from "../../generated/prisma/enums";
+import { AdminUserDetailDto, AdminUserListItemDto, AdminUserStatusDto } from "./dto/admin-response.dto";
 import { AdminUsersService } from "./admin-users.service";
 import { CreateAdminUserDto, QueryUsersDto } from "./dto/admin-users.dto";
 
@@ -28,12 +33,14 @@ export class AdminUsersController {
 
   @Get()
   @ApiOperation({ summary: "List users" })
+  @ApiPaginatedResponse(AdminUserListItemDto)
   list(@Query() query: QueryUsersDto) {
     return this.adminUsers.list(query);
   }
 
   @Post()
   @ApiOperation({ summary: "Create an admin user" })
+  @ApiEnvelopeResponse(AdminUserListItemDto, { status: 201 })
   create(
     @Body() dto: CreateAdminUserDto,
     @CurrentUser() actor: AuthenticatedUser,
@@ -44,6 +51,7 @@ export class AdminUsersController {
 
   @Get(":id")
   @ApiOperation({ summary: "Get a user" })
+  @ApiEnvelopeResponse(AdminUserDetailDto)
   get(@Param("id") id: string) {
     return this.adminUsers.get(id);
   }
@@ -51,6 +59,7 @@ export class AdminUsersController {
   @Post(":id/suspend")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Suspend a user and revoke their sessions" })
+  @ApiEnvelopeResponse(AdminUserStatusDto)
   suspend(
     @Param("id") id: string,
     @CurrentUser() actor: AuthenticatedUser,
@@ -62,6 +71,7 @@ export class AdminUsersController {
   @Post(":id/reactivate")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reactivate a user" })
+  @ApiEnvelopeResponse(AdminUserStatusDto)
   reactivate(
     @Param("id") id: string,
     @CurrentUser() actor: AuthenticatedUser,

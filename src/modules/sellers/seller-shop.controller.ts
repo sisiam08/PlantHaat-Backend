@@ -9,7 +9,7 @@ import {
   Patch,
   Post,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiNoContentResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -93,6 +93,7 @@ export class SellerShopController {
   @Delete("delivery-zones/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a delivery zone" })
+  @ApiNoContentResponse({ description: "Zone deleted" })
   async removeZone(@CurrentUser("id") userId: string, @Param("id") id: string) {
     await this.deliveryService.remove(userId, id);
   }

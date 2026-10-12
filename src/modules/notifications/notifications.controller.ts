@@ -6,7 +6,12 @@ import {
   ApiEnvelopeResponse,
   ApiPaginatedResponse,
 } from "../../common/swagger/api-response.decorators";
-import { NotificationItemDto, UnreadCountDto } from "./dto/notification.dto";
+import {
+  NotificationItemDto,
+  NotificationReadAllDto,
+  NotificationReadDto,
+  UnreadCountDto,
+} from "./dto/notification.dto";
 import { QueryNotificationsDto } from "./dto/query-notifications.dto";
 import { NotificationsService } from "./notifications.service";
 
@@ -31,6 +36,7 @@ export class NotificationsController {
 
   @Patch(":id/read")
   @ApiOperation({ summary: "Mark a notification as read" })
+  @ApiEnvelopeResponse(NotificationReadDto)
   markRead(@CurrentUser("id") userId: string, @Param("id") id: string) {
     return this.notificationsService.markRead(userId, id);
   }
@@ -38,6 +44,7 @@ export class NotificationsController {
   @Post("read-all")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Mark all notifications as read" })
+  @ApiEnvelopeResponse(NotificationReadAllDto)
   markAllRead(@CurrentUser("id") userId: string) {
     return this.notificationsService.markAllRead(userId);
   }

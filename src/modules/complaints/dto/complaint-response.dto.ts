@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 
-import { ComplaintStatus, ComplaintType, Role } from "../../../generated/prisma/enums";
+import { ComplaintStatus, ComplaintType, RefundStatus, Role } from "../../../generated/prisma/enums";
 
 export class ComplaintAttachmentDto {
   @ApiProperty() id!: string;
@@ -62,4 +62,27 @@ export class SellerComplaintDetailDto {
   @ApiProperty({ type: [ComplaintAttachmentDto] }) attachments!: ComplaintAttachmentDto[];
   @ApiProperty({ type: [ComplaintCommentResponseDto] })
   comments!: ComplaintCommentResponseDto[];
+}
+
+export class AdminComplaintRefundRefDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ type: String, description: "Decimal as string" }) amount!: string;
+  @ApiProperty({ enum: Object.values(RefundStatus) }) status!: RefundStatus;
+}
+
+export class AdminComplaintListItemDto extends SellerComplaintListItemDto {}
+
+export class AdminComplaintDetailDto extends SellerComplaintDetailDto {
+  @ApiProperty({ type: [AdminComplaintRefundRefDto] })
+  refunds!: AdminComplaintRefundRefDto[];
+  @ApiProperty({
+    type: [ComplaintCommentResponseDto],
+    description: "Includes internal admin comments",
+  })
+  declare comments: ComplaintCommentResponseDto[];
+}
+
+export class CustomerComplaintDetailDto extends SellerComplaintDetailDto {
+  @ApiProperty({ type: [AdminComplaintRefundRefDto] })
+  refunds!: AdminComplaintRefundRefDto[];
 }

@@ -14,10 +14,15 @@ import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { getRequestMeta } from "../../common/utils/request-meta";
 import { Role } from "../../generated/prisma/enums";
 import { ProcessRefundDto, QueryRefundsDto, RejectRefundDto } from "./dto/refund.dto";
+import { RefundDto, RefundProcessedDto } from "./dto/refund-response.dto";
 import { RefundsService } from "./refunds.service";
 
 @ApiTags("Admin: refunds")
@@ -28,6 +33,7 @@ export class AdminRefundsController {
 
   @Get()
   @ApiOperation({ summary: "List refunds" })
+  @ApiPaginatedResponse(RefundDto)
   list(@Query() query: QueryRefundsDto) {
     return this.refunds.list(query);
   }
@@ -35,6 +41,7 @@ export class AdminRefundsController {
   @Post(":id/approve")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Approve a requested refund" })
+  @ApiEnvelopeResponse(RefundDto)
   approve(
     @Param("id") id: string,
     @CurrentUser() actor: AuthenticatedUser,
@@ -46,6 +53,7 @@ export class AdminRefundsController {
   @Post(":id/reject")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reject a refund" })
+  @ApiEnvelopeResponse(RefundDto)
   reject(
     @Param("id") id: string,
     @Body() dto: RejectRefundDto,
@@ -58,6 +66,7 @@ export class AdminRefundsController {
   @Post(":id/process")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Process a refund and adjust the ledger" })
+  @ApiEnvelopeResponse(RefundProcessedDto)
   process(
     @Param("id") id: string,
     @Body() dto: ProcessRefundDto,

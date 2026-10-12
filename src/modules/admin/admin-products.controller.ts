@@ -14,9 +14,14 @@ import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import {
+  ApiEnvelopeResponse,
+  ApiPaginatedResponse,
+} from "../../common/swagger/api-response.decorators";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { getRequestMeta } from "../../common/utils/request-meta";
 import { Role } from "../../generated/prisma/enums";
+import { AdminProductListItemDto, AdminProductStatusDto } from "./dto/admin-response.dto";
 import { AdminProductsService } from "./admin-products.service";
 import { QueryAdminProductsDto } from "./dto/query-admin-products.dto";
 import { RejectSellerDto } from "./dto/reject-seller.dto";
@@ -29,6 +34,7 @@ export class AdminProductsController {
 
   @Get()
   @ApiOperation({ summary: "List products for moderation" })
+  @ApiPaginatedResponse(AdminProductListItemDto)
   list(@Query() query: QueryAdminProductsDto) {
     return this.adminProducts.list(query);
   }
@@ -36,6 +42,7 @@ export class AdminProductsController {
   @Post(":id/approve")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Approve a product" })
+  @ApiEnvelopeResponse(AdminProductStatusDto)
   approve(
     @Param("id") id: string,
     @CurrentUser() actor: AuthenticatedUser,
@@ -47,6 +54,7 @@ export class AdminProductsController {
   @Post(":id/reject")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reject a product" })
+  @ApiEnvelopeResponse(AdminProductStatusDto)
   reject(
     @Param("id") id: string,
     @Body() dto: RejectSellerDto,
@@ -59,6 +67,7 @@ export class AdminProductsController {
   @Post(":id/remove")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Remove a product from the catalog" })
+  @ApiEnvelopeResponse(AdminProductStatusDto)
   remove(
     @Param("id") id: string,
     @Body() dto: RejectSellerDto,
