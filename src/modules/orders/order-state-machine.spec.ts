@@ -35,4 +35,14 @@ describe("order state machine", () => {
     expect(allowedTransitions("DELIVERED", "ADMIN")).toHaveLength(0);
     expect(allowedTransitions("CANCELLED", "ADMIN")).toHaveLength(0);
   });
+
+  it("lists allowed transitions for an intermediate state", () => {
+    expect(allowedTransitions("CONFIRMED", "SELLER")).toEqual(["PACKED", "CANCELLED"]);
+    expect(allowedTransitions("PENDING", "CUSTOMER")).toEqual(["CANCELLED"]);
+  });
+
+  it("lets the system auto-cancel a pending order", () => {
+    expect(canTransition("PENDING", "CANCELLED", "SYSTEM")).toBe(true);
+    expect(canTransition("CONFIRMED", "CANCELLED", "SYSTEM")).toBe(false);
+  });
 });

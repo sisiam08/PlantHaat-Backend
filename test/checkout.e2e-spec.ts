@@ -181,13 +181,18 @@ describe("Checkout & orders (e2e)", () => {
   });
 
   it("returns the free-delivery threshold per shop group", async () => {
-    const shop = await createShopWithProduct(300, 5);
+    const shop = await createShopWithProduct(300, 10);
     await prisma.shopDeliveryZone.updateMany({
       where: { shopId: shop.shop.id },
       data: { freeDeliveryAbove: 1000 },
     });
     const customer = await createCustomer();
 
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shop.variant.id, quantity: 2 })
+      .expect(200);
     const withDistrict = await customer.agent
       .get(`${API}/cart?districtId=${districtId}`)
       .set("Origin", ORIGIN)
@@ -195,11 +200,16 @@ describe("Checkout & orders (e2e)", () => {
     const group = withDistrict.body.data.shops[0];
     expect(group.freeDeliveryAbove).toBe("1000");
     expect(Number(group.deliveryCharge)).toBe(60);
+    expect(Number(group.subtotal)).toBe(600);
 
-    const belowThreshold = await customer.agent
+    await customer.agent
       .put(`${API}/cart/items`)
       .set("Origin", ORIGIN)
       .send({ variantId: shop.variant.id, quantity: 3 })
+      .expect(200);
+    const belowThreshold = await customer.agent
+      .get(`${API}/cart?districtId=${districtId}`)
+      .set("Origin", ORIGIN)
       .expect(200);
     const stillCharged = belowThreshold.body.data.shops[0];
     expect(Number(stillCharged.subtotal)).toBe(900);

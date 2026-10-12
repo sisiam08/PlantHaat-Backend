@@ -549,8 +549,9 @@ export class OrdersService {
     });
 
     if (dto.approve) {
+      // Pass the actor id so the transition ownership guard accepts seller responses.
       await this.transition(
-        null,
+        actor.id,
         actor.role === "ADMIN" ? "ADMIN" : "SELLER",
         request.shopOrderId,
         {
