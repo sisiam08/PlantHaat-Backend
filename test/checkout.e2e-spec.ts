@@ -204,7 +204,9 @@ describe("Checkout & orders (e2e)", () => {
     expect(Number(group.subtotal)).toBe(600);
     expect(group.shop.logoUrl).toBeNull();
     expect(group.shop.verified).toBe(true);
-    expect(typeof group.shop.district).toBe("string");
+    expect(group.shop.district).toBe("Dhaka");
+    expect(group.estimatedDaysMin).toBeGreaterThan(0);
+    expect(group.estimatedDaysMax).toBeGreaterThanOrEqual(group.estimatedDaysMin);
     expect(typeof group.items[0].image).toBe("string");
 
     await customer.agent

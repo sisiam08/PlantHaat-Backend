@@ -11460,6 +11460,16 @@
             "items": {
               "$ref": "#/components/schemas/CartItemDto"
             }
+          },
+          "estimatedDaysMin": {
+            "type": "number",
+            "nullable": true,
+            "description": "Present when a zone matched"
+          },
+          "estimatedDaysMax": {
+            "type": "number",
+            "nullable": true,
+            "description": "Present when a zone matched"
           }
         },
         "required": [
@@ -11470,7 +11480,9 @@
           "deliveryCharge",
           "freeDeliveryAbove",
           "subtotal",
-          "items"
+          "items",
+          "estimatedDaysMin",
+          "estimatedDaysMax"
         ]
       },
       "CartViewDto": {

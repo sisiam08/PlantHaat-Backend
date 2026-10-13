@@ -173,6 +173,8 @@ export class CartService {
     for (const group of groups.values()) {
       let deliveryCharge: Prisma.Decimal | null = null;
       let freeDeliveryAbove: string | null = null;
+      let estimatedDaysMin: number | null = null;
+      let estimatedDaysMax: number | null = null;
       if (districtId) {
         const zone = await resolveDeliveryZone(this.prisma, group.shopId, districtId);
         if (zone) {
@@ -181,6 +183,8 @@ export class CartService {
           deliveryCharge = free ? new Prisma.Decimal(0) : zone.charge;
           freeDeliveryAbove =
             zone.freeDeliveryAbove === null ? null : zone.freeDeliveryAbove.toString();
+          estimatedDaysMin = zone.estimatedDaysMin;
+          estimatedDaysMax = zone.estimatedDaysMax;
         }
       }
       shops.push({
@@ -196,6 +200,8 @@ export class CartService {
         subtotal: group.subtotal,
         deliveryCharge,
         freeDeliveryAbove,
+        estimatedDaysMin,
+        estimatedDaysMax,
       });
       subtotal = subtotal.plus(group.subtotal);
       if (deliveryCharge) {

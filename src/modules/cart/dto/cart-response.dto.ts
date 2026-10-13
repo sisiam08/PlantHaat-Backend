@@ -53,6 +53,10 @@ export class CartShopGroupDto {
   freeDeliveryAbove!: string | null;
   @ApiProperty({ type: String, description: "Decimal as string" }) subtotal!: string;
   @ApiProperty({ type: [CartItemDto] }) items!: CartItemDto[];
+  @ApiProperty({ nullable: true, type: Number, description: "Present when a zone matched" })
+  estimatedDaysMin!: number | null;
+  @ApiProperty({ nullable: true, type: Number, description: "Present when a zone matched" })
+  estimatedDaysMax!: number | null;
 }
 
 export class CartViewDto {
