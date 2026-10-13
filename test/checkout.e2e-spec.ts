@@ -82,6 +82,7 @@ describe("Checkout & orders (e2e)", () => {
         slug: `shop-${id}`,
         status: "ACTIVE",
         approvedAt: new Date(),
+        district: "Dhaka",
       },
     });
     await prisma.shopDeliveryZone.create({
@@ -201,6 +202,10 @@ describe("Checkout & orders (e2e)", () => {
     expect(group.freeDeliveryAbove).toBe("1000");
     expect(Number(group.deliveryCharge)).toBe(60);
     expect(Number(group.subtotal)).toBe(600);
+    expect(group.shop.logoUrl).toBeNull();
+    expect(group.shop.verified).toBe(true);
+    expect(typeof group.shop.district).toBe("string");
+    expect(typeof group.items[0].image).toBe("string");
 
     await customer.agent
       .put(`${API}/cart/items`)

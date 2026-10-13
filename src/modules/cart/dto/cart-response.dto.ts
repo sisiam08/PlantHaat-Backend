@@ -21,10 +21,23 @@ export class CartItemDto {
   @ApiProperty({ type: [CartItemIssueDto] }) issues!: CartItemIssueDto[];
 }
 
+export class CartShopInfoDto {
+  @ApiProperty({ nullable: true, type: String }) logoUrl!: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: "Shop's own district name (seller-entered, not localized)",
+  })
+  district!: string | null;
+  @ApiProperty({ description: "True when the seller profile is APPROVED" })
+  verified!: boolean;
+}
+
 export class CartShopGroupDto {
   @ApiProperty() shopId!: string;
   @ApiProperty() shopName!: string;
   @ApiProperty() shopSlug!: string;
+  @ApiProperty({ type: CartShopInfoDto }) shop!: CartShopInfoDto;
   @ApiProperty({
     nullable: true,
     type: String,

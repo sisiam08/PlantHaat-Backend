@@ -11330,6 +11330,29 @@
           "sections"
         ]
       },
+      "CartShopInfoDto": {
+        "type": "object",
+        "properties": {
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true,
+            "description": "Shop's own district name (seller-entered, not localized)"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "True when the seller profile is APPROVED"
+          }
+        },
+        "required": [
+          "logoUrl",
+          "district",
+          "verified"
+        ]
+      },
       "CartItemIssueDto": {
         "type": "object",
         "properties": {
@@ -11415,6 +11438,9 @@
           "shopSlug": {
             "type": "string"
           },
+          "shop": {
+            "$ref": "#/components/schemas/CartShopInfoDto"
+          },
           "deliveryCharge": {
             "type": "string",
             "nullable": true,
@@ -11440,6 +11466,7 @@
           "shopId",
           "shopName",
           "shopSlug",
+          "shop",
           "deliveryCharge",
           "freeDeliveryAbove",
           "subtotal",

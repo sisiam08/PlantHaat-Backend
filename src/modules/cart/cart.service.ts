@@ -13,6 +13,7 @@ const CART_ITEM_INCLUDE = {
     include: {
       product: {
         include: {
+          images: { select: { url: true, isPrimary: true } },
           shop: { include: { sellerProfile: { select: { status: true } } } },
         },
       },
@@ -109,6 +110,9 @@ export class CartService {
         shopId: string;
         shopName: string;
         shopSlug: string;
+        shopLogoUrl: string | null;
+        shopDistrict: string | null;
+        shopVerified: boolean;
         items: GroupItem[];
         subtotal: Prisma.Decimal;
       }
@@ -135,10 +139,14 @@ export class CartService {
       }
 
       const lineTotal = variant.price.mul(item.quantity);
+      const primary = product.images.find((image) => image.isPrimary) ?? product.images[0];
       const group = groups.get(shop.id) ?? {
         shopId: shop.id,
         shopName: shop.name,
         shopSlug: shop.slug,
+        shopLogoUrl: shop.logoUrl,
+        shopDistrict: shop.district,
+        shopVerified: shop.sellerProfile.status === "APPROVED",
         items: [],
         subtotal: new Prisma.Decimal(0),
       };
@@ -148,7 +156,7 @@ export class CartService {
         productName: product.name,
         variantName: variant.name,
         slug: product.slug,
-        image: null,
+        image: primary?.url ?? null,
         unitPrice: variant.price,
         quantity: item.quantity,
         lineTotal,
@@ -179,6 +187,11 @@ export class CartService {
         shopId: group.shopId,
         shopName: group.shopName,
         shopSlug: group.shopSlug,
+        shop: {
+          logoUrl: group.shopLogoUrl,
+          district: group.shopDistrict,
+          verified: group.shopVerified,
+        },
         items: group.items,
         subtotal: group.subtotal,
         deliveryCharge,
