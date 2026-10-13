@@ -13,6 +13,13 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { resolveDeliveryZone } from "../orders/delivery-zone.resolver";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import {
+  buildCursorWhere,
+  cursorOrderBy,
+  decodeProductCursor,
+  encodeProductCursor,
+  type CursorRow,
+} from "./product-cursor";
+import {
   cursorPage,
   type CursorPayload,
   decodeCursor,
@@ -69,6 +76,9 @@ export class PublicProductsService {
     if (query.sort === "random") {
       return this.listRandom(query, shopId);
     }
+    if (query.pagination === "cursor") {
+      return this.listCursor(query, shopId);
+    }
     const { page, limit, skip } = resolvePagination(query);
     const where = await this.buildWhere(query, shopId);
 
@@ -84,6 +94,71 @@ export class PublicProductsService {
     ]);
 
     return paginate(rows.map((product) => this.toListItem(product)), total, page, limit);
+  }
+
+  /**
+   * Cursor pagination for every deterministic sort: `(sortKey(s), id)` keyset
+   * conditions with an opaque base64url cursor bound to the sort — positional
+   * offset pagination stays available (deprecated) for sitemap/internal use.
+   */
+  private async listCursor(
+    query: QueryProductsDto,
+    shopId?: string,
+  ): Promise<CursorPaginatedResult<unknown>> {
+    const limit = query.limit ?? 20;
+    const sort = query.sort ?? "newest";
+
+    let decoded: ReturnType<typeof decodeProductCursor> | null = null;
+    if (query.cursor) {
+      try {
+        decoded = decodeProductCursor(query.cursor, sort);
+      } catch (error) {
+        if (error instanceof InvalidCursorError) {
+          throw AppException.badRequest(
+            ErrorCode.INVALID_CURSOR,
+            `Invalid cursor for sort ${sort}`,
+          );
+        }
+        throw error;
+      }
+    }
+
+    const where = await this.buildWhere(query, shopId);
+    const keyset: Prisma.ProductWhereInput = decoded
+      ? buildCursorWhere(sort, decoded)
+      : {};
+
+    const includeTotal = query.includeTotal === true && decoded === null;
+    const [rows, count] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { AND: [where, keyset] },
+        orderBy: cursorOrderBy(sort),
+        take: limit,
+        include: LIST_ITEM_INCLUDE,
+      }),
+      includeTotal ? this.prisma.product.count({ where }) : Promise.resolve(undefined),
+    ]);
+
+    const last = rows.at(-1) as unknown as CursorRow | undefined;
+    const hasMore = rows.length === limit && Boolean(last);
+    const nextCursor = hasMore && last ? encodeProductCursor(sort, last) : null;
+
+    const meta: {
+      limit: number;
+      nextCursor: string | null;
+      hasMore: boolean;
+      total?: number;
+    } = { limit, nextCursor, hasMore };
+    if (count !== undefined) {
+      meta.total = count;
+    }
+
+    return {
+      data: rows.map((product) =>
+        this.toListItem(product as unknown as ProductListRow),
+      ),
+      meta,
+    };
   }
 
   private async listRandom(

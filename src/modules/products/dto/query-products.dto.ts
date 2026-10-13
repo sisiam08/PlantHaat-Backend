@@ -30,6 +30,9 @@ export const PRODUCT_SORTS = [
 ] as const;
 export type ProductSort = (typeof PRODUCT_SORTS)[number];
 
+export const PRODUCT_PAGINATION_MODES = ["offset", "cursor"] as const;
+export type ProductPaginationMode = (typeof PRODUCT_PAGINATION_MODES)[number];
+
 export class QueryProductsDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: "Search name, nameBn, scientificName or tags" })
   @IsOptional()
@@ -112,7 +115,25 @@ export class QueryProductsDto extends PaginationQueryDto {
   })
   seed?: string;
 
-  @ApiPropertyOptional({ description: "Opaque cursor returned by `sort=random` pagination" })
+  @ApiPropertyOptional({
+    description:
+      "Pagination mode for deterministic sorts: `offset` (deprecated; page/limit/total meta) or `cursor` (keyset `meta: {limit, nextCursor, hasMore, total?}`). `sort=random` always pages by cursor.",
+    enum: PRODUCT_PAGINATION_MODES,
+  })
+  @IsOptional()
+  @IsIn(PRODUCT_PAGINATION_MODES)
+  pagination?: ProductPaginationMode;
+
+  @ApiPropertyOptional({
+    description:
+      "Cursor-mode extra: include `meta.total` on the FIRST page (no cursor) for an 'N results' label.",
+  })
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  includeTotal?: boolean;
+
+  @ApiPropertyOptional({ description: "Opaque cursor (`sort=random` or `pagination=cursor`)" })
   @IsOptional()
   @IsString()
   @MaxLength(512)

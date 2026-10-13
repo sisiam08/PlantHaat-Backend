@@ -13,6 +13,11 @@ export class CursorPaginationMetaDto {
   @ApiProperty({ nullable: true, type: String, description: "Opaque cursor for the next page" })
   nextCursor!: string | null;
   @ApiProperty() hasMore!: boolean;
+  @ApiPropertyOptional({
+    type: Number,
+    description: "Cursor-mode only (`includeTotal=true`, first page): total matching rows",
+  })
+  total?: number;
 }
 
 export class ErrorBodyDto {

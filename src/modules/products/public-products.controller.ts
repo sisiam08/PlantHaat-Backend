@@ -34,9 +34,12 @@ export class PublicProductsController {
   @ApiOperation({
     summary: "Search/filter public products",
     description:
-      "Default sorts return page-based meta (`page/limit/total/totalPages`). " +
-      "`sort=random` returns cursor meta (`limit/nextCursor/hasMore`) with no total; " +
-      "pass `seed` (1–64 chars `[A-Za-z0-9_-]`) for a stable shuffle and `cursor` to page.",
+      "Default behavior: page-based meta (`page/limit/total/totalPages`) — deprecated for the " +
+      "storefront, kept for the sitemap/internal callers. `pagination=cursor` returns keyset " +
+      "meta (`limit/nextCursor/hasMore`, and `total` on the first page with `includeTotal=true`) " +
+      "for every deterministic sort; cursors are opaque and bound to the sort (tampering → 400). " +
+      "`sort=random` always returns cursor meta (`limit/nextCursor/hasMore`, no total); pass " +
+      "`seed` (1–64 chars `[A-Za-z0-9_-]`) for a stable shuffle.",
   })
   @ApiAdaptivePaginatedResponse(ProductListItemDto)
   list(@Query() query: QueryProductsDto) {
@@ -97,8 +100,8 @@ export class PublicProductsController {
 
   @Public()
   @Get("shops/:slug/products")
-  @ApiOperation({ summary: "List a shop's public products" })
-  @ApiPaginatedResponse(ProductListItemDto)
+  @ApiOperation({ summary: "List a shop's public products (same pagination modes as /products)" })
+  @ApiAdaptivePaginatedResponse(ProductListItemDto)
   shopProducts(@Param("slug") slug: string, @Query() query: QueryProductsDto) {
     return this.products.listShopProducts(slug, query);
   }
