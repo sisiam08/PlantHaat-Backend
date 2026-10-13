@@ -117,8 +117,24 @@ describe("Search suggestions (e2e)", () => {
         maxPrice: "100",
       },
     });
+    // Decoy: name does NOT contain the query and nameBn/scientificName are null,
+    // so its prefix_hit must be FALSE (not NULL) or it would wrongly sort first.
+    const decoy = await prisma.product.create({
+      data: {
+        shopId: shop.id,
+        categoryId: category.id,
+        name: "Elm Bonsai",
+        slug: `elm-bonsai-${suffix()}`,
+        description: "x",
+        status: "ACTIVE",
+        publishedAt: new Date(),
+        minPrice: "500",
+        maxPrice: "500",
+        inStock: true,
+      },
+    });
 
-    return { shop, category, hiddenCategory, active, outOfStock, hiddenProduct };
+    return { shop, category, hiddenCategory, active, outOfStock, hiddenProduct, decoy };
   };
 
   it('rejects queries shorter than 2 characters, blanks and oversized input with 400', async () => {
@@ -198,14 +214,16 @@ describe("Search suggestions (e2e)", () => {
 
   it("prefers prefix matches and in-stock products", async () => {
     await createSeed();
-    // "monstera" prefix-matches both products; a similarity-only product created
-    // with a name merely containing "monstera-like" text might exist — the
-    // prefix product must come first.
+    // "monstera" prefix-matches the Monstera products. The decoy ("Elm Bonsai")
+    // only matches by word similarity and has null nameBn/scientificName — a
+    // regression where prefix_hit evaluated to NULL made it sort first
+    // (Postgres DESC = NULLS FIRST), so the Monstera products must lead.
     const response = await request(server)
       .get(`${API}/search/suggest?q=monstera`)
       .set("Origin", ORIGIN);
     const products = response.body.data.products as { name: string; inStock: boolean }[];
     expect(products.length).toBeGreaterThanOrEqual(2);
+    expect(products[0].name.startsWith("Monstera")).toBe(true);
     const prefixProducts = products.filter((product) => product.name.startsWith("Monstera"));
     expect(products.slice(0, prefixProducts.length)).toEqual(prefixProducts);
   });

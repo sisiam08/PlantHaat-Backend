@@ -95,9 +95,9 @@ export class SearchService {
               ELSE 0
             END
           ) AS sim,
-          (p."name" ILIKE ${pattern}
-            OR p."nameBn" ILIKE ${pattern}
-            OR p."scientificName" ILIKE ${pattern}) AS prefix_hit
+          (COALESCE(p."name" ILIKE ${pattern}, FALSE)
+            OR COALESCE(p."nameBn" ILIKE ${pattern}, FALSE)
+            OR COALESCE(p."scientificName" ILIKE ${pattern}, FALSE)) AS prefix_hit
         FROM "Product" p
         JOIN "Shop" s ON s."id" = p."shopId"
         JOIN "SellerProfile" sp ON sp."id" = s."sellerProfileId"
