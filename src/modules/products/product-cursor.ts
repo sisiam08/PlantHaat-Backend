@@ -201,9 +201,17 @@ export function buildCursorWhere(sort: string, decoded: DecodedCursor): Prisma.P
     const key = keys[index];
     const raw = decoded.values[index];
     if (raw === null) {
-      // The cursor row is inside a null run and nulls are adjacent to it in the
-      // sort order — paging continues inside the run via the deeper keys.
-      return after(index + 1, [...prefix, isNull(key)]);
+      const nullBranches: Cond[] = [];
+      if (key.nullable && key.dir === "desc") {
+        // DESC sorts nulls first, so after the entire null run come *all*
+        // non-null rows — without this branch they would be skipped forever
+        // once a page boundary lands inside the null run (e.g. price_desc with
+        // products that have no active variant).
+        nullBranches.push({ AND: [...prefix, { [key.field]: { not: null } }] });
+      }
+      // Continue inside the null run via the deeper keys.
+      nullBranches.push(...after(index + 1, [...prefix, isNull(key)]));
+      return nullBranches;
     }
     const branches: Cond[] = [{ AND: [...prefix, cmpAhead(key, raw)] }];
     if (key.nullable && key.dir === "asc") {

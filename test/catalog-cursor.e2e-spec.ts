@@ -179,7 +179,11 @@ describe("Product cursor pagination (e2e)", () => {
   }
 
   /** Walks cursor pages to the end; asserts no duplicates and no gaps vs offset. */
-  async function walkCursor(sort: string, extra: Record<string, string | number | boolean> = {}) {
+  async function walkCursor(
+    sort: string,
+    extra: Record<string, string | number | boolean> = {},
+    limit = 3,
+  ) {
     const seen: string[] = [];
     let cursor: string | undefined;
     let guard = 0;
@@ -188,7 +192,7 @@ describe("Product cursor pagination (e2e)", () => {
         pagination: "cursor",
         sort,
         cursor,
-        limit: 3,
+        limit,
         includeTotal: cursor === undefined,
         ...extra,
       });
@@ -203,7 +207,7 @@ describe("Product cursor pagination (e2e)", () => {
       expect(new Set(seen).size).toBe(seen.length); // no duplicates
       cursor = (meta.nextCursor as string | null) ?? undefined;
       guard += 1;
-      expect(guard).toBeLessThanOrEqual(totalVisible + 2); // hard stop
+      expect(guard).toBeLessThanOrEqual(200); // hard stop
     } while (cursor);
 
     // full coverage: seen lengths equal the offset walk's
@@ -215,7 +219,7 @@ describe("Product cursor pagination (e2e)", () => {
     expect(new Set(seen)).toEqual(new Set(offsetIds));
 
     // deterministic across walks
-    const again = await fetch({ pagination: "cursor", sort, limit: 3, ...extra });
+    const again = await fetch({ pagination: "cursor", sort, limit, ...extra });
     const firstIds = (again.body.data as { id: string }[]).map((row) => row.id);
     expect(firstIds).toEqual(seen.slice(0, firstIds.length));
 
@@ -225,6 +229,54 @@ describe("Product cursor pagination (e2e)", () => {
   it("walks every product exactly once for each sort (ties + nulls included)", async () => {
     for (const sort of DETERMINISTIC_SORTS) {
       await walkCursor(sort);
+    }
+  });
+
+  it("pages a nullable DESC key when a page ends inside the null run", async () => {
+    // price_desc sorts null minPrice first; a page size that ends exactly on a
+    // null row used to drop every non-null product that followed the null run.
+    for (const limit of [1, 2]) {
+      const seen = await walkCursor("price_desc", {}, limit);
+      const offset = await fetch({ sort: "price_desc", page: 1, limit: 50 });
+      const expected = (offset.body.data as { id: string }[]).map((row) => row.id);
+      expect(seen.length).toBe(expected.length);
+      expect(new Set(seen)).toEqual(new Set(expected));
+    }
+  });
+
+  it("pages newest across products with a null publishedAt", async () => {
+    const prisma = slots.prisma;
+    const category = await prisma.category.findFirstOrThrow({
+      where: { slug: slots.categorySlug },
+    });
+    const created = await Promise.all(
+      [1, 2, 3].map((n) =>
+        prisma.product.create({
+          data: {
+            shopId: slots.shopIds.a,
+            categoryId: category.id,
+            name: `NullPub ${n}`,
+            slug: `nullpub-${suffix()}-${n}`,
+            description: "x",
+            status: "ACTIVE",
+            publishedAt: null,
+            createdAt: new Date(Date.now() - n * 1000),
+            updatedAt: new Date(),
+            inStock: true,
+            ratingAvg: "0",
+            ratingCount: 0,
+            soldCount: 0,
+          },
+        }),
+      ),
+    );
+    try {
+      const seen = await walkCursor("newest", {}, 1);
+      for (const product of created) {
+        expect(seen).toContain(product.id);
+      }
+    } finally {
+      await prisma.product.deleteMany({ where: { id: { in: created.map((p) => p.id) } } });
     }
   });
 

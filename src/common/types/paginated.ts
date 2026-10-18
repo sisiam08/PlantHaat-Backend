@@ -31,6 +31,8 @@ export interface CursorPaginationMeta {
   limit: number;
   nextCursor: string | null;
   hasMore: boolean;
+  /** Present only on the first page when `includeTotal=true` was requested. */
+  total?: number;
 }
 
 export interface CursorPaginatedResult<T> {
