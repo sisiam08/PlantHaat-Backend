@@ -15,7 +15,10 @@ async function bootstrap(): Promise<void> {
   configureApp(app, config);
   app.enableShutdownHooks();
 
-  await app.listen(config.values.PORT, "0.0.0.0");
+  // Bind to all interfaces with Node's default host (dual-stack `::` when IPv6
+  // is available, otherwise `0.0.0.0`). Binding IPv4-only made `localhost`
+  // resolves to `::1` fail with ECONNREFUSED for callers that try IPv6 first.
+  await app.listen(config.values.PORT);
   logger.log(`PlantHaat API listening on ${config.values.API_URL} (port ${config.values.PORT})`);
 }
 

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
@@ -8,7 +9,10 @@ import type { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
 
 @Injectable()
 export class AdminCategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   list() {
     return this.prisma.category.findMany({
@@ -24,7 +28,7 @@ export class AdminCategoriesService {
     const slug = dto.slug
       ? await this.ensureUniqueSlug(toSlug(dto.slug))
       : await this.ensureUniqueSlug(toUniqueSlug(dto.name));
-    return this.prisma.category.create({
+    const created = await this.prisma.category.create({
       data: {
         name: dto.name.trim(),
         nameBn: dto.nameBn ?? null,
@@ -35,6 +39,8 @@ export class AdminCategoriesService {
         isActive: dto.isActive ?? true,
       },
     });
+    this.events.emit("category.changed");
+    return created;
   }
 
   async update(id: string, dto: UpdateCategoryDto) {
@@ -48,7 +54,7 @@ export class AdminCategoriesService {
       }
       await this.assertParent(dto.parentId);
     }
-    return this.prisma.category.update({
+    const updated = await this.prisma.category.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
@@ -60,6 +66,8 @@ export class AdminCategoriesService {
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
     });
+    this.events.emit("category.changed");
+    return updated;
   }
 
   async remove(id: string): Promise<void> {
@@ -79,6 +87,7 @@ export class AdminCategoriesService {
       );
     }
     await this.prisma.category.delete({ where: { id } });
+    this.events.emit("category.changed");
   }
 
   private async assertParent(parentId: string): Promise<void> {
