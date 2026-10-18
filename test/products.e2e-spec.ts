@@ -205,6 +205,44 @@ describe("Products (e2e)", () => {
     expect(listed.body.data.some((p: { slug: string }) => p.slug === slug)).toBe(false);
   });
 
+  it("counts a view sent as the product UUID", async () => {
+    const seller = await approvedSeller();
+    const { productId } = await createActiveProduct(seller.agent);
+
+    await request(server).post(`${API}/products/${productId}/view`).expect(204);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+    expect(product.viewCount).toBe(1);
+  });
+
+  it("counts a view sent as the product slug", async () => {
+    const seller = await approvedSeller();
+    const { productId, slug } = await createActiveProduct(seller.agent);
+
+    await request(server).post(`${API}/products/${slug}/view`).expect(204);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+    expect(product.viewCount).toBe(1);
+  });
+
+  it("ignores an unknown id/slug without failing", async () => {
+    const seller = await approvedSeller();
+    const { productId, slug } = await createActiveProduct(seller.agent);
+    const before = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+
+    await request(server).post(`${API}/products/no-such-slug-f3a1/view`).expect(204);
+    await request(server)
+      .post(`${API}/products/00000000-0000-4000-8000-000000000000/view`)
+      .expect(204);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const after = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+    expect(after.viewCount).toBe(before.viewCount);
+    expect(slug).toBeTruthy();
+  });
+
   it("counts at most one product view per IP within the window", async () => {
     const seller = await approvedSeller();
     const { productId } = await createActiveProduct(seller.agent);

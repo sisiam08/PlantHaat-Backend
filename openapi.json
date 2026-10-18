@@ -2348,6 +2348,7 @@
     },
     "/api/v1/products/{id}/view": {
       "post": {
+        "description": "Accepts either the product UUID or its slug. Unknown products are ignored silently (204), so this endpoint can never fail a page view.",
         "operationId": "PublicProductsController_recordView",
         "parameters": [
           {
@@ -2361,7 +2362,7 @@
         ],
         "responses": {
           "204": {
-            "description": "View recorded (or deduplicated)"
+            "description": "View recorded (or deduplicated/ignored)"
           }
         },
         "summary": "Record a product view (deduplicated per IP, 30-minute window)",

@@ -66,8 +66,13 @@ export class PublicProductsController {
   @Post("products/:id/view")
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ default: { limit: 60, ttl: 60 * 1000 } })
-  @ApiOperation({ summary: "Record a product view (deduplicated per IP, 30-minute window)" })
-  @ApiNoContentResponse({ description: "View recorded (or deduplicated)" })
+  @ApiOperation({
+    summary: "Record a product view (deduplicated per IP, 30-minute window)",
+    description:
+      "Accepts either the product UUID or its slug. Unknown products are ignored " +
+      "silently (204), so this endpoint can never fail a page view.",
+  })
+  @ApiNoContentResponse({ description: "View recorded (or deduplicated/ignored)" })
   recordView(@Param("id") id: string, @Req() request: Request): void {
     this.views.record(id, (request as Request & { clientIp?: string }).clientIp);
   }
