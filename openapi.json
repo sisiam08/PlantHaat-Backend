@@ -11658,10 +11658,15 @@
           "shop": {
             "$ref": "#/components/schemas/CartShopInfoDto"
           },
+          "deliverable": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "The shop can deliver to the chosen district. null when no districtId was passed, false when a district was chosen but the shop has no active zone covering it, true otherwise."
+          },
           "deliveryCharge": {
             "type": "string",
             "nullable": true,
-            "description": "Delivery charge as a decimal string; null when no districtId passed"
+            "description": "Delivery charge as a decimal string; null when no districtId passed or not deliverable"
           },
           "freeDeliveryAbove": {
             "type": "string",

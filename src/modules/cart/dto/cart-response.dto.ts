@@ -40,8 +40,16 @@ export class CartShopGroupDto {
   @ApiProperty({ type: CartShopInfoDto }) shop!: CartShopInfoDto;
   @ApiProperty({
     nullable: true,
+    type: Boolean,
+    description:
+      "The shop can deliver to the chosen district. null when no districtId was passed, " +
+      "false when a district was chosen but the shop has no active zone covering it, true otherwise.",
+  })
+  deliverable!: boolean | null;
+  @ApiProperty({
+    nullable: true,
     type: String,
-    description: "Delivery charge as a decimal string; null when no districtId passed",
+    description: "Delivery charge as a decimal string; null when no districtId passed or not deliverable",
   })
   deliveryCharge!: string | null;
   @ApiProperty({

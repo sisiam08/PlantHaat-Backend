@@ -175,8 +175,12 @@ export class CartService {
       let freeDeliveryAbove: string | null = null;
       let estimatedDaysMin: number | null = null;
       let estimatedDaysMax: number | null = null;
+      // null = no district chosen yet; false = district chosen but the shop has
+      // no active zone covering it; true = a zone matched.
+      let deliverable: boolean | null = null;
       if (districtId) {
         const zone = await resolveDeliveryZone(this.prisma, group.shopId, districtId);
+        deliverable = zone !== null;
         if (zone) {
           const free =
             zone.freeDeliveryAbove !== null && group.subtotal.gte(zone.freeDeliveryAbove);
@@ -198,6 +202,7 @@ export class CartService {
         },
         items: group.items,
         subtotal: group.subtotal,
+        deliverable,
         deliveryCharge,
         freeDeliveryAbove,
         estimatedDaysMin,

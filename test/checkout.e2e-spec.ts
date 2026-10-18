@@ -199,6 +199,7 @@ describe("Checkout & orders (e2e)", () => {
       .set("Origin", ORIGIN)
       .expect(200);
     const group = withDistrict.body.data.shops[0];
+    expect(group.deliverable).toBe(true);
     expect(group.freeDeliveryAbove).toBe("1000");
     expect(Number(group.deliveryCharge)).toBe(60);
     expect(Number(group.subtotal)).toBe(600);
@@ -239,8 +240,33 @@ describe("Checkout & orders (e2e)", () => {
       .get(`${API}/cart`)
       .set("Origin", ORIGIN)
       .expect(200);
+    expect(noDistrict.body.data.shops[0].deliverable).toBeNull();
     expect(noDistrict.body.data.shops[0].freeDeliveryAbove).toBeNull();
     expect(noDistrict.body.data.shops[0].deliveryCharge).toBeNull();
+  });
+
+  it("marks a shop not deliverable for a district outside its zones", async () => {
+    const shop = await createShopWithProduct(300, 10);
+    const customer = await createCustomer();
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shop.variant.id, quantity: 1 })
+      .expect(200);
+
+    const otherDistrict = await prisma.district.create({
+      data: { name: `Sylhet-${suffix()}`, nameBn: "সিলেট", division: "Sylhet" },
+    });
+
+    const res = await customer.agent
+      .get(`${API}/cart?districtId=${otherDistrict.id}`)
+      .set("Origin", ORIGIN)
+      .expect(200);
+    const group = res.body.data.shops[0];
+    expect(group.deliverable).toBe(false);
+    expect(group.deliveryCharge).toBeNull();
+    expect(group.freeDeliveryAbove).toBeNull();
+    expect(Number(res.body.data.deliveryTotal)).toBe(0);
   });
 
   it("is idempotent for the same Idempotency-Key", async () => {
