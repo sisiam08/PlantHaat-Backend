@@ -2083,28 +2083,54 @@
             "name": "light",
             "required": false,
             "in": "query",
+            "description": "Light requirement(s); repeat the param or use comma-separated values",
             "schema": {
-              "type": "string",
-              "enum": [
-                "FULL_SUN",
-                "PARTIAL_SHADE",
-                "SHADE",
-                "BRIGHT_INDIRECT",
-                "LOW_LIGHT"
-              ]
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "FULL_SUN",
+                  "PARTIAL_SHADE",
+                  "SHADE",
+                  "BRIGHT_INDIRECT",
+                  "LOW_LIGHT"
+                ]
+              }
             }
           },
           {
             "name": "difficulty",
             "required": false,
             "in": "query",
+            "description": "Care difficulty(ies); repeat the param or use comma-separated values",
             "schema": {
-              "type": "string",
-              "enum": [
-                "EASY",
-                "MODERATE",
-                "HARD"
-              ]
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "EASY",
+                  "MODERATE",
+                  "HARD"
+                ]
+              }
+            }
+          },
+          {
+            "name": "minRating",
+            "required": false,
+            "in": "query",
+            "description": "Only products rated at least this (1–5) with reviews",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "onSale",
+            "required": false,
+            "in": "query",
+            "description": "Only products with a discounted variant",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -2239,6 +2265,60 @@
           }
         },
         "summary": "Search/filter public products",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/products/filter-options": {
+      "get": {
+        "operationId": "PublicProductsController_filterOptions",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Category slug (includes child categories)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Free-text search to narrow the option set",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FilterOptionsResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Filter facet values (price bounds, light/difficulty) for the current category/search",
         "tags": [
           "Catalog"
         ]
@@ -2609,28 +2689,54 @@
             "name": "light",
             "required": false,
             "in": "query",
+            "description": "Light requirement(s); repeat the param or use comma-separated values",
             "schema": {
-              "type": "string",
-              "enum": [
-                "FULL_SUN",
-                "PARTIAL_SHADE",
-                "SHADE",
-                "BRIGHT_INDIRECT",
-                "LOW_LIGHT"
-              ]
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "FULL_SUN",
+                  "PARTIAL_SHADE",
+                  "SHADE",
+                  "BRIGHT_INDIRECT",
+                  "LOW_LIGHT"
+                ]
+              }
             }
           },
           {
             "name": "difficulty",
             "required": false,
             "in": "query",
+            "description": "Care difficulty(ies); repeat the param or use comma-separated values",
             "schema": {
-              "type": "string",
-              "enum": [
-                "EASY",
-                "MODERATE",
-                "HARD"
-              ]
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "EASY",
+                  "MODERATE",
+                  "HARD"
+                ]
+              }
+            }
+          },
+          {
+            "name": "minRating",
+            "required": false,
+            "in": "query",
+            "description": "Only products rated at least this (1–5) with reviews",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "onSale",
+            "required": false,
+            "in": "query",
+            "description": "Only products with a discounted variant",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -11051,6 +11157,62 @@
           "hasMore"
         ]
       },
+      "PriceBoundsDto": {
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "number",
+            "nullable": true,
+            "example": 50
+          },
+          "max": {
+            "type": "number",
+            "nullable": true,
+            "example": 4500
+          }
+        },
+        "required": [
+          "min",
+          "max"
+        ]
+      },
+      "FilterOptionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "$ref": "#/components/schemas/PriceBoundsDto"
+          },
+          "light": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FULL_SUN",
+                "PARTIAL_SHADE",
+                "SHADE",
+                "BRIGHT_INDIRECT",
+                "LOW_LIGHT"
+              ]
+            }
+          },
+          "difficulty": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "EASY",
+                "MODERATE",
+                "HARD"
+              ]
+            }
+          }
+        },
+        "required": [
+          "price",
+          "light",
+          "difficulty"
+        ]
+      },
       "ProductShopSummaryDto": {
         "type": "object",
         "properties": {
@@ -11699,6 +11861,7 @@
           "shopName",
           "shopSlug",
           "shop",
+          "deliverable",
           "deliveryCharge",
           "freeDeliveryAbove",
           "subtotal",

@@ -9,8 +9,10 @@ import { ErrorCode } from "../../common/errors/error-codes";
 import type { CursorPaginatedResult, PaginatedResult } from "../../common/types/paginated";
 import { paginate } from "../../common/types/paginated";
 import type { Prisma } from "../../generated/prisma/client";
+import type { CareDifficulty, LightRequirement } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { resolveDeliveryZone } from "../orders/delivery-zone.resolver";
+import type { FilterOptionsQueryDto } from "./dto/filter-options-query.dto";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import {
   buildCursorWhere,
@@ -62,10 +64,23 @@ interface ProductListRow {
   category: { id: string; name: string; nameBn: string | null; slug: string };
 }
 
+export interface FilterOptions {
+  price: { min: number | null; max: number | null };
+  light: LightRequirement[];
+  difficulty: CareDifficulty[];
+}
+
+const FILTER_OPTIONS_TTL_MS = 60 * 1000;
+const FILTER_OPTIONS_MAX_ENTRIES = 200;
+
 @Injectable()
 export class PublicProductsService {
   private readonly logger = new Logger(PublicProductsService.name);
   private readonly randomIdCache = new Map<string, { ids: string[]; expiresAt: number }>();
+  private readonly filterOptionsCache = new Map<
+    string,
+    { value: FilterOptions; expiresAt: number }
+  >();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -225,8 +240,10 @@ export class PublicProductsService {
           shopId: shopId ?? null,
           minPrice: query.minPrice ?? null,
           maxPrice: query.maxPrice ?? null,
-          light: query.light ?? null,
-          difficulty: query.difficulty ?? null,
+          light: query.light ? [...query.light].sort() : null,
+          difficulty: query.difficulty ? [...query.difficulty].sort() : null,
+          minRating: query.minRating ?? null,
+          onSale: query.onSale ?? null,
           isIndoor: query.isIndoor ?? null,
           isPetSafe: query.isPetSafe ?? null,
           inStock: query.inStock ?? null,
@@ -248,6 +265,62 @@ export class PublicProductsService {
   @OnEvent("product.moderated", { async: true })
   invalidateRandomCache(): void {
     this.randomIdCache.clear();
+    this.filterOptionsCache.clear();
+  }
+
+  /**
+   * Filter facet values for the current category/search context: price bounds
+   * plus the light/difficulty values that actually occur. Cached briefly.
+   */
+  async getFilterOptions(query: FilterOptionsQueryDto): Promise<FilterOptions> {
+    const key = `${query.category ?? ""}|${query.q ?? ""}`;
+    const now = Date.now();
+    const cached = this.filterOptionsCache.get(key);
+    if (cached && cached.expiresAt > now) {
+      return cached.value;
+    }
+
+    const where = await this.buildWhere({
+      category: query.category,
+      q: query.q,
+    } as QueryProductsDto);
+
+    const [priceAgg, lightRows, difficultyRows] = await Promise.all([
+      this.prisma.product.aggregate({
+        where,
+        _min: { minPrice: true },
+        _max: { minPrice: true },
+      }),
+      this.prisma.product.findMany({
+        where,
+        distinct: ["lightRequirement"],
+        select: { lightRequirement: true },
+      }),
+      this.prisma.product.findMany({
+        where,
+        distinct: ["careDifficulty"],
+        select: { careDifficulty: true },
+      }),
+    ]);
+
+    const value: FilterOptions = {
+      price: {
+        min: priceAgg._min.minPrice === null ? null : Number(priceAgg._min.minPrice),
+        max: priceAgg._max.minPrice === null ? null : Number(priceAgg._max.minPrice),
+      },
+      light: lightRows
+        .map((row) => row.lightRequirement)
+        .filter((entry): entry is LightRequirement => entry !== null),
+      difficulty: difficultyRows
+        .map((row) => row.careDifficulty)
+        .filter((entry): entry is CareDifficulty => entry !== null),
+    };
+
+    if (this.filterOptionsCache.size >= FILTER_OPTIONS_MAX_ENTRIES) {
+      this.filterOptionsCache.clear();
+    }
+    this.filterOptionsCache.set(key, { value, expiresAt: now + FILTER_OPTIONS_TTL_MS });
+    return value;
   }
 
   private toListItem(product: ProductListRow): unknown {
@@ -615,8 +688,18 @@ export class PublicProductsService {
       });
     }
 
-    if (query.light) and.push({ lightRequirement: query.light });
-    if (query.difficulty) and.push({ careDifficulty: query.difficulty });
+    if (query.light && query.light.length > 0) {
+      and.push({ lightRequirement: { in: query.light } });
+    }
+    if (query.difficulty && query.difficulty.length > 0) {
+      and.push({ careDifficulty: { in: query.difficulty } });
+    }
+    if (query.minRating !== undefined) {
+      and.push({ ratingAvg: { gte: query.minRating }, ratingCount: { gt: 0 } });
+    }
+    if (query.onSale) {
+      and.push({ hasDiscount: true });
+    }
     if (query.isIndoor !== undefined) and.push({ isIndoor: query.isIndoor });
     if (query.isPetSafe !== undefined) and.push({ isPetSafe: query.isPetSafe });
     if (query.inStock) and.push({ inStock: true });

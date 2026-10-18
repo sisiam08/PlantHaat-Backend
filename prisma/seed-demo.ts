@@ -414,6 +414,23 @@ function resolveVariants(product: DemoProduct): DemoVariant[] {
   return [{ name: "Standard", price: product.price, stockQty: product.outOfStock ? 0 : 20 }];
 }
 
+const LIGHT_VALUES = [
+  "FULL_SUN",
+  "PARTIAL_SHADE",
+  "SHADE",
+  "BRIGHT_INDIRECT",
+  "LOW_LIGHT",
+] as const;
+const DIFFICULTY_VALUES = ["EASY", "MODERATE", "HARD"] as const;
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
+
 async function seedProduct(
   prisma: PrismaClient,
   storage: StorageService,
@@ -422,6 +439,17 @@ async function seedProduct(
   categoryId: string,
 ): Promise<void> {
   const variants = resolveVariants(product);
+
+  // Deterministic demo attributes so the storefront filters have data:
+  // light/difficulty spread across the enum values, indoor by category, and
+  // ~1/3 of products carry a discount on their first variant.
+  const seed = hashString(product.name);
+  const lightRequirement = LIGHT_VALUES[seed % LIGHT_VALUES.length];
+  const careDifficulty = DIFFICULTY_VALUES[seed % DIFFICULTY_VALUES.length];
+  const isIndoor = product.categorySlug === "indoor-plants";
+  const isPetSafe = seed % 2 === 0;
+  const discounted = seed % 3 === 0;
+
   let record = await prisma.product.findFirst({ where: { name: product.name }, select: { id: true } });
   if (!record) {
     record = await prisma.product.create({
@@ -433,12 +461,21 @@ async function seedProduct(
         description: `${product.name} — healthy, nursery-grown and ready for delivery.`,
         status: "ACTIVE",
         publishedAt: new Date(),
+        lightRequirement,
+        careDifficulty,
+        isIndoor,
+        isPetSafe,
         minPrice: Math.min(...variants.map((variant) => variant.price)),
         maxPrice: Math.max(...variants.map((variant) => variant.price)),
         inStock: variants.some((variant) => variant.stockQty > 0),
         tags: [product.categorySlug.replace(/-/g, " ")],
       },
       select: { id: true },
+    });
+  } else {
+    await prisma.product.update({
+      where: { id: record.id },
+      data: { lightRequirement, careDifficulty, isIndoor, isPetSafe },
     });
   }
 
@@ -450,9 +487,23 @@ async function seedProduct(
           productId: record.id,
           name: variant.name,
           price: variant.price,
+          compareAtPrice:
+            discounted && index === 0 ? Math.round(variant.price * 1.25) : null,
           stockQty: variant.stockQty,
           sortOrder: index,
         },
+      });
+    }
+  } else if (discounted) {
+    const first = await prisma.productVariant.findFirst({
+      where: { productId: record.id },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, price: true, compareAtPrice: true },
+    });
+    if (first && first.compareAtPrice === null) {
+      await prisma.productVariant.update({
+        where: { id: first.id },
+        data: { compareAtPrice: Math.round(Number(first.price) * 1.25) },
       });
     }
   }
@@ -461,16 +512,21 @@ async function seedProduct(
 
   const storedVariants = await prisma.productVariant.findMany({
     where: { productId: record.id },
-    select: { price: true, stockQty: true },
+    select: { price: true, stockQty: true, compareAtPrice: true },
   });
   if (storedVariants.length > 0) {
     const prices = storedVariants.map((variant) => Number(variant.price));
+    const hasDiscount = storedVariants.some(
+      (variant) =>
+        variant.compareAtPrice !== null && Number(variant.compareAtPrice) > Number(variant.price),
+    );
     await prisma.product.update({
       where: { id: record.id },
       data: {
         minPrice: Math.min(...prices),
         maxPrice: Math.max(...prices),
         inStock: storedVariants.some((variant) => variant.stockQty > 0),
+        hasDiscount,
       },
     });
   }

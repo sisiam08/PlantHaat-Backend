@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -9,6 +10,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
 } from "class-validator";
@@ -19,6 +21,26 @@ import { PaginationQueryDto } from "../../../common/dto/pagination-query.dto";
 
 const toBoolean = ({ value }: { value: unknown }): boolean =>
   value === true || value === "true" || value === "1";
+
+/**
+ * Normalizes a filter value that may arrive as a repeated query param
+ * (`light=A&light=B` → array) or a single comma-separated string
+ * (`light=A,B`) into a trimmed, de-duplicated string array.
+ */
+const toStringArray = ({ value }: { value: unknown }): string[] | undefined => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  const raw = Array.isArray(value) ? value : String(value).split(",");
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    const trimmed = String(entry).trim();
+    if (trimmed.length > 0) {
+      seen.add(trimmed);
+    }
+  }
+  return seen.size > 0 ? [...seen] : undefined;
+};
 
 export const PRODUCT_SORTS = [
   "newest",
@@ -64,15 +86,41 @@ export class QueryProductsDto extends PaginationQueryDto {
   @Min(0)
   maxPrice?: number;
 
-  @ApiPropertyOptional({ enum: LightRequirement })
+  @ApiPropertyOptional({
+    enum: LightRequirement,
+    isArray: true,
+    description: "Light requirement(s); repeat the param or use comma-separated values",
+  })
   @IsOptional()
-  @IsEnum(LightRequirement)
-  light?: LightRequirement;
+  @Transform(toStringArray)
+  @IsArray()
+  @IsEnum(LightRequirement, { each: true })
+  light?: LightRequirement[];
 
-  @ApiPropertyOptional({ enum: CareDifficulty })
+  @ApiPropertyOptional({
+    enum: CareDifficulty,
+    isArray: true,
+    description: "Care difficulty(ies); repeat the param or use comma-separated values",
+  })
   @IsOptional()
-  @IsEnum(CareDifficulty)
-  difficulty?: CareDifficulty;
+  @Transform(toStringArray)
+  @IsArray()
+  @IsEnum(CareDifficulty, { each: true })
+  difficulty?: CareDifficulty[];
+
+  @ApiPropertyOptional({ description: "Only products rated at least this (1–5) with reviews" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  minRating?: number;
+
+  @ApiPropertyOptional({ description: "Only products with a discounted variant" })
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  onSale?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

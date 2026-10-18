@@ -16,6 +16,8 @@ import { HomeResponseDto } from "./dto/home-response.dto";
 import { ProductDetailDto, ProductListItemDto } from "./dto/product-response.dto";
 import { QueryProductsDto } from "./dto/query-products.dto";
 import { DeliveryQuoteQueryDto } from "./dto/delivery-quote-query.dto";
+import { FilterOptionsQueryDto } from "./dto/filter-options-query.dto";
+import { FilterOptionsResponseDto } from "./dto/filter-options-response.dto";
 import { RelatedProductsQueryDto } from "./dto/related-products.dto";
 import { ShopDetailDto, ShopListItemDto } from "./dto/shop-response.dto";
 import { ProductViewsService } from "./product-views.service";
@@ -44,6 +46,16 @@ export class PublicProductsController {
   @ApiAdaptivePaginatedResponse(ProductListItemDto)
   list(@Query() query: QueryProductsDto) {
     return this.products.list(query);
+  }
+
+  @Public()
+  @Get("products/filter-options")
+  @ApiOperation({
+    summary: "Filter facet values (price bounds, light/difficulty) for the current category/search",
+  })
+  @ApiEnvelopeResponse(FilterOptionsResponseDto)
+  filterOptions(@Query() query: FilterOptionsQueryDto) {
+    return this.products.getFilterOptions(query);
   }
 
   @Public()

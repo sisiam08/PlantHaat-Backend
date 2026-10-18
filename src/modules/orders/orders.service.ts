@@ -14,6 +14,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { CommissionsService } from "../commissions/commissions.service";
 import { LedgerService } from "../ledger/ledger.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { recomputeProductAggregates } from "../products/product-aggregates";
 import { SettingsService } from "../settings/settings.service";
 import { resolveDeliveryZone, type ResolvedDelivery } from "./delivery-zone.resolver";
 import type { CancelOrderDto } from "./dto/cancel-order.dto";
@@ -360,7 +361,7 @@ export class OrdersService {
                   referenceId: order.id,
                 },
               });
-              await recomputeProduct(tx, line.productId);
+              await recomputeProductAggregates(tx, line.productId);
             }
 
             await tx.orderStatusHistory.create({
@@ -703,7 +704,7 @@ export class OrdersService {
             },
           });
           if (item.productId) {
-            await recomputeProduct(tx, item.productId);
+            await recomputeProductAggregates(tx, item.productId);
           }
         }
       }
@@ -863,32 +864,6 @@ function shouldRestock(from: OrderStatus, requested: boolean | undefined): boole
 
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
-async function recomputeProduct(tx: Prisma.TransactionClient, productId: string): Promise<void> {
-  const variants = await tx.productVariant.findMany({
-    where: { productId, isActive: true },
-    select: { price: true, stockQty: true },
-  });
-  if (variants.length === 0) {
-    await tx.product.update({
-      where: { id: productId },
-      data: { minPrice: null, maxPrice: null, inStock: false },
-    });
-    return;
-  }
-  let min = variants[0].price;
-  let max = variants[0].price;
-  let inStock = false;
-  for (const variant of variants) {
-    if (variant.price.lessThan(min)) min = variant.price;
-    if (variant.price.greaterThan(max)) max = variant.price;
-    if (variant.stockQty > 0) inStock = true;
-  }
-  await tx.product.update({
-    where: { id: productId },
-    data: { minPrice: min, maxPrice: max, inStock },
-  });
 }
 
 function computeOverallStatus(statuses: OrderStatus[]): string {

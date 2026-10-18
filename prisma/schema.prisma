@@ -516,6 +516,7 @@ model Product {
   minPrice         Decimal?           @db.Decimal(12, 2)
   maxPrice         Decimal?           @db.Decimal(12, 2)
   inStock          Boolean            @default(false)
+  hasDiscount      Boolean            @default(false)
   ratingAvg        Decimal            @default(0) @db.Decimal(3, 2)
   ratingCount      Int                @default(0)
   soldCount        Int                @default(0)
@@ -537,6 +538,7 @@ model Product {
   @@index([status, createdAt])
   @@index([status, minPrice])
   @@index([status, soldCount])
+  @@index([status, hasDiscount])
 }
 
 model ProductVariant {
