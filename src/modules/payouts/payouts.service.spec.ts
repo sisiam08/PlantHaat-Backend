@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 
 import { ErrorCode } from "../../common/errors/error-codes";
+import { Prisma } from "../../generated/prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { AuditService } from "../audit/audit.service";
 import type { SellerContextService } from "../sellers/seller-context.service";
@@ -37,6 +38,7 @@ function createService(
 ) {
   const ledgerMock = ledger ?? {
     record: jest.fn<() => Promise<void>>(),
+      balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
     balance: jest.fn<() => Promise<unknown>>().mockResolvedValue("12.34"),
     list: jest.fn<() => Promise<unknown>>().mockResolvedValue({ data: [], meta: { total: 0 } }),
   };
@@ -89,6 +91,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue("0"),
       list: jest.fn(),
     };
@@ -166,6 +169,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue({ toFixed: () => "77.00" }),
       list: jest.fn(),
     };
@@ -186,6 +190,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue({ toFixed: () => "-20.00" }),
       list: jest.fn(),
     };
@@ -209,6 +214,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>(),
       list: jest.fn<() => Promise<unknown>>().mockResolvedValue({ data: [], meta: { total: 0 } }),
     };
@@ -229,6 +235,7 @@ describe("PayoutsService", () => {
     prisma.payout.findMany.mockResolvedValue([{ id: "p-1" }]);
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue("33.00"),
       list: jest.fn(),
     };
@@ -236,6 +243,6 @@ describe("PayoutsService", () => {
 
     const result = (await service.sellerEarnings("user-1")) as { balance: unknown };
 
-    expect(`${result.balance}`).toBe("33.00");
+    expect(Number(result.balance)).toBe(33);
   });
 });

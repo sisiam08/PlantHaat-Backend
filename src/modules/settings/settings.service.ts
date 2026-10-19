@@ -11,6 +11,7 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   "order.sellerConfirmTimeoutHours": 48,
   "complaint.windowHours": 48,
   "review.windowDays": 60,
+  "payout.holdHours": 48,
   "checkout.maxQtyPerItem": 20,
   "payments.online.enabled": false,
   "shop.maxPerSeller": 1,

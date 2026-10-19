@@ -37,6 +37,7 @@ import { ProductsModule } from "./modules/products/products.module";
 import { QaModule } from "./modules/qa/qa.module";
 import { SearchModule } from "./modules/search/search.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
+import { ReconciliationModule } from "./modules/reconciliation/reconciliation.module";
 import { RefundsModule } from "./modules/refunds/refunds.module";
 import { ReviewsModule } from "./modules/reviews/reviews.module";
 import { SellersModule } from "./modules/sellers/sellers.module";
@@ -88,6 +89,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     ReviewsModule,
     ComplaintsModule,
     RealtimeModule,
+    ReconciliationModule,
     ContentModule,
     AnnouncementsModule,
     AnalyticsModule,

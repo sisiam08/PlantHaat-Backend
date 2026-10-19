@@ -25,6 +25,13 @@ export class SellerLedgerEntryDto {
   amount!: string;
   @ApiProperty({ nullable: true, type: String }) description!: string | null;
   @ApiProperty({ nullable: true, type: String }) createdById!: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    format: "date-time",
+    description: "When a positive entry unlocks (null = immediate/negative)",
+  })
+  availableAt!: string | null;
   @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
 }
 
@@ -48,6 +55,14 @@ export class SellerPayoutDto {
 export class SellerEarningsDto {
   @ApiProperty({ type: String, description: "Decimal as string (positive = owed to seller)" })
   balance!: string;
+  @ApiProperty({ type: String, description: "Held positive entries (payout hold / open complaint)" })
+  pending!: string;
+  @ApiProperty({ type: String, description: "Payout-able amount (unlocked positive minus negative)" })
+  available!: string;
+  @ApiProperty({ type: String, description: "Amount owed to the platform when available < 0" })
+  owedToPlatform!: string;
+  @ApiProperty({ type: String, description: "pending + available (total ledger sum)" })
+  net!: string;
   @ApiProperty({ type: [SellerLedgerEntryDto] })
   ledger!: SellerLedgerEntryDto[];
   @ApiProperty({ type: [SellerPayoutDto] })

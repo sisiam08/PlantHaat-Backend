@@ -1,120 +1,112 @@
 import { jest } from "@jest/globals";
 
+import { Prisma } from "../../generated/prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
+import type { SettingsService } from "../settings/settings.service";
 import { LedgerService } from "./ledger.service";
 
-type PrismaMockFn = jest.Mock<(...args: unknown[]) => Promise<unknown>>;
-
-const mockFn = (): PrismaMockFn => jest.fn<(...args: unknown[]) => Promise<unknown>>();
+type MockFn = jest.Mock<(...args: unknown[]) => Promise<unknown>>;
+const mockFn = (): MockFn => jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 function createPrismaMock() {
   return {
-    ledgerEntry: {
-      create: mockFn(),
-      findMany: mockFn(),
-      count: mockFn(),
-      aggregate: mockFn(),
-    },
+    ledgerEntry: { create: mockFn(), findMany: mockFn(), count: mockFn() },
+    shopOrder: { findUnique: mockFn() },
+    complaint: { findMany: mockFn() },
     $transaction: mockFn(),
   };
 }
 
+function settings(holdHours = 48) {
+  return { getNumber: jest.fn(async () => holdHours) } as unknown as SettingsService;
+}
+
+const HOUR = 60 * 60 * 1000;
+
 describe("LedgerService", () => {
-  it("records an entry with defaults applied", async () => {
+  it("leaves negative entries immediately available", async () => {
     const prisma = createPrismaMock();
-    const service = new LedgerService(prisma as unknown as PrismaService);
-
+    const service = new LedgerService(prisma as unknown as PrismaService, settings());
     await service.record(prisma as unknown as PrismaService, {
-      sellerProfileId: "seller-1",
-      type: "PAYOUT",
-      amount: {} as never,
-      description: "Payout PO-1",
-      shopOrderId: null,
-      payoutId: "payout-1",
-      createdById: "admin-1",
+      sellerProfileId: "s1",
+      type: "COD_COMMISSION_DUE",
+      amount: new Prisma.Decimal(-30),
     });
-
-    expect(prisma.ledgerEntry.create).toHaveBeenCalledTimes(1);
-    const arg = prisma.ledgerEntry.create.mock.calls[0][0] as {
-      data: { sellerProfileId: string; payoutId: string };
-    };
-    expect(arg.data.sellerProfileId).toBe("seller-1");
-    expect(arg.data.payoutId).toBe("payout-1");
+    const data = (prisma.ledgerEntry.create.mock.calls[0][0] as { data: { availableAt: Date | null } })
+      .data;
+    expect(data.availableAt).toBeNull();
   });
 
-  it("returns zero when there are no ledger entries", async () => {
+  it("unlocks positive earnings at deliveredAt + holdHours", async () => {
     const prisma = createPrismaMock();
-    prisma.ledgerEntry.aggregate.mockResolvedValue({ _sum: { amount: null } });
-    const service = new LedgerService(prisma as unknown as PrismaService);
-
-    const balance = await service.balance("seller-1");
-
-    expect(`${balance}`).toBe("0");
-  });
-
-  it("sums the ledger for the balance", async () => {
-    const prisma = createPrismaMock();
-    prisma.ledgerEntry.aggregate.mockResolvedValue({ _sum: { amount: { toString: () => "42.50" } } });
-    const service = new LedgerService(prisma as unknown as PrismaService);
-
-    const balance = await service.balance("seller-1");
-
-    expect(`${balance}`).toBe("42.50");
-  });
-
-  it("aggregates with the given seller and no extra filters", async () => {
-    const prisma = createPrismaMock();
-    prisma.ledgerEntry.aggregate.mockResolvedValue({ _sum: { amount: null } });
-    const service = new LedgerService(prisma as unknown as PrismaService);
-
-    await service.balance("seller-9");
-
-    expect(prisma.ledgerEntry.aggregate).toHaveBeenCalledWith({
-      where: { sellerProfileId: "seller-9" },
-      _sum: { amount: true },
+    const deliveredAt = new Date("2026-10-01T00:00:00Z");
+    prisma.shopOrder.findUnique.mockResolvedValue({ deliveredAt });
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(48));
+    await service.record(prisma as unknown as PrismaService, {
+      sellerProfileId: "s1",
+      shopOrderId: "so1",
+      type: "ORDER_EARNING",
+      amount: new Prisma.Decimal(100),
     });
+    const data = (prisma.ledgerEntry.create.mock.calls[0][0] as { data: { availableAt: Date } }).data;
+    expect(data.availableAt.toISOString()).toBe(
+      new Date(deliveredAt.getTime() + 48 * HOUR).toISOString(),
+    );
   });
 
-  it("lists entries paginated (all types)", async () => {
+  it("uses creation time for positive credits without a delivery", async () => {
     const prisma = createPrismaMock();
-    prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
-      const op = args[0] as unknown;
-      if (typeof op === "function") {
-        return (op as (tx: unknown) => unknown)(prisma);
-      }
-      return Promise.all(op as Promise<unknown>[]);
+    const before = Date.now();
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(48));
+    await service.record(prisma as unknown as PrismaService, {
+      sellerProfileId: "s1",
+      type: "ADJUSTMENT",
+      amount: new Prisma.Decimal(10),
     });
-    prisma.ledgerEntry.findMany.mockResolvedValue([{ id: "l-1" }]);
-    prisma.ledgerEntry.count.mockResolvedValue(1);
-    const service = new LedgerService(prisma as unknown as PrismaService);
-
-    const result = (await service.list("seller-1", {
-      page: 1,
-      limit: 20,
-    } as never)) as { data: unknown[]; meta: { total: number } };
-
-    expect(result.data).toHaveLength(1);
-    expect(result.meta.total).toBe(1);
-    const manyArg = prisma.ledgerEntry.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
-    expect(manyArg.where.sellerProfileId).toBe("seller-1");
-    expect(manyArg.where.type).toBeUndefined();
+    const data = (prisma.ledgerEntry.create.mock.calls[0][0] as { data: { availableAt: Date } }).data;
+    expect(data.availableAt.getTime()).toBeGreaterThanOrEqual(before + 48 * HOUR);
   });
 
-  it("filters by entry type when given", async () => {
+  it("splits pending/available/owed/net and holds entries under open complaints", async () => {
     const prisma = createPrismaMock();
-    prisma.$transaction.mockImplementation(async (...args: unknown[]) => {
-      const op = args[0] as unknown;
-      return typeof op === "function"
-        ? (op as (tx: unknown) => unknown)(prisma)
-        : Promise.all(op as Promise<unknown>[]);
-    });
-    prisma.ledgerEntry.findMany.mockResolvedValue([]);
-    prisma.ledgerEntry.count.mockResolvedValue(0);
-    const service = new LedgerService(prisma as unknown as PrismaService);
+    const past = new Date(Date.now() - HOUR);
+    const future = new Date(Date.now() + HOUR);
+    prisma.ledgerEntry.findMany.mockResolvedValue([
+      { amount: new Prisma.Decimal(100), availableAt: past, shopOrderId: "so-held" },
+      { amount: new Prisma.Decimal(50), availableAt: future, shopOrderId: "so-future" },
+      { amount: new Prisma.Decimal(-30), availableAt: null, shopOrderId: "so-held" },
+    ]);
+    prisma.complaint.findMany.mockResolvedValue([{ shopOrderId: "so-held" }]);
+    const service = new LedgerService(prisma as unknown as PrismaService, settings());
 
-    await service.list("seller-1", { page: 1, limit: 20, type: "PAYOUT" } as never);
+    const balance = await service.balances("s1");
+    expect(balance.pending.toFixed(2)).toBe("150.00");
+    expect(balance.available.toFixed(2)).toBe("-30.00");
+    expect(balance.owedToPlatform.toFixed(2)).toBe("30.00");
+    expect(balance.net.toFixed(2)).toBe("120.00");
+  });
 
-    const manyArg = prisma.ledgerEntry.findMany.mock.calls[0][0] as { where: { type: string } };
-    expect(manyArg.where.type).toBe("PAYOUT");
+  it("releases held entries once the complaint is resolved", async () => {
+    const prisma = createPrismaMock();
+    prisma.ledgerEntry.findMany.mockResolvedValue([
+      { amount: new Prisma.Decimal(100), availableAt: new Date(Date.now() - HOUR), shopOrderId: "so1" },
+      { amount: new Prisma.Decimal(-30), availableAt: null, shopOrderId: "so1" },
+    ]);
+    prisma.complaint.findMany.mockResolvedValue([]);
+    const service = new LedgerService(prisma as unknown as PrismaService, settings());
+
+    const balance = await service.balances("s1");
+    expect(balance.pending.toFixed(2)).toBe("0.00");
+    expect(balance.available.toFixed(2)).toBe("70.00");
+    expect(balance.net.toFixed(2)).toBe("70.00");
+  });
+
+  it("keeps the legacy balance() as the net total", async () => {
+    const prisma = createPrismaMock();
+    prisma.ledgerEntry.findMany.mockResolvedValue([
+      { amount: new Prisma.Decimal(10), availableAt: null, shopOrderId: null },
+    ]);
+    const service = new LedgerService(prisma as unknown as PrismaService, settings());
+    expect((await service.balance("s1")).toFixed(2)).toBe("10.00");
   });
 });

@@ -49,6 +49,20 @@ export class PayoutsService {
   async createPayout(dto: CreatePayoutDto, actor: AuthenticatedUser, meta: RequestMeta) {
     await this.assertSeller(dto.sellerProfileId);
     const amount = new Prisma.Decimal(dto.amount);
+    if (amount.lte(0)) {
+      throw AppException.unprocessable(
+        ErrorCode.PAYOUT_INVALID_AMOUNT,
+        "Payout amount must be positive",
+      );
+    }
+    // Only the unlocked (available) balance can be paid out.
+    const balances = await this.ledger.balances(dto.sellerProfileId);
+    if (amount.gt(balances.available)) {
+      throw AppException.unprocessable(
+        ErrorCode.PAYOUT_EXCEEDS_AVAILABLE,
+        `Payout exceeds the available balance (${balances.available.toFixed(2)})`,
+      );
+    }
 
     const payout = await this.prisma.$transaction(async (tx) => {
       const created = await tx.payout.create({
@@ -180,7 +194,7 @@ export class PayoutsService {
 
   async sellerEarnings(userId: string) {
     const profile = await this.sellerContext.requireProfile(userId);
-    const balance = await this.ledger.balance(profile.id);
+    const balances = await this.ledger.balances(profile.id);
     const [ledger, payouts] = await this.prisma.$transaction([
       this.prisma.ledgerEntry.findMany({
         where: { sellerProfileId: profile.id },
@@ -193,7 +207,12 @@ export class PayoutsService {
         take: 50,
       }),
     ]);
-    return { balance, ledger, payouts };
+    return { ...balances, balance: balances.net, ledger, payouts };
+  }
+
+  async sellerBalance(sellerProfileId: string) {
+    await this.assertSeller(sellerProfileId);
+    return this.ledger.balances(sellerProfileId);
   }
 
   private async assertSeller(sellerProfileId: string): Promise<void> {

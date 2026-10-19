@@ -7,6 +7,12 @@ import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { paginate, type PaginatedResult } from "../../common/types/paginated";
+import {
+  lineCommission,
+  lineTotal as computeLineTotal,
+  money,
+  sumMoney,
+} from "../../common/utils/money";
 import { generateOrderNumber, toShopOrderNumber } from "../../common/utils/order-number";
 import { Prisma } from "../../generated/prisma/client";
 import type { OrderStatus } from "../../generated/prisma/enums";
@@ -175,13 +181,13 @@ export class OrdersService {
         },
       );
       const group = groups.get(shop.id)!;
-      const lineTotal = variant.price.mul(item.quantity);
+      const lineTotal = computeLineTotal(variant.price, item.quantity);
       const rate = await this.commissions.resolveRatePercent({
         sellerProfileId: seller.id,
         categoryId: product.category.id,
         parentCategoryId: product.category.parentId,
       });
-      const commissionAmount = lineTotal.mul(rate).div(100).toDecimalPlaces(2);
+      const commissionAmount = lineCommission(lineTotal, rate);
       group.lines.push({
         variantId: variant.id,
         productId: product.id,
@@ -258,12 +264,12 @@ export class OrdersService {
   }): Promise<string> {
     const { customerId, address, dto, idempotencyKey, cartId, groups } = params;
 
-    const subtotal = groups.reduce((sum, g) => sum.plus(g.subtotal), new Prisma.Decimal(0));
-    const deliveryTotal = groups.reduce((sum, g) => {
+    const subtotal = money(groups.reduce((sum, g) => sum.plus(g.subtotal), new Prisma.Decimal(0)));
+    const deliveryTotal = money(groups.reduce((sum, g) => {
       const free =
         g.delivery.freeDeliveryAbove !== null && g.subtotal.gte(g.delivery.freeDeliveryAbove);
       return sum.plus(free ? new Prisma.Decimal(0) : g.delivery.charge);
-    }, new Prisma.Decimal(0));
+    }, new Prisma.Decimal(0)));
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const orderNumber = generateOrderNumber();
@@ -287,7 +293,7 @@ export class OrdersService {
               subtotal,
               deliveryTotal,
               discountTotal: new Prisma.Decimal(0),
-              grandTotal: subtotal.plus(deliveryTotal),
+              grandTotal: money(subtotal.plus(deliveryTotal)),
             },
           });
 
@@ -297,10 +303,8 @@ export class OrdersService {
               group.delivery.freeDeliveryAbove !== null &&
               group.subtotal.gte(group.delivery.freeDeliveryAbove);
             const deliveryCharge = free ? new Prisma.Decimal(0) : group.delivery.charge;
-            const commissionAmount = group.lines
-              .reduce((sum, l) => sum.plus(l.commissionAmount), new Prisma.Decimal(0))
-              .toDecimalPlaces(2);
-            const total = group.subtotal.plus(deliveryCharge);
+            const commissionAmount = sumMoney(group.lines.map((line) => line.commissionAmount));
+            const total = money(group.subtotal.plus(deliveryCharge));
             const shopOrderNumber = toShopOrderNumber(orderNumber, index);
             index += 1;
 
@@ -314,7 +318,7 @@ export class OrdersService {
                 deliveryCharge,
                 total,
                 commissionAmount,
-                sellerNetAmount: total.minus(commissionAmount),
+                sellerNetAmount: money(total.minus(commissionAmount)),
                 estimatedDeliveryFrom: addDays(new Date(), group.delivery.estimatedDaysMin),
                 estimatedDeliveryTo: addDays(new Date(), group.delivery.estimatedDaysMax),
               },

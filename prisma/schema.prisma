@@ -873,6 +873,8 @@ model LedgerEntry {
   description     String?
   createdById     String?
   createdAt       DateTime        @default(now())
+  // Positive entries unlock after payout.holdHours past delivery (null = immediate/negative).
+  availableAt     DateTime?
 
   sellerProfile SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Restrict)
   shopOrder     ShopOrder?    @relation(fields: [shopOrderId], references: [id], onDelete: SetNull)

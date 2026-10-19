@@ -31,7 +31,7 @@ import {
   QueryPayoutsDto,
   UpdatePayoutDto,
 } from "./dto/payout.dto";
-import { SellerBalanceDto } from "./dto/payout-response.dto";
+import { SellerBalanceDto, SellerBalancesDto } from "./dto/payout-response.dto";
 import { PayoutsService } from "./payouts.service";
 
 @ApiTags("Admin: payouts")
@@ -76,6 +76,13 @@ export class AdminPayoutsController {
   @ApiPaginatedResponse(SellerLedgerEntryDto)
   ledger(@Param("id") id: string, @Query() query: QueryLedgerDto) {
     return this.payouts.sellerLedger(id, query);
+  }
+
+  @Get("sellers/:id/balance")
+  @ApiOperation({ summary: "Pending vs available seller balance (payout hold)" })
+  @ApiEnvelopeResponse(SellerBalancesDto)
+  balance(@Param("id") id: string) {
+    return this.payouts.sellerBalance(id);
   }
 
   @Post("sellers/:id/dues-payments")
