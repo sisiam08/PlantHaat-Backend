@@ -97,10 +97,18 @@ export class AnalyticsService {
 
   async sellerDashboard(userId: string) {
     const { profile, shop } = await this.sellerContext.requireShop(userId);
-    const [pendingOrders, unreadNotifications] = await this.prisma.$transaction([
-      this.prisma.shopOrder.count({ where: { shopId: shop.id, status: "PENDING" } }),
-      this.prisma.notification.count({ where: { userId, readAt: null } }),
-    ]);
+    const [pendingOrders, unreadNotifications, unansweredQuestions] =
+      await this.prisma.$transaction([
+        this.prisma.shopOrder.count({ where: { shopId: shop.id, status: "PENDING" } }),
+        this.prisma.notification.count({ where: { userId, readAt: null } }),
+        this.prisma.productQuestion.count({
+          where: {
+            product: { shopId: shop.id },
+            status: "VISIBLE",
+            answers: { none: { status: "VISIBLE" } },
+          },
+        }),
+      ]);
     const variants = await this.prisma.productVariant.findMany({
       where: { product: { shopId: shop.id }, isActive: true },
       select: { stockQty: true, lowStockThreshold: true },
@@ -109,6 +117,7 @@ export class AnalyticsService {
       sellerProfileId: profile.id,
       pendingOrders,
       unreadNotifications,
+      unansweredQuestions,
       lowStockVariants: variants.filter((v) => v.stockQty <= v.lowStockThreshold).length,
     };
   }

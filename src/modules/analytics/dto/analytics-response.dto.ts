@@ -11,6 +11,8 @@ export class SellerDashboardDto {
   @ApiProperty() pendingOrders!: number;
   @ApiProperty() unreadNotifications!: number;
   @ApiProperty() lowStockVariants!: number;
+  @ApiProperty({ description: "Visible product questions with no visible answer" })
+  unansweredQuestions!: number;
 }
 
 export class SellerLedgerEntryDto {

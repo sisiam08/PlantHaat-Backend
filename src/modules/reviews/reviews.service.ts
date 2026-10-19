@@ -12,13 +12,55 @@ import { AuditService } from "../audit/audit.service";
 import { SettingsService } from "../settings/settings.service";
 import type {
   CreateReviewDto,
+  QueryProductReviewsDto,
   QueryReviewsDto,
   ReplyReviewDto,
   ReportReviewDto,
   UpdateReviewDto,
 } from "./dto/review.dto";
+import { recomputeReviewRatings } from "./review-ratings";
 
 const REVIEW_EDIT_WINDOW_DAYS = 7;
+
+type ReviewSort = "newest" | "highest" | "lowest";
+
+interface ReviewCursor {
+  rating: number;
+  createdAt: Date;
+  id: string;
+}
+
+function encodeReviewCursor(sort: ReviewSort, row: { rating: number; createdAt: Date; id: string }) {
+  return Buffer.from(
+    JSON.stringify({ v: 1, s: sort, r: row.rating, t: row.createdAt.toISOString(), id: row.id }),
+    "utf8",
+  ).toString("base64url");
+}
+
+function decodeReviewCursor(cursor: string, sort: ReviewSort): ReviewCursor {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  } catch {
+    throw AppException.badRequest(ErrorCode.INVALID_CURSOR, "Invalid cursor");
+  }
+  const c = parsed as { v?: unknown; s?: unknown; r?: unknown; t?: unknown; id?: unknown };
+  if (
+    c.v !== 1 ||
+    c.s !== sort ||
+    typeof c.r !== "number" ||
+    typeof c.t !== "string" ||
+    typeof c.id !== "string" ||
+    c.id.length === 0
+  ) {
+    throw AppException.badRequest(ErrorCode.INVALID_CURSOR, "Invalid cursor");
+  }
+  const createdAt = new Date(c.t);
+  if (Number.isNaN(createdAt.getTime())) {
+    throw AppException.badRequest(ErrorCode.INVALID_CURSOR, "Invalid cursor");
+  }
+  return { rating: c.r, createdAt, id: c.id };
+}
 
 @Injectable()
 export class ReviewsService {
@@ -72,7 +114,7 @@ export class ReviewsService {
           images: dto.images?.length ? { create: dto.images.map((url) => ({ url })) } : undefined,
         },
       });
-      await this.recomputeRatings(tx, orderItem.productId!, shopOrder.shopId);
+      await recomputeReviewRatings(tx, orderItem.productId!, shopOrder.shopId);
       return created;
     });
     return review;
@@ -103,7 +145,7 @@ export class ReviewsService {
           });
         }
       }
-      await this.recomputeRatings(tx, review.productId, review.shopId);
+      await recomputeReviewRatings(tx, review.productId, review.shopId);
     });
     return this.prisma.review.findUniqueOrThrow({ where: { id: reviewId } });
   }
@@ -112,11 +154,11 @@ export class ReviewsService {
     const review = await this.getOwned(customerId, reviewId);
     await this.prisma.$transaction(async (tx) => {
       await tx.review.delete({ where: { id: reviewId } });
-      await this.recomputeRatings(tx, review.productId, review.shopId);
+      await recomputeReviewRatings(tx, review.productId, review.shopId);
     });
   }
 
-  async listForProduct(slug: string, query: QueryReviewsDto) {
+  async listForProduct(slug: string, query: QueryProductReviewsDto) {
     const product = await this.prisma.product.findFirst({
       where: { slug, deletedAt: null },
       select: { id: true },
@@ -124,22 +166,76 @@ export class ReviewsService {
     if (!product) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Product not found");
     }
+    const base: Prisma.ReviewWhereInput = { productId: product.id, status: "VISIBLE" };
+    const filtered: Prisma.ReviewWhereInput = {
+      ...base,
+      ...(query.rating ? { rating: query.rating } : {}),
+      ...(query.withPhotos ? { images: { some: {} } } : {}),
+    };
+
+    const [distributionRows, averageAgg] = await Promise.all([
+      this.prisma.review.groupBy({
+        by: ["rating"],
+        where: base,
+        _count: { _all: true },
+      }),
+      this.prisma.review.aggregate({ where: base, _avg: { rating: true } }),
+    ]);
+    const distribution: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+    for (const row of distributionRows) {
+      distribution[String(row.rating)] = row._count._all;
+    }
+    const average = Math.round((averageAgg._avg.rating ?? 0) * 100) / 100;
+
+    const include = {
+      images: true,
+      customer: { select: { id: true, name: true, avatarUrl: true, deletedAt: true } },
+      _count: { select: { replies: { where: { status: "VISIBLE" as const } } } },
+    } satisfies Prisma.ReviewInclude;
+
+    if (query.pagination === "cursor") {
+      const sort = query.sort ?? "newest";
+      const limit = query.limit ?? 20;
+      const keyset = query.cursor ? reviewKeyset(sort, decodeReviewCursor(query.cursor, sort)) : {};
+      const where: Prisma.ReviewWhereInput = { AND: [filtered, keyset] };
+      const [rows, total] = await Promise.all([
+        this.prisma.review.findMany({
+          where,
+          orderBy: reviewOrderBy(sort),
+          take: limit,
+          include,
+        }),
+        this.prisma.review.count({ where: filtered }),
+      ]);
+      const last = rows.at(-1);
+      const hasMore = rows.length === limit && Boolean(last);
+      return {
+        data: rows.map(toReviewItem),
+        meta: {
+          limit,
+          hasMore,
+          total,
+          average,
+          distribution,
+          nextCursor: hasMore && last ? encodeReviewCursor(sort, last) : null,
+        },
+      };
+    }
+
     const { page, limit, skip } = resolvePagination(query);
-    const where = { productId: product.id, status: "VISIBLE" as const };
+    const sort = query.sort ?? "newest";
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.review.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
+        where: filtered,
+        orderBy: reviewOrderBy(sort),
         skip,
         take: limit,
-        include: {
-          images: true,
-          customer: { select: { id: true, name: true, avatarUrl: true } },
-        },
+        include,
       }),
-      this.prisma.review.count({ where }),
+      this.prisma.review.count({ where: filtered }),
     ]);
-    return paginate(rows, total, page, limit);
+    const result = paginate(rows.map(toReviewItem), total, page, limit);
+    return { ...result, meta: { ...result.meta, average, distribution } };
   }
 
   async listForSeller(sellerUserId: string, query: QueryReviewsDto) {
@@ -155,14 +251,33 @@ export class ReviewsService {
         take: limit,
         include: {
           images: true,
+          replies: {
+            where: { status: "VISIBLE" },
+            orderBy: { createdAt: "asc" },
+            include: { author: { select: { id: true, name: true, avatarUrl: true, deletedAt: true } } },
+          },
           product: { select: { id: true, name: true, slug: true } },
         },
       }),
       this.prisma.review.count({ where }),
     ]);
-    return paginate(rows, total, page, limit);
+    return paginate(
+      rows.map((row) => ({
+        ...row,
+        replies: row.replies.map((reply) => ({
+          ...reply,
+          author: reply.author.deletedAt
+            ? { id: reply.author.id, name: null, avatarUrl: null, deleted: true }
+            : { id: reply.author.id, name: reply.author.name, avatarUrl: reply.author.avatarUrl, deleted: false },
+        })),
+      })),
+      total,
+      page,
+      limit,
+    );
   }
 
+  /** Kept for compatibility: writes a seller Reply and the deprecated fields. */
   async reply(sellerUserId: string, reviewId: string, dto: ReplyReviewDto) {
     const review = await this.prisma.review.findFirst({
       where: { id: reviewId, shop: { sellerProfile: { userId: sellerUserId } } },
@@ -171,51 +286,90 @@ export class ReviewsService {
     if (!review) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Review not found");
     }
-    return this.prisma.review.update({
-      where: { id: reviewId },
-      data: { sellerReply: dto.reply, sellerRepliedAt: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.reply.findFirst({
+        where: { reviewId, isSellerReply: true, authorId: sellerUserId },
+        select: { id: true },
+      });
+      if (existing) {
+        await tx.reply.update({ where: { id: existing.id }, data: { body: dto.reply } });
+      } else {
+        await tx.reply.create({
+          data: {
+            reviewId,
+            authorId: sellerUserId,
+            body: dto.reply,
+            isSellerReply: true,
+          },
+        });
+      }
+      // @deprecated mirror for old clients.
+      await tx.review.update({
+        where: { id: reviewId },
+        data: { sellerReply: dto.reply, sellerRepliedAt: new Date() },
+      });
     });
+    return this.prisma.review.findUniqueOrThrow({ where: { id: reviewId } });
   }
 
-  async report(sellerUserId: string, reviewId: string, dto: ReportReviewDto) {
+  async report(_sellerUserId: string, reviewId: string, dto: ReportReviewDto) {
     const review = await this.prisma.review.findFirst({
-      where: { id: reviewId, shop: { sellerProfile: { userId: sellerUserId } } },
+      where: { id: reviewId },
       select: { id: true },
     });
     if (!review) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Review not found");
     }
-    return this.prisma.reviewReport.create({
-      data: { reviewId, reporterId: sellerUserId, reason: dto.reason },
+    const created = await this.prisma.contentReport.create({
+      data: {
+        targetType: "REVIEW",
+        targetId: reviewId,
+        reporterId: _sellerUserId,
+        reason: dto.reason,
+      },
     });
+    // `reviewId` retained for the legacy admin/seller clients.
+    return { ...created, reviewId: created.targetId };
   }
 
   async listReports(query: QueryReviewsDto, status: ReportStatus = "OPEN") {
     const { page, limit, skip } = resolvePagination(query);
-    const where: Prisma.ReviewReportWhereInput = { status };
+    const where: Prisma.ContentReportWhereInput = { status, targetType: "REVIEW" };
     const [rows, total] = await this.prisma.$transaction([
-      this.prisma.reviewReport.findMany({
+      this.prisma.contentReport.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
-        include: { review: { include: { shop: { select: { id: true, name: true } } } } },
       }),
-      this.prisma.reviewReport.count({ where }),
+      this.prisma.contentReport.count({ where }),
     ]);
-    return paginate(rows, total, page, limit);
+    // Resolve the reported reviews for the admin console.
+    const reviewIds = rows.map((row) => row.targetId);
+    const reviews = await this.prisma.review.findMany({
+      where: { id: { in: reviewIds } },
+      include: { shop: { select: { id: true, name: true } } },
+    });
+    const byId = new Map(reviews.map((review) => [review.id, review]));
+    return paginate(
+      rows.map((row) => ({
+        ...row,
+        reviewId: row.targetId,
+        review: byId.get(row.targetId) ?? null,
+      })),
+      total,
+      page,
+      limit,
+    );
   }
 
   async resolveReport(id: string, hide: boolean, actor: AuthenticatedUser) {
-    const report = await this.prisma.reviewReport.findUnique({
-      where: { id },
-      include: { review: { select: { id: true, productId: true, shopId: true } } },
-    });
+    const report = await this.prisma.contentReport.findUnique({ where: { id } });
     if (!report) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Report not found");
     }
     await this.prisma.$transaction(async (tx) => {
-      await tx.reviewReport.update({
+      await tx.contentReport.update({
         where: { id },
         data: {
           status: hide ? "RESOLVED_HIDDEN" : "RESOLVED_KEPT",
@@ -223,13 +377,14 @@ export class ReviewsService {
           resolvedAt: new Date(),
         },
       });
-      if (hide) {
-        await tx.review.update({
-          where: { id: report.review.id },
+      if (hide && report.targetType === "REVIEW") {
+        const review = await tx.review.update({
+          where: { id: report.targetId },
           data: { status: "HIDDEN" },
+          select: { productId: true, shopId: true },
         });
+        await recomputeReviewRatings(tx, review.productId, review.shopId);
       }
-      await this.recomputeRatings(tx, report.review.productId, report.review.shopId);
     });
     return { resolved: true, hidden: hide };
   }
@@ -247,7 +402,7 @@ export class ReviewsService {
         where: { id },
         data: { status: visible ? "VISIBLE" : "HIDDEN" },
       });
-      await this.recomputeRatings(tx, review.productId, review.shopId);
+      await recomputeReviewRatings(tx, review.productId, review.shopId);
     });
     await this.audit.record({
       actorId: actor.id,
@@ -271,40 +426,47 @@ export class ReviewsService {
     }
     return review;
   }
-
-  private async recomputeRatings(
-    tx: Prisma.TransactionClient,
-    productId: string,
-    shopId: string,
-  ): Promise<void> {
-    const productAgg = await tx.review.aggregate({
-      where: { productId, status: "VISIBLE" },
-      _avg: { rating: true },
-      _count: { _all: true },
-    });
-    await tx.product.update({
-      where: { id: productId },
-      data: {
-        ratingAvg: round2(productAgg._avg.rating ?? 0),
-        ratingCount: productAgg._count._all,
-      },
-    });
-
-    const shopAgg = await tx.review.aggregate({
-      where: { shopId, status: "VISIBLE" },
-      _avg: { rating: true },
-      _count: { _all: true },
-    });
-    await tx.shop.update({
-      where: { id: shopId },
-      data: {
-        ratingAvg: round2(shopAgg._avg.rating ?? 0),
-        ratingCount: shopAgg._count._all,
-      },
-    });
-  }
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+function reviewOrderBy(sort: ReviewSort): Prisma.ReviewOrderByWithRelationInput[] {
+  if (sort === "highest") {
+    return [{ rating: "desc" }, { createdAt: "desc" }, { id: "desc" }];
+  }
+  if (sort === "lowest") {
+    return [{ rating: "asc" }, { createdAt: "desc" }, { id: "desc" }];
+  }
+  return [{ createdAt: "desc" }, { id: "desc" }];
+}
+
+function reviewKeyset(sort: ReviewSort, cursor: ReviewCursor): Prisma.ReviewWhereInput {
+  const tie: Prisma.ReviewWhereInput = {
+    OR: [
+      { createdAt: { lt: cursor.createdAt } },
+      { AND: [{ createdAt: cursor.createdAt }, { id: { lt: cursor.id } }] },
+    ],
+  };
+  if (sort === "newest") {
+    return tie;
+  }
+  const ahead: Prisma.ReviewWhereInput =
+    sort === "highest" ? { rating: { lt: cursor.rating } } : { rating: { gt: cursor.rating } };
+  return { OR: [ahead, { AND: [{ rating: cursor.rating }, tie] }] };
+}
+
+function toReviewItem(row: {
+  images: unknown;
+  customer: { id: string; name: string; avatarUrl: string | null; deletedAt: Date | null };
+  _count: { replies: number };
+  [key: string]: unknown;
+}) {
+  const { _count, ...rest } = row;
+  const customer = row.customer.deletedAt
+    ? { id: row.customer.id, name: null, avatarUrl: null, deleted: true }
+    : {
+        id: row.customer.id,
+        name: row.customer.name,
+        avatarUrl: row.customer.avatarUrl,
+        deleted: false,
+      };
+  return { ...rest, customer, replyCount: _count.replies };
 }

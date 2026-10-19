@@ -34,6 +34,7 @@ import { OrdersModule } from "./modules/orders/orders.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { PayoutsModule } from "./modules/payouts/payouts.module";
 import { ProductsModule } from "./modules/products/products.module";
+import { QaModule } from "./modules/qa/qa.module";
 import { SearchModule } from "./modules/search/search.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RefundsModule } from "./modules/refunds/refunds.module";
@@ -75,6 +76,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     SettingsModule,
     SellersModule,
     ProductsModule,
+    QaModule,
     SearchModule,
     CartModule,
     OrdersModule,

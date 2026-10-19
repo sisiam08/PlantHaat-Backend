@@ -52,13 +52,17 @@ export class SellerReviewListItemDto {
 
 export class ReviewAuthorRefDto {
   @ApiProperty() id!: string;
-  @ApiProperty() name!: string;
+  @ApiProperty({ nullable: true, type: String }) name!: string | null;
   @ApiProperty({ nullable: true, type: String }) avatarUrl!: string | null;
+  @ApiProperty({ description: "The author's account was deleted" }) deleted!: boolean;
 }
 
 export class ProductReviewListItemDto extends ReviewDto {
   @ApiProperty({ type: [ReviewImageDto] }) images!: ReviewImageDto[];
   @ApiProperty({ type: ReviewAuthorRefDto }) customer!: ReviewAuthorRefDto;
+  @ApiProperty() replyCount!: number;
+  @ApiProperty({ type: [Object], description: "Threaded replies (seller first)" })
+  replies!: Record<string, unknown>[];
 }
 
 export class ReviewReportDto {

@@ -16,15 +16,12 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Public } from "../../common/decorators/public.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import {
+  ApiAdaptivePaginatedResponse,
   ApiEnvelopeResponse,
-  ApiPaginatedResponse,
 } from "../../common/swagger/api-response.decorators";
 import { Role } from "../../generated/prisma/enums";
-import { CreateReviewDto, QueryReviewsDto, UpdateReviewDto } from "./dto/review.dto";
-import {
-  ProductReviewListItemDto,
-  ReviewDto,
-} from "./dto/review-response.dto";
+import { CreateReviewDto, QueryProductReviewsDto, UpdateReviewDto } from "./dto/review.dto";
+import { ProductReviewListItemDto, ReviewDto } from "./dto/review-response.dto";
 import { ReviewsService } from "./reviews.service";
 
 @ApiTags("Reviews")
@@ -34,9 +31,15 @@ export class ReviewsController {
 
   @Public()
   @Get("products/:slug/reviews")
-  @ApiOperation({ summary: "List visible reviews for a product" })
-  @ApiPaginatedResponse(ProductReviewListItemDto)
-  listForProduct(@Param("slug") slug: string, @Query() query: QueryReviewsDto) {
+  @ApiOperation({
+    summary: "List visible reviews for a product",
+    description:
+      "Offset pagination by default (meta adds `average` + `distribution`); " +
+      "`pagination=cursor` pages by (createdAt,id) for `newest` and by (rating,createdAt,id) " +
+      "for `highest`/`lowest`. Filters: `rating` (1-5), `withPhotos`, `sort`.",
+  })
+  @ApiAdaptivePaginatedResponse(ProductReviewListItemDto)
+  listForProduct(@Param("slug") slug: string, @Query() query: QueryProductReviewsDto) {
     return this.reviewsService.listForProduct(slug, query);
   }
 

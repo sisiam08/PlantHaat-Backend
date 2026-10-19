@@ -2911,6 +2911,1422 @@
         ]
       }
     },
+    "/api/v1/products/{slug}/questions": {
+      "get": {
+        "operationId": "QaPublicController_listQuestions",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/QuestionDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/CursorPaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List visible questions for a product (newest first)",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/questions/{id}/answers": {
+      "get": {
+        "operationId": "QaPublicController_listAnswers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AnswerDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/CursorPaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List answers for a question (seller answers first)",
+        "tags": [
+          "Q&A"
+        ]
+      },
+      "post": {
+        "operationId": "QaPublicController_answer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AnswerDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Answer a question (verified users only)",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/answers/{id}/replies": {
+      "get": {
+        "operationId": "QaPublicController_listAnswerReplies",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReplyDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/CursorPaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List replies under an answer",
+        "tags": [
+          "Q&A"
+        ]
+      },
+      "post": {
+        "operationId": "QaPublicController_replyToAnswer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReplyDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reply to an answer (verified users only)",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/reviews/{id}/replies": {
+      "get": {
+        "operationId": "QaPublicController_listReviewReplies",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReplyDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/CursorPaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List replies under a review",
+        "tags": [
+          "Q&A"
+        ]
+      },
+      "post": {
+        "operationId": "QaPublicController_replyToReview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReplyDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reply to a review (verified users only)",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/questions": {
+      "post": {
+        "operationId": "QaPublicController_ask",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuestionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/QuestionDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ask a question (verified users only)",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/questions/{id}": {
+      "patch": {
+        "operationId": "QaPublicController_updateQuestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuestionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/QuestionDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit your question",
+        "tags": [
+          "Q&A"
+        ]
+      },
+      "delete": {
+        "operationId": "QaPublicController_deleteQuestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Question deleted"
+          }
+        },
+        "summary": "Delete your question (15 min window once answered)",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/answers/{id}": {
+      "patch": {
+        "operationId": "QaPublicController_updateAnswer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AnswerDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit your answer",
+        "tags": [
+          "Q&A"
+        ]
+      },
+      "delete": {
+        "operationId": "QaPublicController_deleteAnswer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Answer deleted"
+          }
+        },
+        "summary": "Delete your answer",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/replies/{id}": {
+      "patch": {
+        "operationId": "QaPublicController_updateReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReplyDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit your reply",
+        "tags": [
+          "Q&A"
+        ]
+      },
+      "delete": {
+        "operationId": "QaPublicController_deleteReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Reply deleted"
+          }
+        },
+        "summary": "Delete your reply",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/questions/{id}/report": {
+      "post": {
+        "operationId": "QaPublicController_reportQuestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportContentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentReportDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Report a question",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/answers/{id}/report": {
+      "post": {
+        "operationId": "QaPublicController_reportAnswer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportContentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentReportDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Report an answer",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/replies/{id}/report": {
+      "post": {
+        "operationId": "QaPublicController_reportReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportContentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentReportDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Report a reply",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/reviews/{id}/report": {
+      "post": {
+        "operationId": "QaPublicController_reportReview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportContentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentReportDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Report a review",
+        "tags": [
+          "Q&A"
+        ]
+      }
+    },
+    "/api/v1/seller/questions": {
+      "get": {
+        "operationId": "QaSellerController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "unanswered",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SellerQuestionDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/CursorPaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Questions for the seller's products (unanswered|all)",
+        "tags": [
+          "Seller: Q&A"
+        ]
+      }
+    },
+    "/api/v1/admin/content-reports": {
+      "get": {
+        "operationId": "QaAdminController_listReports",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "RESOLVED_HIDDEN",
+                "RESOLVED_KEPT"
+              ]
+            }
+          },
+          {
+            "name": "targetType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "QUESTION",
+                "ANSWER",
+                "REPLY",
+                "REVIEW"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ContentReportDto"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List content reports (questions, answers, replies, reviews)",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
+    "/api/v1/admin/content-reports/{id}/resolve": {
+      "post": {
+        "operationId": "QaAdminController_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveContentReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentReportResolveDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve a content report (hide or keep)",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
+    "/api/v1/admin/questions/{id}/hide": {
+      "post": {
+        "operationId": "QaAdminController_hideQuestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentModerationResultDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hide a question",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
+    "/api/v1/admin/questions/{id}/unhide": {
+      "post": {
+        "operationId": "QaAdminController_unhideQuestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentModerationResultDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unhide a question",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
+    "/api/v1/admin/answers/{id}/hide": {
+      "post": {
+        "operationId": "QaAdminController_hideAnswer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentModerationResultDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hide an answer",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
+    "/api/v1/admin/answers/{id}/unhide": {
+      "post": {
+        "operationId": "QaAdminController_unhideAnswer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentModerationResultDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unhide an answer",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
+    "/api/v1/admin/replies/{id}/hide": {
+      "post": {
+        "operationId": "QaAdminController_hideReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentModerationResultDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hide a reply",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
+    "/api/v1/admin/replies/{id}/unhide": {
+      "post": {
+        "operationId": "QaAdminController_unhideReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContentModerationResultDto"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unhide a reply",
+        "tags": [
+          "Admin: content reports"
+        ]
+      }
+    },
     "/api/v1/search/suggest": {
       "get": {
         "description": "Returns up to 4 products, 2 categories and 2 shops. Matching: name/nameBn/scientificName/tags ILIKE prefix + pg_trgm similarity/word_similarity; prefix matches rank first; only visible products; in-stock preferred; Bangla and English both work. `q` is trimmed and must be 2–50 characters.",
@@ -4914,6 +6330,7 @@
     },
     "/api/v1/products/{slug}/reviews": {
       "get": {
+        "description": "Offset pagination by default (meta adds `average` + `distribution`); `pagination=cursor` pages by (createdAt,id) for `newest` and by (rating,createdAt,id) for `highest`/`lowest`. Filters: `rating` (1-5), `withPhotos`, `sort`.",
         "operationId": "ReviewsController_listForProduct",
         "parameters": [
           {
@@ -4942,6 +6359,61 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "pagination",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "offset",
+              "type": "string",
+              "enum": [
+                "offset",
+                "cursor"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor (cursor mode)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rating",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 5,
+              "type": "number"
+            }
+          },
+          {
+            "name": "withPhotos",
+            "required": false,
+            "in": "query",
+            "description": "Only reviews with at least one photo",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "newest",
+              "type": "string",
+              "enum": [
+                "newest",
+                "highest",
+                "lowest"
+              ]
+            }
           }
         ],
         "responses": {
@@ -4968,7 +6440,14 @@
                       }
                     },
                     "meta": {
-                      "$ref": "#/components/schemas/PaginationMetaDto"
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/PaginationMetaDto"
+                        },
+                        {
+                          "$ref": "#/components/schemas/CursorPaginationMetaDto"
+                        }
+                      ]
                     }
                   }
                 }
@@ -9371,6 +10850,9 @@
               "COMPLAINT_UPDATED",
               "PAYOUT_PROCESSED",
               "ANNOUNCEMENT",
+              "QUESTION_ASKED",
+              "QUESTION_ANSWERED",
+              "REPLY_RECEIVED",
               "SYSTEM"
             ]
           },
@@ -11595,6 +13077,432 @@
           "sections"
         ]
       },
+      "QaAuthorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "The author's account was deleted"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "ReplyDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "answerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewId": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "isSellerReply": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VISIBLE",
+              "HIDDEN"
+            ]
+          },
+          "author": {
+            "$ref": "#/components/schemas/QaAuthorDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "answerId",
+          "reviewId",
+          "body",
+          "isSellerReply",
+          "status",
+          "author",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AnswerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "questionId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "isSellerAnswer": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VISIBLE",
+              "HIDDEN"
+            ]
+          },
+          "author": {
+            "$ref": "#/components/schemas/QaAuthorDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "replyCount": {
+            "type": "number"
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplyDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "questionId",
+          "body",
+          "isSellerAnswer",
+          "status",
+          "author",
+          "createdAt",
+          "updatedAt",
+          "replyCount",
+          "replies"
+        ]
+      },
+      "QuestionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VISIBLE",
+              "HIDDEN"
+            ]
+          },
+          "author": {
+            "$ref": "#/components/schemas/QaAuthorDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "answerCount": {
+            "type": "number"
+          },
+          "answers": {
+            "description": "The first answers (seller first)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnswerDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "body",
+          "status",
+          "author",
+          "createdAt",
+          "updatedAt",
+          "answerCount",
+          "answers"
+        ]
+      },
+      "CreateQuestionDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "UpdateQuestionDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "CreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "UpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "ContentReportDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "QUESTION",
+              "ANSWER",
+              "REPLY",
+              "REVIEW"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "reporterId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "RESOLVED_HIDDEN",
+              "RESOLVED_KEPT"
+            ]
+          },
+          "resolvedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "reporterId",
+          "reason",
+          "status",
+          "resolvedById",
+          "resolvedAt",
+          "createdAt"
+        ]
+      },
+      "ReportContentDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "SellerQuestionProductRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ]
+      },
+      "SellerQuestionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VISIBLE",
+              "HIDDEN"
+            ]
+          },
+          "author": {
+            "$ref": "#/components/schemas/QaAuthorDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "answerCount": {
+            "type": "number"
+          },
+          "answers": {
+            "description": "The first answers (seller first)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnswerDto"
+            }
+          },
+          "product": {
+            "$ref": "#/components/schemas/SellerQuestionProductRefDto"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "body",
+          "status",
+          "author",
+          "createdAt",
+          "updatedAt",
+          "answerCount",
+          "answers",
+          "product"
+        ]
+      },
+      "ContentReportResolveDto": {
+        "type": "object",
+        "properties": {
+          "resolved": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Whether the reported content was hidden"
+          }
+        },
+        "required": [
+          "resolved",
+          "hidden"
+        ]
+      },
+      "ResolveContentReportDto": {
+        "type": "object",
+        "properties": {
+          "hide": {
+            "type": "boolean",
+            "description": "true hides the reported content, false keeps it"
+          }
+        },
+        "required": [
+          "hide"
+        ]
+      },
+      "ContentModerationResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
       "SuggestedProductDto": {
         "type": "object",
         "properties": {
@@ -13545,17 +15453,23 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "avatarUrl": {
             "type": "string",
             "nullable": true
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "The author's account was deleted"
           }
         },
         "required": [
           "id",
           "name",
-          "avatarUrl"
+          "avatarUrl",
+          "deleted"
         ]
       },
       "ProductReviewListItemDto": {
@@ -13619,6 +15533,16 @@
           },
           "customer": {
             "$ref": "#/components/schemas/ReviewAuthorRefDto"
+          },
+          "replyCount": {
+            "type": "number"
+          },
+          "replies": {
+            "description": "Threaded replies (seller first)",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         },
         "required": [
@@ -13636,7 +15560,9 @@
           "createdAt",
           "updatedAt",
           "images",
-          "customer"
+          "customer",
+          "replyCount",
+          "replies"
         ]
       },
       "ReviewDto": {
@@ -13725,7 +15651,7 @@
             "type": "string"
           },
           "images": {
-            "maxItems": 3,
+            "maxItems": 5,
             "type": "array",
             "items": {
               "type": "string"
@@ -13751,7 +15677,7 @@
             "type": "string"
           },
           "images": {
-            "maxItems": 3,
+            "maxItems": 5,
             "type": "array",
             "items": {
               "type": "string"
@@ -15349,13 +17275,18 @@
           },
           "lowStockVariants": {
             "type": "number"
+          },
+          "unansweredQuestions": {
+            "type": "number",
+            "description": "Visible product questions with no visible answer"
           }
         },
         "required": [
           "sellerProfileId",
           "pendingOrders",
           "unreadNotifications",
-          "lowStockVariants"
+          "lowStockVariants",
+          "unansweredQuestions"
         ]
       },
       "AdminAnalyticsTopShopDto": {
