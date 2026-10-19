@@ -18,6 +18,8 @@ const TRANSITIONS: Record<OrderStatus, Partial<Record<OrderStatus, OrderActor[]>
   SHIPPED: {
     DELIVERED: ["SELLER", "ADMIN"],
     FAILED_DELIVERY: ["SELLER", "ADMIN"],
+    // Admin bulk-cancel when a seller is suspended.
+    CANCELLED: ["ADMIN"],
   },
   FAILED_DELIVERY: {
     SHIPPED: ["SELLER", "ADMIN"],

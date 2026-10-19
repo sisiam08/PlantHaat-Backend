@@ -7,6 +7,7 @@ import type { PrismaService } from "../../prisma/prisma.service";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import type { CommissionsService } from "../commissions/commissions.service";
 import type { LedgerService } from "../ledger/ledger.service";
+import type { MailService } from "../mail/mail.service";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { SettingsService } from "../settings/settings.service";
 
@@ -74,10 +75,15 @@ function createPrismaMock() {
       findMany: mockFn(),
       count: mockFn(),
     },
+    notification: { create: mockFn(), createMany: mockFn() },
+    user: { findMany: mockFn() },
+    sellerProfile: { findUnique: mockFn(), update: mockFn() },
+    refund: { create: mockFn() },
   } satisfies Record<string, Record<string, PrismaMockFn>>;
   const prisma = {
     ...bag,
     $transaction: mockFn(),
+    $queryRaw: mockFn(),
   };
   prisma.$transaction.mockImplementation(async (op: unknown) =>
     typeof op === "function"
@@ -104,6 +110,7 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
   const notifications = { create: jest.fn() } as never as NotificationsService;
   const ledger = { record: jest.fn<() => Promise<void>>() } as never as LedgerService;
   const events = { emit: jest.fn() } as unknown as EventEmitter2;
+  const mail = { queue: jest.fn() } as never as MailService;
   const service = new OrdersService(
     prismaBag.prisma as unknown as PrismaService,
     commissions,
@@ -111,8 +118,9 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     notifications,
     ledger,
     events,
+    mail,
   );
-  return { service, commissions, settings, ledger, events };
+  return { service, commissions, settings, ledger, events, mail };
 }
 
 function variantFixture(
@@ -341,6 +349,37 @@ describe("OrdersService", () => {
       await expect(deps.service.checkout("u1", checkoutDto(), "idem")).rejects.toMatchObject({
         details: [{ code: "SHOP_NOT_DELIVERING_TO_DISTRICT" }],
       });
+    });
+
+    it("returns 409 PRICE_CHANGED with the changed lines and applies nothing", async () => {
+      const bag = createPrismaMock();
+      const variant = variantFixture({ price: dec(120) });
+      bag.prisma.address.findFirst.mockResolvedValue(addressFixture);
+      bag.prisma.cart.findUnique.mockResolvedValue({
+        id: "cart-1",
+        items: [{ variant, variantId: "variant-1", quantity: 1, priceSnapshot: dec(100) }],
+      });
+      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      const { service } = createService(bag);
+
+      await expect(
+        service.checkout("u1", checkoutDto({ expectedGrandTotal: 160 }), "idem"),
+      ).rejects.toMatchObject({
+        code: ErrorCode.PRICE_CHANGED,
+        details: {
+          expectedGrandTotal: "160",
+          grandTotal: "180",
+          changedLines: [
+            {
+              variantId: "variant-1",
+              from: "100",
+              to: "120",
+            },
+          ],
+        },
+      });
+      expect(bag.prisma.$transaction).not.toHaveBeenCalled();
+      expect(bag.prisma.order.create).not.toHaveBeenCalled();
     });
 
     it("places a successful COD order: totals, payment, history, stock and cart cleanup", async () => {
@@ -805,6 +844,242 @@ describe("OrdersService", () => {
       expect(result).toEqual({ handled: true, approved: false });
       expect(ledger.record).not.toHaveBeenCalled();
       expect(bag.prisma.shopOrder.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("replacements", () => {
+    it("returns the existing replacement instead of creating a duplicate", async () => {
+      const bag = createPrismaMock();
+      const deps = createService(bag);
+      bag.prisma.shopOrder.findUnique.mockResolvedValue({
+        id: "so-1",
+        shopOrderNumber: "SO-1",
+        shopId: "shop-1",
+        order: { customerId: "c-1" },
+        items: [],
+        shop: { id: "shop-1", sellerProfile: { userId: "u-seller" } },
+      });
+      bag.prisma.shopOrder.findFirst.mockResolvedValue({ id: "replacement-1", orderId: "order-2" });
+
+      const result = await deps.service.createReplacementFromComplaint({
+        parentShopOrderId: "so-1",
+        complaintId: "cmp-1",
+        actorId: "admin-1",
+      });
+
+      expect(result).toEqual({ orderId: "order-2", shopOrderId: "replacement-1" });
+      expect(bag.prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("creates a zero-priced replacement with no payment and no commission", async () => {
+      const bag = createPrismaMock();
+      const deps = createService(bag);
+      bag.prisma.shopOrder.findUnique.mockResolvedValue({
+        id: "so-1",
+        shopOrderNumber: "SO-1",
+        shopId: "shop-1",
+        order: {
+          customerId: "c-1",
+          contactName: "Customer",
+          contactPhone: "01700000000",
+          shippingDistrictId: 1,
+          shippingDistrictName: "Dhaka",
+          shippingArea: "Mirpur",
+          shippingAddressLine: "House 1",
+          shippingPostalCode: null,
+          paymentMethod: "COD",
+        },
+        items: [
+          {
+            productId: "product-1",
+            variantId: "variant-1",
+            productName: "Plant",
+            variantName: "Standard",
+            imageUrl: null,
+            quantity: 1,
+          },
+        ],
+        shop: { id: "shop-1", name: "Shop", sellerProfile: { userId: "u-seller" } },
+      });
+      bag.prisma.shopOrder.findFirst.mockResolvedValue(null);
+      bag.prisma.order.create.mockResolvedValue({ id: "order-2" });
+      bag.prisma.shopOrder.create.mockResolvedValue({ id: "replacement-1" });
+      bag.prisma.productVariant.findUniqueOrThrow.mockResolvedValue({ stockQty: 4 });
+      bag.prisma.productVariant.findMany.mockResolvedValue([
+        { price: dec(100), stockQty: 4, compareAtPrice: null },
+      ]);
+
+      await deps.service.createReplacementFromComplaint({
+        parentShopOrderId: "so-1",
+        complaintId: "cmp-1",
+        actorId: "admin-1",
+      });
+
+      expect(bag.prisma.shopOrder.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            kind: "REPLACEMENT",
+            parentShopOrderId: "so-1",
+            total: dec(0),
+            commissionAmount: dec(0),
+            sellerNetAmount: dec(0),
+          }),
+        }),
+      );
+      expect(bag.prisma.orderItem.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ unitPrice: dec(0), lineTotal: dec(0), commissionAmount: dec(0) }),
+        }),
+      );
+      expect(bag.prisma.payment.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("stuck orders", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-10-19T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    function stuckService() {
+      const bag = createPrismaMock();
+      const deps = createService(bag);
+      const getNumber = deps.settings.getNumber as unknown as {
+        mockImplementation: (fn: (key: string) => Promise<number>) => void;
+      };
+      getNumber.mockImplementation(
+        async (key) =>
+          ({
+            "stuck.confirmedHours": 48,
+            "stuck.packedHours": 48,
+            "stuck.shippedGraceDays": 2,
+            "stuck.reminderHours": 24,
+            "stuck.maxReminders": 3,
+          })[key] ?? 48,
+      );
+      bag.prisma.$queryRaw.mockResolvedValue([{ locked: true }]);
+      bag.prisma.user.findMany.mockResolvedValue([{ id: "admin-1" }]);
+      return { bag, deps };
+    }
+
+    it("does nothing when the advisory lock is held by another instance", async () => {
+      const { bag, deps } = stuckService();
+      bag.prisma.$queryRaw.mockResolvedValue([{ locked: false }]);
+
+      await deps.service.flagStuckOrders();
+
+      expect(bag.prisma.shopOrder.findMany).not.toHaveBeenCalled();
+      expect(bag.prisma.notification.create).not.toHaveBeenCalled();
+    });
+
+    it("sends one delay notice, reminds the seller and flags after max reminders", async () => {
+      const { bag, deps } = stuckService();
+      bag.prisma.shopOrder.findMany
+        .mockResolvedValueOnce([
+          { id: "so-delay", shopOrderNumber: "SO-1", order: { customerId: "c-1" } },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: "so-stuck",
+            shopOrderNumber: "SO-2",
+            status: "CONFIRMED",
+            createdAt: new Date("2026-10-15T00:00:00.000Z"),
+            confirmedAt: new Date("2026-10-15T00:00:00.000Z"),
+            packedAt: null,
+            shippedAt: null,
+            estimatedDeliveryTo: new Date("2026-10-10T00:00:00.000Z"),
+            stuckReminderCount: 0,
+            stuckLastRemindedAt: null,
+            stuckFlaggedAt: null,
+            shop: {
+              name: "Green Shop",
+              sellerProfile: { userId: "u-seller", user: { email: "seller@example.com" } },
+            },
+          },
+          {
+            id: "so-flag",
+            shopOrderNumber: "SO-3",
+            status: "PACKED",
+            createdAt: new Date("2026-10-12T00:00:00.000Z"),
+            confirmedAt: new Date("2026-10-12T00:00:00.000Z"),
+            packedAt: new Date("2026-10-12T00:00:00.000Z"),
+            shippedAt: null,
+            estimatedDeliveryTo: null,
+            stuckReminderCount: 3,
+            stuckLastRemindedAt: new Date("2026-10-18T00:00:00.000Z"),
+            stuckFlaggedAt: null,
+            shop: {
+              name: "Green Shop",
+              sellerProfile: { userId: "u-seller", user: { email: "seller@example.com" } },
+            },
+          },
+        ]);
+
+      await deps.service.flagStuckOrders();
+
+      expect(bag.prisma.notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ type: "ORDER_DELAYED", userId: "c-1" }),
+        }),
+      );
+      expect(bag.prisma.shopOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "so-delay" },
+          data: { delayNotifiedAt: new Date("2026-10-19T12:00:00.000Z") },
+        }),
+      );
+      expect(bag.prisma.shopOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "so-stuck" },
+          data: {
+            stuckReminderCount: { increment: 1 },
+            stuckLastRemindedAt: new Date("2026-10-19T12:00:00.000Z"),
+          },
+        }),
+      );
+      expect(bag.prisma.shopOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "so-flag" },
+          data: { stuckFlaggedAt: new Date("2026-10-19T12:00:00.000Z") },
+        }),
+      );
+      expect(deps.mail.queue).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "seller@example.com" }),
+      );
+    });
+
+    it("does not remind again inside the 24h window (idempotent)", async () => {
+      const { bag, deps } = stuckService();
+      bag.prisma.shopOrder.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: "so-recent",
+            shopOrderNumber: "SO-4",
+            status: "CONFIRMED",
+            createdAt: new Date("2026-10-15T00:00:00.000Z"),
+            confirmedAt: new Date("2026-10-15T00:00:00.000Z"),
+            packedAt: null,
+            shippedAt: null,
+            estimatedDeliveryTo: null,
+            stuckReminderCount: 1,
+            stuckLastRemindedAt: new Date("2026-10-19T06:00:00.000Z"),
+            stuckFlaggedAt: null,
+            shop: {
+              name: "Green Shop",
+              sellerProfile: { userId: "u-seller", user: { email: "seller@example.com" } },
+            },
+          },
+        ]);
+
+      await deps.service.flagStuckOrders();
+
+      expect(bag.prisma.shopOrder.update).not.toHaveBeenCalled();
+      expect(deps.mail.queue).not.toHaveBeenCalled();
     });
   });
 

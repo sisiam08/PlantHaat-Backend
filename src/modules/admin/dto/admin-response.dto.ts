@@ -111,6 +111,10 @@ export class AdminSellerListItemDto {
   @ApiProperty() businessAddress!: string;
   @ApiProperty({ enum: Object.values(SellerStatus) }) status!: SellerStatus;
   @ApiProperty({ nullable: true, type: String }) rejectionReason!: string | null;
+  @ApiProperty({ description: "Times customers reported a delivered order as not delivered" })
+  falseDeliveryFlags!: number;
+  @ApiProperty({ description: "Open (non-terminal) shop orders across the seller's shops" })
+  openOrderCount!: number;
   @ApiProperty({ nullable: true, type: String, format: "date-time" }) submittedAt!: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
   verifiedAt!: string | null;
@@ -129,6 +133,23 @@ export class AdminSellerDetailDto extends AdminSellerListItemDto {
   @ApiProperty({ type: [AdminShopRefDto] }) declare shops: AdminShopRefDto[];
   @ApiProperty({ type: [AdminSellerPayoutAccountDto] })
   payoutAccounts!: AdminSellerPayoutAccountDto[];
+}
+
+export class SuspendedSellerOpenOrdersDto {
+  @ApiProperty() sellerProfileId!: string;
+  @ApiProperty() businessName!: string;
+  @ApiProperty() userId!: string;
+  @ApiProperty() email!: string;
+  @ApiProperty() falseDeliveryFlags!: number;
+  @ApiProperty() openOrderCount!: number;
+  @ApiProperty({ type: [Object] }) orders!: Record<string, unknown>[];
+}
+
+export class BulkCancelResultDto {
+  @ApiProperty() sellerProfileId!: string;
+  @ApiProperty() cancelledCount!: number;
+  @ApiProperty() skipped!: number;
+  @ApiProperty() openOrderCount!: number;
 }
 
 /* ── Admin: shops ──────────────────────────────────────────────── */

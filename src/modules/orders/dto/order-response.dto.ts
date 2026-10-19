@@ -4,12 +4,15 @@ import {
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
+  ShopOrderKind,
 } from "../../../generated/prisma/enums";
 import { SellerOrderPaymentDto } from "./seller-order-response.dto";
 
 export class OrderListShopOrderRefDto {
   @ApiProperty({ enum: Object.values(OrderStatus) }) status!: OrderStatus;
   @ApiProperty() shopId!: string;
+  @ApiProperty({ enum: Object.values(ShopOrderKind) }) kind!: ShopOrderKind;
+  @ApiProperty({ nullable: true, type: String }) parentShopOrderId!: string | null;
 }
 
 export class OrderListItemDto {

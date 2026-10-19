@@ -26,6 +26,12 @@ export class TransitionOrderDto {
   @MaxLength(100)
   trackingCode?: string;
 
+  @ApiPropertyOptional({ description: "Optional seller note recorded when marking DELIVERED" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  deliveryNote?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsISO8601()

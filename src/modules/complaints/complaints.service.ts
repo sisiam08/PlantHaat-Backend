@@ -10,7 +10,9 @@ import { Prisma } from "../../generated/prisma/client";
 import type { Role } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { LedgerService } from "../ledger/ledger.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { OrdersService } from "../orders/orders.service";
 import { SettingsService } from "../settings/settings.service";
 import type {
   ComplaintCommentDto,
@@ -30,6 +32,8 @@ export class ComplaintsService {
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly ledger: LedgerService,
+    private readonly orders: OrdersService,
   ) {}
 
   async create(customerId: string, dto: CreateComplaintDto) {
@@ -37,15 +41,35 @@ export class ComplaintsService {
       where: { id: dto.shopOrderId },
       include: {
         order: { select: { customerId: true } },
-        shop: { select: { sellerProfile: { select: { userId: true } } } },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            sellerProfile: { select: { id: true, userId: true } },
+          },
+        },
       },
     });
     if (!shopOrder || shopOrder.order.customerId !== customerId) {
       throw AppException.notFound(ErrorCode.ORDER_NOT_FOUND, "Order not found");
     }
 
-    if (SHIPPED_ONLY_TYPES.has(dto.type)) {
-      if (!["SHIPPED", "FAILED_DELIVERY"].includes(shopOrder.status)) {
+    const isShipped = ["SHIPPED", "FAILED_DELIVERY"].includes(shopOrder.status);
+    const isDeliveredNotDelivered =
+      dto.type === "NOT_DELIVERED" && shopOrder.status === "DELIVERED";
+
+    if (dto.type === "NOT_DELIVERED") {
+      if (!isShipped && shopOrder.status !== "DELIVERED") {
+        throw AppException.badRequest(
+          ErrorCode.COMPLAINT_NOT_ALLOWED,
+          "This complaint type requires a shipped or delivered order",
+        );
+      }
+      if (shopOrder.status === "DELIVERED") {
+        await this.assertWithinComplaintWindow(shopOrder.deliveredAt);
+      }
+    } else if (SHIPPED_ONLY_TYPES.has(dto.type)) {
+      if (!isShipped) {
         throw AppException.badRequest(
           ErrorCode.COMPLAINT_NOT_ALLOWED,
           "This complaint type requires a shipped order",
@@ -58,14 +82,7 @@ export class ComplaintsService {
           "You can complain only about delivered orders",
         );
       }
-      const windowHours = await this.settings.getNumber("complaint.windowHours");
-      const deliveredAt = shopOrder.deliveredAt;
-      if (!deliveredAt || Date.now() > deliveredAt.getTime() + windowHours * 3_600_000) {
-        throw AppException.badRequest(
-          ErrorCode.COMPLAINT_WINDOW_CLOSED,
-          "The complaint window has closed",
-        );
-      }
+      await this.assertWithinComplaintWindow(shopOrder.deliveredAt);
     }
 
     if (ATTACHMENT_REQUIRED_TYPES.has(dto.type) && (dto.attachments?.length ?? 0) === 0) {
@@ -85,20 +102,32 @@ export class ComplaintsService {
       }
     }
 
-    const complaint = await this.prisma.complaint.create({
-      data: {
-        ticketNumber: generateComplaintTicket(),
-        shopOrderId: shopOrder.id,
-        orderItemId: dto.orderItemId ?? null,
-        customerId,
-        shopId: shopOrder.shopId,
-        type: dto.type,
-        description: dto.description,
-        status: "OPEN",
-        attachments: dto.attachments?.length
-          ? { create: dto.attachments.map((url) => ({ url })) }
-          : undefined,
-      },
+    const { complaint, falseDeliveryFlags } = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.complaint.create({
+        data: {
+          ticketNumber: generateComplaintTicket(),
+          shopOrderId: shopOrder.id,
+          orderItemId: dto.orderItemId ?? null,
+          customerId,
+          shopId: shopOrder.shopId,
+          type: dto.type,
+          description: dto.description,
+          status: "OPEN",
+          attachments: dto.attachments?.length
+            ? { create: dto.attachments.map((url) => ({ url })) }
+            : undefined,
+        },
+      });
+      let flags: number | null = null;
+      if (isDeliveredNotDelivered) {
+        const updated = await tx.sellerProfile.update({
+          where: { id: shopOrder.shop.sellerProfile.id },
+          data: { falseDeliveryFlags: { increment: 1 } },
+          select: { falseDeliveryFlags: true },
+        });
+        flags = updated.falseDeliveryFlags;
+      }
+      return { complaint: created, falseDeliveryFlags: flags };
     });
 
     await this.notifications.create({
@@ -109,7 +138,34 @@ export class ComplaintsService {
       data: { complaintId: complaint.id },
     });
 
+    if (isDeliveredNotDelivered) {
+      // A delivered order reported as not delivered is a potential false
+      // delivery: tell admins immediately and keep the seller's counter.
+      await this.notifications.createForAdmins({
+        type: "FALSE_DELIVERY_FLAG",
+        title: "Delivered order reported as not delivered",
+        body: `${shopOrder.shop.name} marked ${shopOrder.shopOrderNumber} delivered, but the customer says it never arrived (complaint ${complaint.ticketNumber}).`,
+        data: {
+          complaintId: complaint.id,
+          shopOrderId: shopOrder.id,
+          shopId: shopOrder.shopId,
+          sellerProfileId: shopOrder.shop.sellerProfile.id,
+          sellerFalseDeliveryFlags: falseDeliveryFlags,
+        },
+      });
+    }
+
     return complaint;
+  }
+
+  private async assertWithinComplaintWindow(deliveredAt: Date | null): Promise<void> {
+    const windowHours = await this.settings.getNumber("complaint.windowHours");
+    if (!deliveredAt || Date.now() > deliveredAt.getTime() + windowHours * 3_600_000) {
+      throw AppException.badRequest(
+        ErrorCode.COMPLAINT_WINDOW_CLOSED,
+        "The complaint window has closed",
+      );
+    }
   }
 
   async listMine(customerId: string, query: QueryComplaintsDto): Promise<PaginatedResult<unknown>> {
@@ -203,6 +259,12 @@ export class ComplaintsService {
     meta: { ipAddress?: string; userAgent?: string },
   ) {
     await this.getAny(id);
+    if (dto.status === "RESOLVED_REFUND" || dto.status === "RESOLVED_REPLACEMENT") {
+      throw AppException.badRequest(
+        ErrorCode.COMPLAINT_NOT_ALLOWED,
+        "Use the resolve endpoint for refunds and replacements",
+      );
+    }
     await this.prisma.complaint.update({
       where: { id },
       data: {
@@ -233,10 +295,32 @@ export class ComplaintsService {
   ) {
     const complaint = await this.prisma.complaint.findUnique({
       where: { id },
-      select: { id: true, shopOrderId: true, status: true },
+      include: {
+        shopOrder: {
+          select: {
+            id: true,
+            shopOrderNumber: true,
+            total: true,
+            commissionAmount: true,
+            status: true,
+            order: { select: { paymentMethod: true } },
+            shop: { select: { sellerProfileId: true } },
+          },
+        },
+      },
     });
     if (!complaint) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Complaint not found");
+    }
+
+    // Replacement creation runs in its own transaction and is idempotent, so a
+    // retry after a partial failure returns the existing replacement.
+    if (dto.status === "RESOLVED_REPLACEMENT") {
+      await this.orders.createReplacementFromComplaint({
+        parentShopOrderId: complaint.shopOrderId,
+        complaintId: id,
+        actorId: actor.id,
+      });
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -249,16 +333,29 @@ export class ComplaintsService {
           resolvedAt: new Date(),
         },
       });
-      if (dto.status === "RESOLVED_REFUND" && dto.refundAmount) {
-        await tx.refund.create({
+      if (dto.status === "RESOLVED_REFUND") {
+        const refund = await tx.refund.create({
           data: {
             shopOrderId: complaint.shopOrderId,
             complaintId: id,
-            amount: new Prisma.Decimal(dto.refundAmount),
+            amount:
+              dto.refundAmount !== undefined
+                ? new Prisma.Decimal(dto.refundAmount)
+                : complaint.shopOrder.total,
             reason: dto.resolutionNote ?? "Complaint resolved with refund",
             status: "REQUESTED",
             requestedById: actor.id,
           },
+        });
+        // Reverse the seller's ledger immediately (idempotent per refund); the
+        // admin still processes the actual payout of the refund later.
+        await this.ledger.reverseRefund(tx, {
+          refundId: refund.id,
+          sellerProfileId: complaint.shopOrder.shop.sellerProfileId,
+          shopOrderId: complaint.shopOrderId,
+          commissionAmount: complaint.shopOrder.commissionAmount,
+          paymentMethod: complaint.shopOrder.order.paymentMethod,
+          createdById: actor.id,
         });
       }
     });

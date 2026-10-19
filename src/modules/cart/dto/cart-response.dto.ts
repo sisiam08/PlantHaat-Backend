@@ -18,6 +18,20 @@ export class CartItemDto {
   @ApiProperty() quantity!: number;
   @ApiProperty({ type: String, description: "Decimal as string" }) lineTotal!: string;
   @ApiProperty() stockQty!: number;
+  @ApiProperty({ description: "Unit price changed since this line was added/updated" })
+  priceChanged!: boolean;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: "The snapshot price when the line was added (null if unchanged/unknown)",
+  })
+  priceChangedFrom!: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: "The current price (null if unchanged)",
+  })
+  priceChangedTo!: string | null;
   @ApiProperty({ type: [CartItemIssueDto] }) issues!: CartItemIssueDto[];
 }
 
@@ -60,6 +74,8 @@ export class CartShopGroupDto {
   })
   freeDeliveryAbove!: string | null;
   @ApiProperty({ type: String, description: "Decimal as string" }) subtotal!: string;
+  @ApiProperty({ description: "At least one line's price changed since it was added" })
+  priceChanged!: boolean;
   @ApiProperty({ type: [CartItemDto] }) items!: CartItemDto[];
   @ApiProperty({ nullable: true, type: Number, description: "Present when a zone matched" })
   estimatedDaysMin!: number | null;
@@ -73,4 +89,8 @@ export class CartViewDto {
   @ApiProperty({ type: String, description: "Decimal as string" }) deliveryTotal!: string;
   @ApiProperty({ type: String, description: "Decimal as string" }) grandTotal!: string;
   @ApiProperty() itemCount!: number;
+  @ApiProperty({ description: "Any line changed price since it was added" })
+  priceChanged!: boolean;
+  @ApiProperty({ description: "Number of lines whose price changed" })
+  changedLineCount!: number;
 }

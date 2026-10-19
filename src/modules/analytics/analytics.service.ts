@@ -32,7 +32,11 @@ export class AnalyticsService {
     const { profile, shop } = await this.sellerContext.requireShop(userId);
 
     const shopOrders = await this.prisma.shopOrder.findMany({
-      where: { shopId: shop.id, createdAt: { gte: range.from, lte: range.to } },
+      where: {
+        shopId: shop.id,
+        kind: "ORDER",
+        createdAt: { gte: range.from, lte: range.to },
+      },
       select: { status: true, total: true, commissionAmount: true, createdAt: true },
     });
 
@@ -97,7 +101,7 @@ export class AnalyticsService {
 
   async sellerDashboard(userId: string) {
     const { profile, shop } = await this.sellerContext.requireShop(userId);
-    const [pendingOrders, unreadNotifications, unansweredQuestions] =
+    const [pendingOrders, unreadNotifications, unansweredQuestions, stuckOrders] =
       await this.prisma.$transaction([
         this.prisma.shopOrder.count({ where: { shopId: shop.id, status: "PENDING" } }),
         this.prisma.notification.count({ where: { userId, readAt: null } }),
@@ -107,6 +111,9 @@ export class AnalyticsService {
             status: "VISIBLE",
             answers: { none: { status: "VISIBLE" } },
           },
+        }),
+        this.prisma.shopOrder.count({
+          where: { shopId: shop.id, stuckFlaggedAt: { not: null } },
         }),
       ]);
     const variants = await this.prisma.productVariant.findMany({
@@ -118,6 +125,7 @@ export class AnalyticsService {
       pendingOrders,
       unreadNotifications,
       unansweredQuestions,
+      stuckOrders,
       lowStockVariants: variants.filter((v) => v.stockQty <= v.lowStockThreshold).length,
     };
   }
@@ -125,8 +133,12 @@ export class AnalyticsService {
   async adminOverview(dto: AnalyticsRangeDto) {
     const range = resolveRange(dto);
 
+    // Replacement orders are free and must not affect GMV / order counts.
     const orders = await this.prisma.order.findMany({
-      where: { placedAt: { gte: range.from, lte: range.to } },
+      where: {
+        placedAt: { gte: range.from, lte: range.to },
+        shopOrders: { some: { kind: "ORDER" } },
+      },
       select: {
         grandTotal: true,
         placedAt: true,
@@ -136,7 +148,7 @@ export class AnalyticsService {
     const gmv = orders.reduce((sum, order) => sum.plus(order.grandTotal), new Prisma.Decimal(0));
 
     const shopOrders = await this.prisma.shopOrder.findMany({
-      where: { createdAt: { gte: range.from, lte: range.to } },
+      where: { kind: "ORDER", createdAt: { gte: range.from, lte: range.to } },
       select: { status: true, commissionAmount: true, total: true, shopId: true, createdAt: true },
     });
     const commissionEarned = shopOrders
@@ -144,19 +156,34 @@ export class AnalyticsService {
       .reduce((sum, order) => sum.plus(order.commissionAmount), new Prisma.Decimal(0));
     const cancelled = shopOrders.filter((order) => order.status === "CANCELLED").length;
 
-    const [newCustomers, newSellers, pendingApprovals, complaintCount] =
-      await this.prisma.$transaction([
-        this.prisma.user.count({
-          where: { role: "CUSTOMER", createdAt: { gte: range.from, lte: range.to } },
-        }),
-        this.prisma.sellerProfile.count({
-          where: { createdAt: { gte: range.from, lte: range.to } },
-        }),
-        this.prisma.sellerProfile.count({ where: { status: "PENDING" } }),
-        this.prisma.complaint.count({
-          where: { createdAt: { gte: range.from, lte: range.to } },
-        }),
-      ]);
+    const [
+      newCustomers,
+      newSellers,
+      pendingApprovals,
+      complaintCount,
+      stuckOrders,
+      suspendedSellerOpenOrders,
+      falseDeliveryFlags,
+    ] = await this.prisma.$transaction([
+      this.prisma.user.count({
+        where: { role: "CUSTOMER", createdAt: { gte: range.from, lte: range.to } },
+      }),
+      this.prisma.sellerProfile.count({
+        where: { createdAt: { gte: range.from, lte: range.to } },
+      }),
+      this.prisma.sellerProfile.count({ where: { status: "PENDING" } }),
+      this.prisma.complaint.count({
+        where: { createdAt: { gte: range.from, lte: range.to } },
+      }),
+      this.prisma.shopOrder.count({ where: { stuckFlaggedAt: { not: null } } }),
+      this.prisma.shopOrder.count({
+        where: {
+          shop: { sellerProfile: { status: "SUSPENDED" } },
+          status: { in: ["PENDING", "CONFIRMED", "PACKED", "SHIPPED", "FAILED_DELIVERY"] },
+        },
+      }),
+      this.prisma.sellerProfile.aggregate({ _sum: { falseDeliveryFlags: true } }),
+    ]);
 
     const shopTotals = new Map<string, Prisma.Decimal>();
     for (const order of shopOrders) {
@@ -206,6 +233,9 @@ export class AnalyticsService {
       newCustomers,
       newSellers,
       pendingApprovals,
+      stuckOrders,
+      suspendedSellerOpenOrders,
+      falseDeliveryFlags: falseDeliveryFlags._sum.falseDeliveryFlags ?? 0,
       cancellationRate: orderCount > 0 ? Math.round((cancelled / orderCount) * 1000) / 10 : 0,
       complaintRate: orderCount > 0 ? Math.round((complaintCount / orderCount) * 1000) / 10 : 0,
       topShops,

@@ -21,6 +21,12 @@ describe("order state machine", () => {
     expect(canTransition("DELIVERED", "CANCELLED", "ADMIN")).toBe(false);
   });
 
+  it("lets only an admin bulk-cancel a shipped order", () => {
+    expect(canTransition("SHIPPED", "CANCELLED", "ADMIN")).toBe(true);
+    expect(canTransition("SHIPPED", "CANCELLED", "SELLER")).toBe(false);
+    expect(canTransition("SHIPPED", "CANCELLED", "CUSTOMER")).toBe(false);
+  });
+
   it("handles retries from FAILED_DELIVERY", () => {
     expect(canTransition("FAILED_DELIVERY", "SHIPPED", "SELLER")).toBe(true);
     expect(canTransition("FAILED_DELIVERY", "CANCELLED", "SELLER")).toBe(true);

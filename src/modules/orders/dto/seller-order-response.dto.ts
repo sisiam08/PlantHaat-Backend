@@ -7,6 +7,7 @@ import {
   PaymentMethod,
   PaymentStatus,
   Role,
+  ShopOrderKind,
 } from "../../../generated/prisma/enums";
 
 export class SellerOrderItemDto {
@@ -68,11 +69,19 @@ export class SellerOrderRefDto {
   @ApiProperty({ enum: Object.values(PaymentMethod) }) paymentMethod!: PaymentMethod;
 }
 
+export class SellerShopOrderRefDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() orderId!: string;
+  @ApiProperty() shopOrderNumber!: string;
+}
+
 export class SellerShopOrderDto {
   @ApiProperty() id!: string;
   @ApiProperty() shopOrderNumber!: string;
   @ApiProperty() orderId!: string;
   @ApiProperty() shopId!: string;
+  @ApiProperty({ enum: Object.values(ShopOrderKind) }) kind!: ShopOrderKind;
+  @ApiProperty({ nullable: true, type: String }) parentShopOrderId!: string | null;
   @ApiProperty({ enum: Object.values(OrderStatus) }) status!: OrderStatus;
   @ApiProperty({ type: String, description: "Decimal as string" }) subtotal!: string;
   @ApiProperty({ type: String, description: "Decimal as string" }) deliveryCharge!: string;
@@ -86,6 +95,12 @@ export class SellerShopOrderDto {
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
   estimatedDeliveryTo!: string | null;
   @ApiProperty({ nullable: true, type: String }) sellerNote!: string | null;
+  @ApiProperty({ nullable: true, type: String }) deliveryNote!: string | null;
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
+  delayNotifiedAt!: string | null;
+  @ApiProperty() stuckReminderCount!: number;
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
+  stuckFlaggedAt!: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" }) confirmedAt!: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" }) packedAt!: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" }) shippedAt!: string | null;
@@ -102,6 +117,9 @@ export class SellerShopOrderDto {
   @ApiProperty({ type: [SellerOrderPaymentDto] }) payments!: SellerOrderPaymentDto[];
   @ApiProperty({ type: OrderShopRefDto }) shop!: OrderShopRefDto;
   @ApiProperty({ type: SellerOrderRefDto }) order!: SellerOrderRefDto;
+  @ApiProperty({ type: SellerShopOrderRefDto, nullable: true })
+  parent!: SellerShopOrderRefDto | null;
+  @ApiProperty({ type: [SellerShopOrderRefDto] }) replacements!: SellerShopOrderRefDto[];
 }
 
 export class SellerCancellationShopOrderRefDto {

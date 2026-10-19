@@ -48,17 +48,24 @@ export class CartService {
 
     const variant = await this.prisma.productVariant.findFirst({
       where: { id: dto.variantId, product: { deletedAt: null } },
-      select: { id: true },
+      select: { id: true, price: true },
     });
     if (!variant) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Variant not found");
     }
 
     const cart = await this.getOrCreateCart(userId);
+    // Re-adding/updating a line resets the snapshot to the price the customer
+    // just saw, so only later price changes are flagged.
     await this.prisma.cartItem.upsert({
       where: { cartId_variantId: { cartId: cart.id, variantId: dto.variantId } },
-      update: { quantity: dto.quantity },
-      create: { cartId: cart.id, variantId: dto.variantId, quantity: dto.quantity },
+      update: { quantity: dto.quantity, priceSnapshot: variant.price },
+      create: {
+        cartId: cart.id,
+        variantId: dto.variantId,
+        quantity: dto.quantity,
+        priceSnapshot: variant.price,
+      },
     });
     return this.buildView(userId);
   }
@@ -102,6 +109,9 @@ export class CartService {
       quantity: number;
       lineTotal: Prisma.Decimal;
       stockQty: number;
+      priceChanged: boolean;
+      priceChangedFrom: string | null;
+      priceChangedTo: string | null;
       issues: CartIssue[];
     }
     const groups = new Map<
@@ -115,6 +125,7 @@ export class CartService {
         shopVerified: boolean;
         items: GroupItem[];
         subtotal: Prisma.Decimal;
+        priceChanged: boolean;
       }
     >();
 
@@ -139,6 +150,8 @@ export class CartService {
       }
 
       const lineTotal = variant.price.mul(item.quantity);
+      const snapshot = item.priceSnapshot;
+      const priceChanged = snapshot != null && !snapshot.equals(variant.price);
       const primary = product.images.find((image) => image.isPrimary) ?? product.images[0];
       const group = groups.get(shop.id) ?? {
         shopId: shop.id,
@@ -149,6 +162,7 @@ export class CartService {
         shopVerified: shop.sellerProfile.status === "APPROVED",
         items: [],
         subtotal: new Prisma.Decimal(0),
+        priceChanged: false,
       };
       group.items.push({
         variantId: variant.id,
@@ -161,9 +175,13 @@ export class CartService {
         quantity: item.quantity,
         lineTotal,
         stockQty: variant.stockQty,
+        priceChanged,
+        priceChangedFrom: priceChanged ? snapshot.toString() : null,
+        priceChangedTo: priceChanged ? variant.price.toString() : null,
         issues,
       });
       group.subtotal = group.subtotal.plus(lineTotal);
+      group.priceChanged = group.priceChanged || priceChanged;
       groups.set(shop.id, group);
     }
 
@@ -202,6 +220,7 @@ export class CartService {
         },
         items: group.items,
         subtotal: group.subtotal,
+        priceChanged: group.priceChanged,
         deliverable,
         deliveryCharge,
         freeDeliveryAbove,
@@ -214,12 +233,18 @@ export class CartService {
       }
     }
 
+    const changedLineCount = shops.reduce(
+      (count, shop) => count + shop.items.filter((item) => item.priceChanged).length,
+      0,
+    );
     return {
       shops,
       subtotal,
       deliveryTotal,
       grandTotal: subtotal.plus(deliveryTotal),
       itemCount: items.reduce((total, item) => total + item.quantity, 0),
+      priceChanged: changedLineCount > 0,
+      changedLineCount,
     };
   }
 }

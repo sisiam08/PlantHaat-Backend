@@ -47,10 +47,10 @@ function createPrismaMock() {
 
 function createService(
   prisma: ReturnType<typeof createPrismaMock>,
-  ledgerRecord = jest.fn<() => Promise<void>>(),
+  reverseRefund = jest.fn<() => Promise<boolean>>(),
 ) {
   const audit = { record: jest.fn() } as unknown as AuditService;
-  const ledger = { record: ledgerRecord, balance: jest.fn(), list: jest.fn() } as never as LedgerService;
+  const ledger = { reverseRefund, balance: jest.fn(), list: jest.fn() } as never as LedgerService;
   return new RefundsService(prisma as unknown as PrismaService, ledger, audit);
 }
 
@@ -152,8 +152,8 @@ describe("RefundsService", () => {
       order: { paymentMethod: "COD" },
       shop: { sellerProfileId: "seller-1" },
     });
-    const ledgerRecord = jest.fn<() => Promise<void>>();
-    const service = createService(prisma, ledgerRecord);
+    const reverseRefund = jest.fn<() => Promise<boolean>>();
+    const service = createService(prisma, reverseRefund);
 
     const result = (await service.process("r-1", {} as never, actor, {})) as {
       processed: boolean;
@@ -165,14 +165,19 @@ describe("RefundsService", () => {
         data: expect.objectContaining({ status: "PROCESSED" }),
       }),
     );
-    expect(ledgerRecord).toHaveBeenCalledTimes(1);
-    const entry = (ledgerRecord as unknown as jest.Mock).mock.calls[0][1] as {
-      type: string;
-      amount: { toString: () => string };
+    expect(reverseRefund).toHaveBeenCalledTimes(1);
+    const entry = (reverseRefund as unknown as jest.Mock).mock.calls[0][1] as {
+      refundId: string;
+      sellerProfileId: string;
+      commissionAmount: { toString: () => string };
+      paymentMethod: string;
     };
-    expect(entry.type).toBe("REFUND_REVERSAL");
-    // COD: the amount credited back is the positive commission
-    expect(entry.amount.toString()).toBe("30.00");
+    expect(entry).toMatchObject({
+      refundId: "r-1",
+      sellerProfileId: "seller-1",
+      paymentMethod: "COD",
+    });
+    expect(entry.commissionAmount.toString()).toBe("30.00");
   });
 
   it("processes an online refund by reversing the seller share", async () => {
@@ -184,17 +189,17 @@ describe("RefundsService", () => {
       order: { paymentMethod: "ONLINE" },
       shop: { sellerProfileId: "seller-1" },
     });
-    const ledgerRecord = jest.fn<() => Promise<void>>();
-    const service = createService(prisma, ledgerRecord);
+    const reverseRefund = jest.fn<() => Promise<boolean>>();
+    const service = createService(prisma, reverseRefund);
 
     await service.process("r-1", {} as never, actor, {});
 
-    const entry = (ledgerRecord as unknown as jest.Mock).mock.calls[0][1] as {
-      type: string;
-      amount: { toString: () => string };
+    const entry = (reverseRefund as unknown as jest.Mock).mock.calls[0][1] as {
+      paymentMethod: string;
+      commissionAmount: { toString: () => string };
     };
-    expect(entry.type).toBe("REFUND_REVERSAL");
-    expect(entry.amount.toString()).toBe("-30.00");
+    expect(entry.paymentMethod).toBe("ONLINE");
+    expect(entry.commissionAmount.toString()).toBe("30.00");
   });
 
   it("merges method/reference/note overrides when processing", async () => {

@@ -13,6 +13,8 @@ export class SellerDashboardDto {
   @ApiProperty() lowStockVariants!: number;
   @ApiProperty({ description: "Visible product questions with no visible answer" })
   unansweredQuestions!: number;
+  @ApiProperty({ description: "Stuck orders flagged after 3 reminders" })
+  stuckOrders!: number;
 }
 
 export class SellerLedgerEntryDto {
@@ -161,6 +163,9 @@ export class AdminAnalyticsOverviewDto {
   @ApiProperty() newCustomers!: number;
   @ApiProperty() newSellers!: number;
   @ApiProperty() pendingApprovals!: number;
+  @ApiProperty() stuckOrders!: number;
+  @ApiProperty() suspendedSellerOpenOrders!: number;
+  @ApiProperty() falseDeliveryFlags!: number;
   @ApiProperty({ description: "Percentage (0-100)" }) cancellationRate!: number;
   @ApiProperty({ description: "Percentage (0-100)" }) complaintRate!: number;
   @ApiProperty({ type: [AdminAnalyticsTopShopDto] })

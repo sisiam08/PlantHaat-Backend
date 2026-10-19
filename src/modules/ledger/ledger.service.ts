@@ -13,6 +13,7 @@ export interface LedgerRecordInput {
   sellerProfileId: string;
   shopOrderId?: string | null;
   payoutId?: string | null;
+  refundId?: string | null;
   type: LedgerEntryType;
   amount: Prisma.Decimal;
   description?: string | null;
@@ -66,6 +67,7 @@ export class LedgerService {
         sellerProfileId: input.sellerProfileId,
         shopOrderId: input.shopOrderId ?? null,
         payoutId: input.payoutId ?? null,
+        refundId: input.refundId ?? null,
         type: input.type,
         amount: input.amount,
         description: input.description ?? null,
@@ -73,6 +75,44 @@ export class LedgerService {
         availableAt,
       },
     });
+  }
+
+  /**
+   * Reverse a refund exactly once. COD: the seller collected cash and owes
+   * commission, so credit the commission back. Online: debit the seller share.
+   * Safe to call from both complaint resolution and refund processing.
+   */
+  async reverseRefund(
+    client: Prisma.TransactionClient | PrismaClient,
+    input: {
+      refundId: string;
+      sellerProfileId: string;
+      shopOrderId: string;
+      commissionAmount: Prisma.Decimal;
+      paymentMethod: string;
+      createdById?: string | null;
+    },
+  ): Promise<boolean> {
+    const existing = await client.ledgerEntry.findFirst({
+      where: { refundId: input.refundId },
+      select: { id: true },
+    });
+    if (existing) {
+      return false;
+    }
+    const isCod = input.paymentMethod === "COD";
+    await this.record(client, {
+      sellerProfileId: input.sellerProfileId,
+      shopOrderId: input.shopOrderId,
+      refundId: input.refundId,
+      type: "REFUND_REVERSAL",
+      amount: isCod ? input.commissionAmount : input.commissionAmount.negated(),
+      description: isCod
+        ? "Refund: commission reversed (COD)"
+        : "Refund: seller share reversed (online)",
+      createdById: input.createdById ?? null,
+    });
+    return true;
   }
 
   /** Total ledger sum (pending + available). */

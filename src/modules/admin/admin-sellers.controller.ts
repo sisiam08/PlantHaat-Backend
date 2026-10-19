@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import type { Request } from "express";
@@ -12,8 +23,13 @@ import {
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { getRequestMeta } from "../../common/utils/request-meta";
 import { Role } from "../../generated/prisma/enums";
-import { AdminSellerDetailDto, AdminSellerListItemDto } from "./dto/admin-response.dto";
+import {
+  AdminSellerDetailDto,
+  AdminSellerListItemDto,
+  BulkCancelResultDto,
+} from "./dto/admin-response.dto";
 import { AdminSellersService } from "./admin-sellers.service";
+import { BulkCancelOrdersDto } from "./dto/bulk-cancel-orders.dto";
 import { QuerySellersDto } from "./dto/query-sellers.dto";
 import { RejectSellerDto } from "./dto/reject-seller.dto";
 import { SuspendDto } from "./dto/suspend.dto";
@@ -70,7 +86,20 @@ export class AdminSellersController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.adminSellers.suspend(id, dto.reason, actor, getRequestMeta(request));
+    return this.adminSellers.suspend(id, dto, actor, getRequestMeta(request));
+  }
+
+  @Post(":id/bulk-cancel-orders")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Cancel all open shop orders of a seller (restock + refunds + audit)" })
+  @ApiEnvelopeResponse(BulkCancelResultDto)
+  bulkCancelOrders(
+    @Param("id") id: string,
+    @Body() dto: BulkCancelOrdersDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.adminSellers.bulkCancelOpenOrders(id, dto, actor, getRequestMeta(request));
   }
 
   @Post(":id/reactivate")

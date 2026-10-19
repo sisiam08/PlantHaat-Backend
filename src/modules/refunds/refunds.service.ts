@@ -111,17 +111,15 @@ export class RefundsService {
       });
 
       // COD: the seller collected cash and owes commission; a refund removes
-      // that commission, so credit it back. Online-paid: reverse the net share.
-      const isCod = shopOrder.order.paymentMethod === "COD";
-      const amount = isCod ? shopOrder.commissionAmount : shopOrder.commissionAmount.negated();
-      await this.ledger.record(tx, {
+      // that commission, so credit it back. Online-paid: reverse the seller
+      // share. Complaint resolution may already have reversed it; the helper is
+      // idempotent per refund (LedgerEntry.refundId).
+      await this.ledger.reverseRefund(tx, {
+        refundId: id,
         sellerProfileId: shopOrder.shop.sellerProfileId,
         shopOrderId: refund.shopOrderId,
-        type: "REFUND_REVERSAL",
-        amount,
-        description: isCod
-          ? "Refund: commission reversed (COD)"
-          : "Refund: seller share reversed (online)",
+        commissionAmount: shopOrder.commissionAmount,
+        paymentMethod: shopOrder.order.paymentMethod,
         createdById: actor.id,
       });
     });

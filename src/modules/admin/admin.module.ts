@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { OrdersModule } from "../orders/orders.module";
 import { AdminAuditController } from "./admin-audit.controller";
 import { AdminCategoriesController } from "./admin-categories.controller";
 import { AdminCategoriesService } from "./admin-categories.service";
@@ -9,15 +10,18 @@ import { AdminProductsController } from "./admin-products.controller";
 import { AdminProductsService } from "./admin-products.service";
 import { AdminSellersController } from "./admin-sellers.controller";
 import { AdminSellersService } from "./admin-sellers.service";
+import { AdminSuspendedSellersController } from "./admin-suspended-sellers.controller";
 import { AdminShopsController } from "./admin-shops.controller";
 import { AdminShopsService } from "./admin-shops.service";
 import { AdminUsersController } from "./admin-users.controller";
 import { AdminUsersService } from "./admin-users.service";
 
 @Module({
+  imports: [OrdersModule],
   controllers: [
     AdminUsersController,
     AdminSellersController,
+    AdminSuspendedSellersController,
     AdminShopsController,
     AdminProductsController,
     AdminCategoriesController,

@@ -112,6 +112,14 @@ enum OrderStatus {
   FAILED_DELIVERY
 }
 
+// A REPLACEMENT is created when a complaint is resolved as a replacement. It
+// follows the same state machine but carries zero prices, no payment and no
+// commission, and is excluded from revenue analytics / seller earnings.
+enum ShopOrderKind {
+  ORDER
+  REPLACEMENT
+}
+
 enum CancelledBy {
   CUSTOMER
   SELLER
@@ -237,6 +245,11 @@ enum NotificationType {
   QUESTION_ASKED
   QUESTION_ANSWERED
   REPLY_RECEIVED
+  ORDER_DELAYED
+  ORDER_STUCK
+  FALSE_DELIVERY_FLAG
+  REPLACEMENT_CREATED
+  ORDERS_BULK_CANCELLED
   SYSTEM
 }
 
@@ -380,6 +393,8 @@ model SellerProfile {
   reviewedAt      DateTime?
   reviewedById    String?
   verifiedAt      DateTime?
+  // Number of DELIVERED orders the customer reported as NOT_DELIVERED.
+  falseDeliveryFlags Int      @default(0)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -635,6 +650,8 @@ model CartItem {
   cartId    String
   variantId String
   quantity  Int
+  // Unit price when the line was added/updated, so the cart can flag changes.
+  priceSnapshot Decimal? @db.Decimal(12, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -682,11 +699,13 @@ model Order {
 }
 
 model ShopOrder {
-  id                    String      @id @default(uuid())
-  shopOrderNumber       String      @unique
+  id                    String        @id @default(uuid())
+  shopOrderNumber       String        @unique
   orderId               String
   shopId                String
-  status                OrderStatus @default(PENDING)
+  kind                  ShopOrderKind @default(ORDER)
+  parentShopOrderId     String?
+  status                OrderStatus   @default(PENDING)
   subtotal              Decimal     @db.Decimal(12, 2)
   deliveryCharge        Decimal     @db.Decimal(12, 2)
   total                 Decimal     @db.Decimal(12, 2)
@@ -697,6 +716,8 @@ model ShopOrder {
   estimatedDeliveryFrom DateTime?
   estimatedDeliveryTo   DateTime?
   sellerNote            String?
+  // Optional note recorded by the seller when marking the order DELIVERED.
+  deliveryNote          String?
   confirmedAt           DateTime?
   packedAt              DateTime?
   shippedAt             DateTime?
@@ -704,11 +725,18 @@ model ShopOrder {
   cancelledAt           DateTime?
   cancelledBy           CancelledBy?
   cancelReason          String?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  // Stuck-order cron bookkeeping (reminders every 24h, max 3, then a flag).
+  delayNotifiedAt       DateTime?
+  stuckReminderCount    Int       @default(0)
+  stuckLastRemindedAt   DateTime?
+  stuckFlaggedAt        DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   order                Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
   shop                 Shop                 @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  parent               ShopOrder?           @relation("ShopOrderReplacement", fields: [parentShopOrderId], references: [id], onDelete: SetNull)
+  replacements         ShopOrder[]          @relation("ShopOrderReplacement")
   items                OrderItem[]
   statusHistory        OrderStatusHistory[]
   cancellationRequests CancellationRequest[]
@@ -720,6 +748,9 @@ model ShopOrder {
   @@index([shopId, status, createdAt])
   @@index([orderId])
   @@index([status, createdAt])
+  @@unique([parentShopOrderId])
+  @@index([kind, status])
+  @@index([status, estimatedDeliveryTo])
 }
 
 model OrderItem {
@@ -836,9 +867,10 @@ model Refund {
   createdAt     DateTime     @default(now())
   processedAt   DateTime?
 
-  shopOrder ShopOrder  @relation(fields: [shopOrderId], references: [id], onDelete: Restrict)
-  payment   Payment?   @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  complaint Complaint? @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  shopOrder     ShopOrder    @relation(fields: [shopOrderId], references: [id], onDelete: Restrict)
+  payment       Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  complaint     Complaint?   @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  ledgerEntries LedgerEntry[]
 
   @@index([shopOrderId])
   @@index([status, createdAt])
@@ -868,6 +900,7 @@ model LedgerEntry {
   sellerProfileId String
   shopOrderId     String?
   payoutId        String?
+  refundId        String?
   type            LedgerEntryType
   amount          Decimal         @db.Decimal(12, 2)
   description     String?
@@ -879,9 +912,11 @@ model LedgerEntry {
   sellerProfile SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Restrict)
   shopOrder     ShopOrder?    @relation(fields: [shopOrderId], references: [id], onDelete: SetNull)
   payout        Payout?       @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  refund        Refund?       @relation(fields: [refundId], references: [id], onDelete: SetNull)
 
   @@index([sellerProfileId, createdAt])
   @@index([shopOrderId])
+  @@index([refundId])
 }
 
 model Payout {

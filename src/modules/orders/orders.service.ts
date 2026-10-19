@@ -19,6 +19,7 @@ import type { OrderStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CommissionsService } from "../commissions/commissions.service";
 import { LedgerService } from "../ledger/ledger.service";
+import { MailService } from "../mail/mail.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { recomputeProductAggregates } from "../products/product-aggregates";
 import { SettingsService } from "../settings/settings.service";
@@ -30,6 +31,7 @@ import type {
 } from "./dto/cancellation-request.dto";
 import type { CheckoutDto } from "./dto/checkout.dto";
 import type { QueryOrdersDto } from "./dto/query-orders.dto";
+import type { QueryStuckOrdersDto } from "./dto/query-stuck-orders.dto";
 import type { TransitionOrderDto } from "./dto/transition-order.dto";
 import { canTransition, type OrderActor } from "./order-state-machine";
 
@@ -65,6 +67,7 @@ export class OrdersService {
     private readonly notifications: NotificationsService,
     private readonly ledger: LedgerService,
     private readonly events: EventEmitter2,
+    private readonly mail: MailService,
   ) {}
 
   async checkout(customerId: string, dto: CheckoutDto, idempotencyKey: string | undefined) {
@@ -228,6 +231,38 @@ export class OrdersService {
       throw AppException.unprocessable(ErrorCode.CART_EMPTY, "Your cart is empty");
     }
 
+    const totals = cartTotals(shopGroups);
+    if (
+      dto.expectedGrandTotal !== undefined &&
+      !totals.grandTotal.equals(new Prisma.Decimal(dto.expectedGrandTotal))
+    ) {
+      const changedLines = cart.items
+        .filter(
+          (item) =>
+            item.priceSnapshot != null && !item.priceSnapshot.equals(item.variant.price),
+        )
+        .map((item) => ({
+          variantId: item.variantId,
+          productId: item.variant.product.id,
+          productName: item.variant.product.name,
+          variantName: item.variant.name,
+          slug: item.variant.product.slug,
+          from: item.priceSnapshot!.toString(),
+          to: item.variant.price.toString(),
+        }));
+      throw AppException.conflict(
+        ErrorCode.PRICE_CHANGED,
+        "Some prices changed since you last saw your cart",
+        {
+          expectedGrandTotal: new Prisma.Decimal(dto.expectedGrandTotal).toString(),
+          subtotal: totals.subtotal.toString(),
+          deliveryTotal: totals.deliveryTotal.toString(),
+          grandTotal: totals.grandTotal.toString(),
+          changedLines,
+        },
+      );
+    }
+
     const orderId = await this.createOrderTransaction({
       customerId,
       address,
@@ -244,6 +279,197 @@ export class OrdersService {
     });
 
     return this.getCustomerOrder(customerId, orderId);
+  }
+
+  /**
+   * Create the free replacement shop order for a complaint resolved as
+   * RESOLVED_REPLACEMENT. Idempotent: a parent can have at most one replacement
+   * (enforced by a unique index on parentShopOrderId).
+   */
+  async createReplacementFromComplaint(input: {
+    parentShopOrderId: string;
+    complaintId: string;
+    actorId: string | null;
+  }): Promise<{ orderId: string; shopOrderId: string }> {
+    const parent = await this.prisma.shopOrder.findUnique({
+      where: { id: input.parentShopOrderId },
+      include: {
+        order: true,
+        items: { orderBy: { createdAt: "asc" } },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            sellerProfile: { select: { userId: true } },
+          },
+        },
+      },
+    });
+    if (!parent) {
+      throw AppException.notFound(ErrorCode.ORDER_NOT_FOUND, "Order not found");
+    }
+
+    const existing = await this.findReplacement(parent.id);
+    if (existing) {
+      return existing;
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const orderNumber = generateOrderNumber();
+      try {
+        const created = await this.prisma.$transaction(async (tx) => {
+          const order = await tx.order.create({
+            data: {
+              orderNumber,
+              customerId: parent.order.customerId,
+              idempotencyKey: null,
+              contactName: parent.order.contactName,
+              contactPhone: parent.order.contactPhone,
+              shippingDistrictId: parent.order.shippingDistrictId,
+              shippingDistrictName: parent.order.shippingDistrictName,
+              shippingArea: parent.order.shippingArea,
+              shippingAddressLine: parent.order.shippingAddressLine,
+              shippingPostalCode: parent.order.shippingPostalCode,
+              deliveryNote: `Replacement for ${parent.shopOrderNumber}`,
+              paymentMethod: parent.order.paymentMethod,
+              // Nothing is due for a replacement.
+              paymentStatus: "PAID",
+              subtotal: new Prisma.Decimal(0),
+              deliveryTotal: new Prisma.Decimal(0),
+              discountTotal: new Prisma.Decimal(0),
+              grandTotal: new Prisma.Decimal(0),
+            },
+          });
+
+          const shopOrder = await tx.shopOrder.create({
+            data: {
+              shopOrderNumber: toShopOrderNumber(orderNumber, 1),
+              orderId: order.id,
+              shopId: parent.shopId,
+              kind: "REPLACEMENT",
+              parentShopOrderId: parent.id,
+              status: "PENDING",
+              subtotal: new Prisma.Decimal(0),
+              deliveryCharge: new Prisma.Decimal(0),
+              total: new Prisma.Decimal(0),
+              commissionAmount: new Prisma.Decimal(0),
+              sellerNetAmount: new Prisma.Decimal(0),
+              estimatedDeliveryFrom: addDays(new Date(), 1),
+              estimatedDeliveryTo: addDays(new Date(), 3),
+            },
+          });
+
+          for (const item of parent.items) {
+            await tx.orderItem.create({
+              data: {
+                shopOrderId: shopOrder.id,
+                productId: item.productId,
+                variantId: item.variantId,
+                productName: item.productName,
+                variantName: item.variantName,
+                imageUrl: item.imageUrl,
+                unitPrice: new Prisma.Decimal(0),
+                quantity: item.quantity,
+                lineTotal: new Prisma.Decimal(0),
+                commissionRate: new Prisma.Decimal(0),
+                commissionAmount: new Prisma.Decimal(0),
+              },
+            });
+
+            if (!item.variantId) {
+              continue;
+            }
+            const decremented = await tx.productVariant.updateMany({
+              where: { id: item.variantId, stockQty: { gte: item.quantity } },
+              data: { stockQty: { decrement: item.quantity } },
+            });
+            if (decremented.count === 0) {
+              throw AppException.unprocessable(
+                ErrorCode.INSUFFICIENT_STOCK,
+                "A replacement item is out of stock",
+              );
+            }
+            const updated = await tx.productVariant.findUniqueOrThrow({
+              where: { id: item.variantId },
+              select: { stockQty: true },
+            });
+            await tx.inventoryLog.create({
+              data: {
+                variantId: item.variantId,
+                delta: -item.quantity,
+                stockAfter: updated.stockQty,
+                reason: "ORDER_PLACED",
+                referenceType: "ShopOrder",
+                referenceId: shopOrder.id,
+                createdById: input.actorId,
+              },
+            });
+            if (item.productId) {
+              await recomputeProductAggregates(tx, item.productId);
+            }
+          }
+
+          await tx.orderStatusHistory.create({
+            data: {
+              shopOrderId: shopOrder.id,
+              toStatus: "PENDING",
+              changedById: input.actorId,
+              changedByRole: "ADMIN",
+              note: `Replacement for ${parent.shopOrderNumber}`,
+            },
+          });
+
+          return { orderId: order.id, shopOrderId: shopOrder.id };
+        });
+
+        await this.notifications.create({
+          userId: parent.order.customerId,
+          type: "REPLACEMENT_CREATED",
+          title: "Replacement order created",
+          body: `A free replacement for ${parent.shopOrderNumber} has been created.`,
+          data: {
+            orderId: created.orderId,
+            shopOrderId: created.shopOrderId,
+            parentShopOrderId: parent.id,
+            complaintId: input.complaintId,
+          },
+        });
+        await this.notifications.create({
+          userId: parent.shop.sellerProfile.userId,
+          type: "REPLACEMENT_CREATED",
+          title: "Replacement order created",
+          body: `A free replacement for ${parent.shopOrderNumber} needs to be fulfilled.`,
+          data: {
+            orderId: created.orderId,
+            shopOrderId: created.shopOrderId,
+            parentShopOrderId: parent.id,
+            complaintId: input.complaintId,
+          },
+        });
+
+        return created;
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          const found = await this.findReplacement(parent.id);
+          if (found) {
+            return found;
+          }
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw AppException.internal("Could not allocate a replacement order number");
+  }
+
+  private async findReplacement(
+    parentShopOrderId: string,
+  ): Promise<{ orderId: string; shopOrderId: string } | null> {
+    const replacement = await this.prisma.shopOrder.findFirst({
+      where: { parentShopOrderId, kind: "REPLACEMENT" },
+      select: { id: true, orderId: true },
+    });
+    return replacement ? { orderId: replacement.orderId, shopOrderId: replacement.id } : null;
   }
 
   private async createOrderTransaction(params: {
@@ -264,12 +490,7 @@ export class OrdersService {
   }): Promise<string> {
     const { customerId, address, dto, idempotencyKey, cartId, groups } = params;
 
-    const subtotal = money(groups.reduce((sum, g) => sum.plus(g.subtotal), new Prisma.Decimal(0)));
-    const deliveryTotal = money(groups.reduce((sum, g) => {
-      const free =
-        g.delivery.freeDeliveryAbove !== null && g.subtotal.gte(g.delivery.freeDeliveryAbove);
-      return sum.plus(free ? new Prisma.Decimal(0) : g.delivery.charge);
-    }, new Prisma.Decimal(0)));
+    const { subtotal, deliveryTotal, grandTotal } = cartTotals(groups);
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const orderNumber = generateOrderNumber();
@@ -293,7 +514,7 @@ export class OrdersService {
               subtotal,
               deliveryTotal,
               discountTotal: new Prisma.Decimal(0),
-              grandTotal: money(subtotal.plus(deliveryTotal)),
+              grandTotal,
             },
           });
 
@@ -615,6 +836,210 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Hourly stuck-order sweep. Advisory-locked so concurrent instances (or a
+   * manual trigger) never double-send; reminders are also time-gated (24 h,
+   * max 3) and the customer delay notice is guarded by delayNotifiedAt.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async flagStuckOrders(): Promise<void> {
+    const [confirmedHours, packedHours, graceDays, reminderHours, maxReminders] =
+      await Promise.all([
+        this.settings.getNumber("stuck.confirmedHours"),
+        this.settings.getNumber("stuck.packedHours"),
+        this.settings.getNumber("stuck.shippedGraceDays"),
+        this.settings.getNumber("stuck.reminderHours"),
+        this.settings.getNumber("stuck.maxReminders"),
+      ]);
+    const now = new Date();
+    const confirmedCutoff = new Date(now.getTime() - confirmedHours * 3_600_000);
+    const packedCutoff = new Date(now.getTime() - packedHours * 3_600_000);
+    const shippedCutoff = new Date(now.getTime() - graceDays * 86_400_000);
+    const reminderCutoff = new Date(now.getTime() - reminderHours * 3_600_000);
+    const mails: { to: string; subject: string; text: string }[] = [];
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const lock = await tx.$queryRaw<{ locked: boolean }[]>`
+          SELECT pg_try_advisory_xact_lock(hashtext('planthaat:stuck-orders')) AS locked
+        `;
+        if (!lock[0]?.locked) {
+          return;
+        }
+
+        // One customer "your order is delayed" notice per shop order, as soon
+        // as the estimate is exceeded.
+        const overdue = await tx.shopOrder.findMany({
+          where: {
+            status: { in: ["CONFIRMED", "PACKED", "SHIPPED", "FAILED_DELIVERY"] },
+            estimatedDeliveryTo: { lt: now },
+            delayNotifiedAt: null,
+          },
+          select: {
+            id: true,
+            shopOrderNumber: true,
+            order: { select: { id: true, customerId: true } },
+          },
+        });
+        for (const shopOrder of overdue) {
+          await tx.notification.create({
+            data: {
+              userId: shopOrder.order.customerId,
+              type: "ORDER_DELAYED",
+              title: "আপনার অর্ডার বিলম্বিত হচ্ছে",
+              body: `অর্ডার ${shopOrder.shopOrderNumber} এর আনুমানিক ডেলিভারি সময় পেরিয়ে গেছে।`,
+              data: { shopOrderId: shopOrder.id, orderId: shopOrder.order.id },
+            },
+          });
+          await tx.shopOrder.update({
+            where: { id: shopOrder.id },
+            data: { delayNotifiedAt: now },
+          });
+        }
+
+        const stuck = await tx.shopOrder.findMany({
+          where: {
+            status: { in: ["CONFIRMED", "PACKED", "SHIPPED"] },
+            OR: [
+              {
+                status: "CONFIRMED",
+                OR: [
+                  { confirmedAt: { lt: confirmedCutoff } },
+                  { confirmedAt: null, createdAt: { lt: confirmedCutoff } },
+                ],
+              },
+              {
+                status: "PACKED",
+                OR: [
+                  { packedAt: { lt: packedCutoff } },
+                  { packedAt: null, updatedAt: { lt: packedCutoff } },
+                ],
+              },
+              { status: "SHIPPED", estimatedDeliveryTo: { lt: shippedCutoff } },
+            ],
+          },
+          include: {
+            shop: {
+              select: {
+                name: true,
+                sellerProfile: {
+                  select: { userId: true, user: { select: { email: true } } },
+                },
+              },
+            },
+          },
+        });
+
+        const admins = await tx.user.findMany({
+          where: { role: "ADMIN", status: "ACTIVE", deletedAt: null },
+          select: { id: true },
+        });
+
+        for (const shopOrder of stuck) {
+          const canRemind =
+            shopOrder.stuckReminderCount < maxReminders &&
+            (shopOrder.stuckLastRemindedAt === null ||
+              shopOrder.stuckLastRemindedAt <= reminderCutoff);
+
+          if (canRemind) {
+            await tx.shopOrder.update({
+              where: { id: shopOrder.id },
+              data: {
+                stuckReminderCount: { increment: 1 },
+                stuckLastRemindedAt: now,
+              },
+            });
+            await tx.notification.create({
+              data: {
+                userId: shopOrder.shop.sellerProfile.userId,
+                type: "ORDER_STUCK",
+                title: "Order needs attention",
+                body: `${shopOrder.shopOrderNumber} has been stuck in ${shopOrder.status} since ${shopOrder.confirmedAt?.toISOString() ?? shopOrder.createdAt.toISOString()}. Please update it.`,
+                data: { shopOrderId: shopOrder.id, status: shopOrder.status },
+              },
+            });
+            mails.push({
+              to: shopOrder.shop.sellerProfile.user.email,
+              subject: `PlantHaat: ${shopOrder.shopOrderNumber} is stuck in ${shopOrder.status}`,
+              text: `Your order ${shopOrder.shopOrderNumber} has been in ${shopOrder.status} for too long. Please pack/ship it or contact support.`,
+            });
+          } else if (shopOrder.stuckReminderCount >= maxReminders && !shopOrder.stuckFlaggedAt) {
+            await tx.shopOrder.update({
+              where: { id: shopOrder.id },
+              data: { stuckFlaggedAt: now },
+            });
+            if (admins.length > 0) {
+              await tx.notification.createMany({
+                data: admins.map((admin) => ({
+                  userId: admin.id,
+                  type: "ORDER_STUCK",
+                  title: "Stuck order flagged",
+                  body: `${shopOrder.shop.name} has not progressed ${shopOrder.shopOrderNumber} after ${maxReminders} reminders.`,
+                  data: { shopOrderId: shopOrder.id, status: shopOrder.status },
+                })),
+              });
+            }
+          }
+        }
+      },
+      { timeout: 30_000 },
+    );
+
+    for (const mail of mails) {
+      this.mail.queue(mail);
+    }
+  }
+
+  async listStuckOrders(query: QueryStuckOrdersDto): Promise<PaginatedResult<unknown>> {
+    const [confirmedHours, packedHours, graceDays] = await Promise.all([
+      this.settings.getNumber("stuck.confirmedHours"),
+      this.settings.getNumber("stuck.packedHours"),
+      this.settings.getNumber("stuck.shippedGraceDays"),
+    ]);
+    const now = new Date();
+    const confirmedCutoff = new Date(now.getTime() - confirmedHours * 3_600_000);
+    const packedCutoff = new Date(now.getTime() - packedHours * 3_600_000);
+    const shippedCutoff = new Date(now.getTime() - graceDays * 86_400_000);
+    const conditions: Prisma.ShopOrderWhereInput[] = [
+      { stuckFlaggedAt: { not: null } },
+    ];
+    if (query.includeOverdue !== false) {
+      conditions.push(
+        {
+          status: "CONFIRMED",
+          OR: [
+            { confirmedAt: { lt: confirmedCutoff } },
+            { confirmedAt: null, createdAt: { lt: confirmedCutoff } },
+          ],
+        },
+        {
+          status: "PACKED",
+          OR: [
+            { packedAt: { lt: packedCutoff } },
+            { packedAt: null, updatedAt: { lt: packedCutoff } },
+          ],
+        },
+        { status: "SHIPPED", estimatedDeliveryTo: { lt: shippedCutoff } },
+      );
+    }
+    const where: Prisma.ShopOrderWhereInput = {
+      status: { in: ["CONFIRMED", "PACKED", "SHIPPED"] },
+      OR: conditions,
+    };
+    const { page, limit, skip } = resolvePagination(query);
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.shopOrder.findMany({
+        where,
+        orderBy: [{ stuckFlaggedAt: "desc" }, { createdAt: "asc" }],
+        skip,
+        take: limit,
+        include: SHOP_ORDER_INCLUDE,
+      }),
+      this.prisma.shopOrder.count({ where }),
+    ]);
+    return paginate(rows, total, page, limit);
+  }
+
   private async transition(
     actorId: string | null,
     actorRole: OrderActor,
@@ -656,6 +1081,9 @@ export class OrdersService {
           status: to,
           ...timestampFor(to),
           ...(dto.note !== undefined ? { sellerNote: dto.note } : {}),
+          ...(to === "DELIVERED" && dto.deliveryNote !== undefined
+            ? { deliveryNote: dto.deliveryNote }
+            : {}),
           ...(to === "SHIPPED"
             ? {
                 courierName: dto.courierName ?? shopOrder.courierName,
@@ -725,26 +1153,30 @@ export class OrdersService {
           where: { shopOrderId, method: "COD", status: "PENDING" },
           data: { status: "PAID", paidAt: new Date() },
         });
-        for (const item of shopOrder.items) {
-          if (item.productId) {
-            await tx.product.update({
-              where: { id: item.productId },
-              data: { soldCount: { increment: item.quantity } },
-            });
+        // Replacements are free and must not inflate soldCount, revenue or the
+        // seller ledger.
+        if (shopOrder.kind !== "REPLACEMENT") {
+          for (const item of shopOrder.items) {
+            if (item.productId) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: { soldCount: { increment: item.quantity } },
+              });
+            }
           }
+          const isCod = shopOrder.order.paymentMethod === "COD";
+          await this.ledger.record(tx, {
+            sellerProfileId: shopOrder.shop.sellerProfile.id,
+            shopOrderId,
+            type: isCod ? "COD_COMMISSION_DUE" : "ORDER_EARNING",
+            amount: isCod ? shopOrder.commissionAmount.negated() : shopOrder.sellerNetAmount,
+            description: isCod
+              ? "COD commission due to platform"
+              : "Order earning (platform-collected payment)",
+            createdById: actorId,
+          });
+          await this.recomputeOrderPaymentStatus(tx, shopOrder.order.id);
         }
-        const isCod = shopOrder.order.paymentMethod === "COD";
-        await this.ledger.record(tx, {
-          sellerProfileId: shopOrder.shop.sellerProfile.id,
-          shopOrderId,
-          type: isCod ? "COD_COMMISSION_DUE" : "ORDER_EARNING",
-          amount: isCod ? shopOrder.commissionAmount.negated() : shopOrder.sellerNetAmount,
-          description: isCod
-            ? "COD commission due to platform"
-            : "Order earning (platform-collected payment)",
-          createdById: actorId,
-        });
-        await this.recomputeOrderPaymentStatus(tx, shopOrder.order.id);
       }
     });
 
@@ -828,6 +1260,8 @@ const SHOP_ORDER_INCLUDE = {
   payments: true,
   shop: { select: { id: true, name: true, slug: true } },
   order: { select: { id: true, orderNumber: true, customerId: true, paymentMethod: true } },
+  parent: { select: { id: true, orderId: true, shopOrderNumber: true } },
+  replacements: { select: { id: true, orderId: true, shopOrderNumber: true } },
 } satisfies Prisma.ShopOrderInclude;
 
 const ORDER_DETAIL_INCLUDE = {
@@ -837,6 +1271,8 @@ const ORDER_DETAIL_INCLUDE = {
       statusHistory: { orderBy: { createdAt: "asc" } },
       payments: true,
       shop: { select: { id: true, name: true, slug: true } },
+      parent: { select: { id: true, orderId: true, shopOrderNumber: true } },
+      replacements: { select: { id: true, orderId: true, shopOrderNumber: true } },
     },
   },
   payments: true,
@@ -864,6 +1300,22 @@ function shouldRestock(from: OrderStatus, requested: boolean | undefined): boole
     return true;
   }
   return requested === true;
+}
+
+function cartTotals(groups: LineGroup[]): {
+  subtotal: Prisma.Decimal;
+  deliveryTotal: Prisma.Decimal;
+  grandTotal: Prisma.Decimal;
+} {
+  const subtotal = money(groups.reduce((sum, g) => sum.plus(g.subtotal), new Prisma.Decimal(0)));
+  const deliveryTotal = money(
+    groups.reduce((sum, g) => {
+      const free =
+        g.delivery.freeDeliveryAbove !== null && g.subtotal.gte(g.delivery.freeDeliveryAbove);
+      return sum.plus(free ? new Prisma.Decimal(0) : g.delivery.charge);
+    }, new Prisma.Decimal(0)),
+  );
+  return { subtotal, deliveryTotal, grandTotal: money(subtotal.plus(deliveryTotal)) };
 }
 
 function addDays(date: Date, days: number): Date {
