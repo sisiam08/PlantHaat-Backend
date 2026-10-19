@@ -96,6 +96,12 @@ export class ContentReportDto {
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
   resolvedAt!: string | null;
   @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
+  @ApiPropertyOptional({
+    type: Object,
+    nullable: true,
+    description: "Reported content in context (body/rating, author, product {id,name,slug})",
+  })
+  target?: Record<string, unknown> | null;
 }
 
 export class ContentReportResolveDto {

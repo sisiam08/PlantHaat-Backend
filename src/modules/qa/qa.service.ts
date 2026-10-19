@@ -198,7 +198,7 @@ export class QaService {
     await this.notify(product.shop.sellerProfile.userId, "QUESTION_ASKED", {
       title: "New product question",
       body: `A customer asked about "${product.name}".`,
-      data: { questionId: question.id, productId },
+      data: { questionId: question.id, productId, productSlug: product.slug },
     });
     return this.toQuestion(question, 0, []);
   }
@@ -252,7 +252,9 @@ export class QaService {
         authorId: true,
         product: {
           select: {
+            id: true,
             name: true,
+            slug: true,
             shop: { select: { sellerProfile: { select: { userId: true } } } },
           },
         },
@@ -271,7 +273,7 @@ export class QaService {
       await this.notify(question.authorId, "QUESTION_ANSWERED", {
         title: "Your question was answered",
         body: `Someone answered your question about "${question.product.name}".`,
-        data: { questionId, answerId: answer.id },
+        data: { questionId, answerId: answer.id, productId: question.product.id, productSlug: question.product.slug },
       });
     }
     return this.toAnswer(answer, 0, []);
@@ -320,7 +322,14 @@ export class QaService {
         authorId: true,
         question: {
           select: {
-            product: { select: { shop: { select: { sellerProfile: { select: { userId: true } } } } } },
+            id: true,
+            product: {
+              select: {
+                id: true,
+                slug: true,
+                shop: { select: { sellerProfile: { select: { userId: true } } } },
+              },
+            },
           },
         },
       },
@@ -338,7 +347,7 @@ export class QaService {
       await this.notify(answer.authorId, "REPLY_RECEIVED", {
         title: "New reply",
         body: "Someone replied to your answer.",
-        data: { answerId, replyId: reply.id },
+        data: { answerId, replyId: reply.id, questionId: answer.question.id ?? null, productSlug: answer.question.product.slug },
       });
     }
     return this.toReply(reply);
@@ -351,6 +360,7 @@ export class QaService {
       select: {
         id: true,
         customerId: true,
+        product: { select: { id: true, slug: true } },
         shop: { select: { sellerProfile: { select: { userId: true } } } },
       },
     });
@@ -367,7 +377,12 @@ export class QaService {
       await this.notify(review.customerId, "REPLY_RECEIVED", {
         title: "New reply to your review",
         body: "Someone replied to your review.",
-        data: { reviewId, replyId: reply.id },
+        data: {
+          reviewId,
+          replyId: reply.id,
+          productId: review.product.id,
+          productSlug: review.product.slug,
+        },
       });
     }
     return this.toReply(reply);
@@ -488,7 +503,101 @@ export class QaService {
       }),
       this.prisma.contentReport.count({ where }),
     ]);
-    return paginate(rows, total, page, limit);
+    const data = await Promise.all(
+      rows.map(async (report) => ({
+        ...report,
+        target: await this.describeTarget(report.targetType, report.targetId),
+      })),
+    );
+    return paginate(data, total, page, limit);
+  }
+
+  /** Context for the admin queue: the reported content + its product/thread. */
+  private async describeTarget(
+    targetType: ContentReportTargetType,
+    targetId: string,
+  ): Promise<Record<string, unknown> | null> {
+    if (targetType === "QUESTION") {
+      const row = await this.prisma.productQuestion.findUnique({
+        where: { id: targetId },
+        include: {
+          author: { select: { name: true, deletedAt: true } },
+          product: { select: { id: true, name: true, slug: true } },
+        },
+      });
+      return row
+        ? {
+            kind: "QUESTION",
+            body: row.body,
+            authorName: row.author.deletedAt ? null : row.author.name,
+            product: row.product,
+          }
+        : null;
+    }
+    if (targetType === "ANSWER") {
+      const row = await this.prisma.questionAnswer.findUnique({
+        where: { id: targetId },
+        include: {
+          author: { select: { name: true, deletedAt: true } },
+          question: { select: { id: true, body: true, product: { select: { id: true, name: true, slug: true } } } },
+        },
+      });
+      return row
+        ? {
+            kind: "ANSWER",
+            body: row.body,
+            authorName: row.author.deletedAt ? null : row.author.name,
+            questionId: row.question.id,
+            questionBody: row.question.body,
+            product: row.question.product,
+          }
+        : null;
+    }
+    if (targetType === "REPLY") {
+      const row = await this.prisma.reply.findUnique({
+        where: { id: targetId },
+        include: {
+          author: { select: { name: true, deletedAt: true } },
+          answer: {
+            select: {
+              id: true,
+              questionId: true,
+              question: { select: { product: { select: { id: true, name: true, slug: true } } } },
+            },
+          },
+          review: { select: { id: true, product: { select: { id: true, name: true, slug: true } } } },
+        },
+      });
+      if (!row) return null;
+      return {
+        kind: "REPLY",
+        body: row.body,
+        authorName: row.author.deletedAt ? null : row.author.name,
+        answerId: row.answer?.id ?? null,
+        questionId: row.answer?.questionId ?? null,
+        reviewId: row.review?.id ?? null,
+        product: row.answer?.question.product ?? row.review?.product ?? null,
+      };
+    }
+    const row = await this.prisma.review.findUnique({
+      where: { id: targetId },
+      include: {
+        customer: { select: { name: true, deletedAt: true } },
+        shop: { select: { name: true } },
+        product: { select: { id: true, name: true, slug: true } },
+      },
+    });
+    return row
+      ? {
+          kind: "REVIEW",
+          title: row.title,
+          body: row.comment,
+          rating: row.rating,
+          shopName: row.shop.name,
+          authorName: row.customer.deletedAt ? null : row.customer.name,
+          product: row.product,
+        }
+      : null;
   }
 
   async resolveReport(id: string, hide: boolean, actor: AuthenticatedUser) {
