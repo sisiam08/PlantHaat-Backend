@@ -57,8 +57,13 @@ export const envSchema = z.object({
   SMTP_PASS: optionalString,
   MAIL_FROM: z.string().min(1).default("PlantHaat <no-reply@planthaat.local>"),
 
-  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  // "auto" uses Cloudinary when its keys are present, otherwise local.
+  STORAGE_DRIVER: z.enum(["auto", "local", "s3", "cloudinary"]).default("auto"),
   UPLOAD_DIR: z.string().min(1).default("uploads"),
+  CLOUDINARY_CLOUD_NAME: optionalString,
+  CLOUDINARY_API_KEY: optionalString,
+  CLOUDINARY_API_SECRET: optionalString,
+  CLOUDINARY_FOLDER_PREFIX: optionalString,
   S3_ENDPOINT: optionalString,
   S3_REGION: optionalString,
   S3_BUCKET: optionalString,
@@ -85,6 +90,38 @@ export const envSchema = z.object({
       code: "custom",
       path: ["BFF_SHARED_SECRET"],
       message: "BFF_SHARED_SECRET is required when NODE_ENV=production",
+    });
+  }
+  const cloudinaryKeys = [
+    "CLOUDINARY_CLOUD_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+  ] as const;
+  const hasAnyCloudinaryKey = cloudinaryKeys.some((key) => Boolean(value[key]));
+  const wantCloudinary =
+    value.STORAGE_DRIVER === "cloudinary" ||
+    (value.STORAGE_DRIVER === "auto" &&
+      cloudinaryKeys.every((key) => Boolean(value[key])));
+  if (wantCloudinary || hasAnyCloudinaryKey) {
+    for (const key of cloudinaryKeys) {
+      if (!value[key]) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required when Cloudinary storage is used`,
+        });
+      }
+    }
+  }
+  if (
+    value.NODE_ENV === "production" &&
+    value.STORAGE_DRIVER !== "cloudinary" &&
+    value.STORAGE_DRIVER !== "s3"
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["STORAGE_DRIVER"],
+      message: "STORAGE_DRIVER must be cloudinary or s3 in production (local is refused)",
     });
   }
   if (value.STORAGE_DRIVER === "s3") {

@@ -4,6 +4,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
+import { PrismaService } from "../../prisma/prisma.service";
 import {
   documentContentType,
   documentExtension,
@@ -14,6 +15,7 @@ import {
   ALLOWED_IMAGE_MIME_TYPES,
   DEFAULT_IMAGE_MAX_EDGE,
   detectImageMime,
+  HEIC_MIME_TYPES,
   MAX_IMAGE_BYTES,
   PRODUCT_IMAGE_MAX_EDGE,
   PRODUCT_IMAGE_QUALITY,
@@ -22,11 +24,26 @@ import {
 import { STORAGE_SERVICE, type StorageService, type StoredObject } from "./storage/storage.types";
 import { UploadPurpose } from "./dto/upload-image.dto";
 
+/** Cloudinary/local folder per upload purpose. */
+const PURPOSE_FOLDER: Record<UploadPurpose, string> = {
+  [UploadPurpose.AVATAR]: "avatars",
+  [UploadPurpose.PRODUCT]: "products",
+  [UploadPurpose.SHOP_LOGO]: "shops",
+  [UploadPurpose.SHOP_BANNER]: "shops",
+  [UploadPurpose.REVIEW]: "reviews",
+  [UploadPurpose.COMPLAINT]: "complaints",
+  [UploadPurpose.BANNER]: "banners",
+  [UploadPurpose.CATEGORY]: "categories",
+};
+
 @Injectable()
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
 
-  constructor(@Inject(STORAGE_SERVICE) private readonly storage: StorageService) {
+  constructor(
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+    private readonly prisma: PrismaService,
+  ) {
     this.logger.log(
       `Image long edge: product=${PRODUCT_IMAGE_MAX_EDGE}px, other purposes=${DEFAULT_IMAGE_MAX_EDGE}px`,
     );
@@ -49,18 +66,31 @@ export class UploadsService {
     if (!detected || !ALLOWED_IMAGE_MIME_TYPES.includes(claimed) || detected !== claimed) {
       throw AppException.badRequest(
         ErrorCode.UPLOAD_INVALID_TYPE,
-        "Only JPEG, PNG and WebP images are allowed",
+        "Only JPEG, PNG, WebP, HEIC and HEIF images are allowed",
       );
     }
 
-    let processed: Buffer;
+    const isHeic = (HEIC_MIME_TYPES as readonly string[]).includes(detected);
+    const folder = PURPOSE_FOLDER[purpose];
+    let buffer: Buffer;
+    let extension: string;
+    let contentType: string;
     try {
-      processed = await reencodeImage(
-        file.buffer,
-        purpose === UploadPurpose.PRODUCT
-          ? { maxEdge: PRODUCT_IMAGE_MAX_EDGE, quality: PRODUCT_IMAGE_QUALITY }
-          : undefined,
-      );
+      if (isHeic) {
+        // sharp cannot decode HEVC; Cloudinary converts HEIC/HEIF to jpg.
+        buffer = file.buffer;
+        extension = detected === "image/heif" ? "heif" : "heic";
+        contentType = detected;
+      } else {
+        buffer = await reencodeImage(
+          file.buffer,
+          purpose === UploadPurpose.PRODUCT
+            ? { maxEdge: PRODUCT_IMAGE_MAX_EDGE, quality: PRODUCT_IMAGE_QUALITY }
+            : undefined,
+        );
+        extension = "webp";
+        contentType = "image/webp";
+      }
     } catch {
       throw AppException.badRequest(
         ErrorCode.UPLOAD_INVALID_TYPE,
@@ -68,18 +98,22 @@ export class UploadsService {
       );
     }
 
-    const key = `images/${purpose}/${ownerId}/${randomUUID()}.webp`;
-    return this.storage.put({
+    const key = `${folder}/${ownerId}/${randomUUID()}.${extension}`;
+    const stored = await this.storage.put({
       key,
-      buffer: processed,
-      contentType: "image/webp",
+      buffer,
+      contentType,
       visibility: "public",
+      resourceType: "image",
+      ...(isHeic ? { format: "jpg" } : {}),
     });
+    await this.trackAsset(stored, purpose, ownerId);
+    return stored;
   }
 
   async uploadDocument(
     file: Express.Multer.File | undefined,
-    ownerId: string,
+    _ownerId: string,
   ): Promise<{ key: string }> {
     if (!file) {
       throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "A file is required");
@@ -98,13 +132,60 @@ export class UploadsService {
       );
     }
 
-    const key = `documents/${ownerId}/${randomUUID()}.${documentExtension(kind)}`;
-    await this.storage.put({
+    const key = `${randomUUID()}.${documentExtension(kind)}`;
+    const stored = await this.storage.put({
       key,
       buffer: file.buffer,
       contentType: documentContentType(kind),
       visibility: "private",
+      resourceType: kind === "pdf" ? "raw" : "image",
     });
-    return { key };
+    return { key: stored.key };
+  }
+
+  /** Marks the PENDING asset whose URL was attached to an entity. */
+  async attachAsset(url: string | null | undefined): Promise<void> {
+    if (!url) return;
+    await this.prisma.uploadedAsset.updateMany({
+      where: { url, status: "PENDING" },
+      data: { status: "ATTACHED", attachedAt: new Date() },
+    });
+  }
+
+  /** Best-effort deletion of a replaced/removed asset (never throws). */
+  async deleteByUrl(url: string | null | undefined): Promise<void> {
+    if (!url) return;
+    try {
+      await this.storage.deleteByUrl?.(url);
+      await this.prisma.uploadedAsset.deleteMany({ where: { url } });
+    } catch (error) {
+      this.logger.debug(
+        `Asset cleanup failed for ${url}: ${error instanceof Error ? error.message : "unknown"}`,
+      );
+    }
+  }
+
+  private async trackAsset(
+    stored: StoredObject,
+    purpose: UploadPurpose,
+    ownerId: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.uploadedAsset.create({
+        data: {
+          publicId: stored.key,
+          resourceType: stored.resourceType ?? "image",
+          url: stored.url || null,
+          purpose,
+          ownerId,
+          status: "PENDING",
+        },
+      });
+    } catch (error) {
+      // Asset tracking must never fail an upload.
+      this.logger.debug(
+        `Could not track upload ${stored.key}: ${error instanceof Error ? error.message : "unknown"}`,
+      );
+    }
   }
 }

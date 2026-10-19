@@ -1,7 +1,28 @@
 import sharp from "sharp";
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-export const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+] as const;
+
+/** HEIC/HEIF (HEVC) cannot be decoded by sharp; Cloudinary converts them. */
+export const HEIC_MIME_TYPES = ["image/heic", "image/heif"] as const;
+export const HEIC_BRANDS = new Set([
+  "heic",
+  "heix",
+  "hevc",
+  "hevx",
+  "heim",
+  "heis",
+  "hevm",
+  "hevs",
+  "mif1",
+  "msf1",
+]);
 
 /** Long-edge cap for every upload purpose except product images. */
 export const DEFAULT_IMAGE_MAX_EDGE = 1600;
@@ -41,6 +62,12 @@ export function detectImageMime(buffer: Buffer): AllowedImageMime | undefined {
     buffer.toString("ascii", 8, 12) === "WEBP"
   ) {
     return "image/webp";
+  }
+  if (buffer.length >= 12 && buffer.toString("ascii", 4, 8) === "ftyp") {
+    const brand = buffer.toString("ascii", 8, 12);
+    if (HEIC_BRANDS.has(brand)) {
+      return brand === "mif1" || brand === "msf1" ? "image/heif" : "image/heic";
+    }
   }
   return undefined;
 }

@@ -1200,3 +1200,26 @@ model SystemSetting {
   updatedById String?
   updatedAt   DateTime @updatedAt
 }
+
+// ------------------------- UPLOADS -------------------------
+enum UploadAssetStatus {
+  PENDING
+  ATTACHED
+}
+
+// Every upload is recorded as PENDING; attaching its URL to an entity marks it
+// ATTACHED. A cron removes PENDING assets older than 24 h (orphan control).
+model UploadedAsset {
+  id           String            @id @default(uuid())
+  publicId     String
+  resourceType String            @default("image")
+  url          String?
+  purpose      String
+  ownerId      String?
+  status       UploadAssetStatus @default(PENDING)
+  createdAt    DateTime          @default(now())
+  attachedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([ownerId])
+}
