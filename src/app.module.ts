@@ -21,6 +21,7 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CartModule } from "./modules/cart/cart.module";
 import { ClientIpModule } from "./common/client-ip/client-ip.module";
+import { CodRiskModule } from "./modules/cod-risk/cod-risk.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommissionsModule } from "./modules/commissions/commissions.module";
 import { ComplaintsModule } from "./modules/complaints/complaints.module";
@@ -80,6 +81,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     QaModule,
     SearchModule,
     CartModule,
+    CodRiskModule,
     OrdersModule,
     CommissionsModule,
     LedgerModule,

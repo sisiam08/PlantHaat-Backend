@@ -15,8 +15,9 @@ import {
 } from "../../common/utils/money";
 import { generateOrderNumber, toShopOrderNumber } from "../../common/utils/order-number";
 import { Prisma } from "../../generated/prisma/client";
-import type { OrderStatus } from "../../generated/prisma/enums";
+import type { CodRiskStatus, OrderStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
+import { CodRiskService } from "../cod-risk/cod-risk.service";
 import { CommissionsService } from "../commissions/commissions.service";
 import { LedgerService } from "../ledger/ledger.service";
 import { MailService } from "../mail/mail.service";
@@ -68,6 +69,7 @@ export class OrdersService {
     private readonly ledger: LedgerService,
     private readonly events: EventEmitter2,
     private readonly mail: MailService,
+    private readonly codRisk: CodRiskService,
   ) {}
 
   async checkout(customerId: string, dto: CheckoutDto, idempotencyKey: string | undefined) {
@@ -207,7 +209,7 @@ export class OrdersService {
     }
 
     for (const group of groups.values()) {
-      const zone = await resolveDeliveryZone(this.prisma, group.shopId, address.districtId);
+      const zone = await resolveDeliveryZone(this.prisma, group.shopId, address.districtId, address.cityScope);
       if (!zone) {
         problems.push({
           variantId: group.lines[0]?.variantId ?? "",
@@ -232,6 +234,34 @@ export class OrdersService {
     }
 
     const totals = cartTotals(shopGroups);
+
+    if (dto.paymentMethod === "COD") {
+      const account = await this.prisma.user.findUnique({
+        where: { id: customerId },
+        select: { phone: true },
+      });
+      const assessment = await this.codRisk.assess({
+        shippingPhone: address.phone,
+        accountPhone: account?.phone ?? null,
+        addressFingerprint: this.codRisk.fingerprint(address),
+        codTotal: totals.grandTotal,
+      });
+      if (assessment.status === "BLOCKED") {
+        throw AppException.unprocessable(
+          ErrorCode.COD_BLOCKED,
+          "Cash on delivery is unavailable for this phone. Please contact support.",
+          { status: assessment.status },
+        );
+      }
+      if (assessment.capExceeded) {
+        const cap = await this.settings.getNumber("codRisk.restrictCap");
+        throw AppException.unprocessable(
+          ErrorCode.COD_RESTRICTED,
+          "Cash on delivery is limited to ? for this phone. Please contact support.",
+          { status: assessment.status, limit: cap, grandTotal: totals.grandTotal.toString() },
+        );
+      }
+    }
     if (
       dto.expectedGrandTotal !== undefined &&
       !totals.grandTotal.equals(new Prisma.Decimal(dto.expectedGrandTotal))
@@ -686,7 +716,7 @@ export class OrdersService {
       }),
       this.prisma.shopOrder.count({ where }),
     ]);
-    return paginate(rows, total, page, limit);
+    return paginate(await this.attachCodRisk(rows), total, page, limit);
   }
 
   async getSellerOrder(sellerUserId: string, shopOrderId: string) {
@@ -1051,7 +1081,17 @@ export class OrdersService {
       include: {
         items: true,
         payments: true,
-        order: { select: { id: true, customerId: true, paymentMethod: true } },
+        order: {
+          select: {
+            id: true,
+            customerId: true,
+            paymentMethod: true,
+            contactPhone: true,
+            shippingDistrictId: true,
+            shippingArea: true,
+            shippingAddressLine: true,
+          },
+        },
         shop: { include: { sellerProfile: { select: { id: true, userId: true } } } },
       },
     });
@@ -1180,6 +1220,19 @@ export class OrdersService {
       }
     });
 
+    if (to === "FAILED_DELIVERY" || to === "DELIVERED") {
+      const fingerprint = this.codRisk.fingerprint({
+        districtId: shopOrder.order.shippingDistrictId,
+        area: shopOrder.order.shippingArea,
+        addressLine: shopOrder.order.shippingAddressLine,
+      });
+      if (to === "FAILED_DELIVERY") {
+        await this.codRisk.recordFailure(shopOrder.order.contactPhone, fingerprint);
+      } else {
+        await this.codRisk.recordDelivery(shopOrder.order.contactPhone, fingerprint);
+      }
+    }
+
     this.events.emit("order.status_changed", {
       shopOrderId,
       orderId: shopOrder.order.id,
@@ -1217,7 +1270,7 @@ export class OrdersService {
     if (!shopOrder) {
       throw AppException.notFound(ErrorCode.ORDER_NOT_FOUND, "Order not found");
     }
-    return shopOrder;
+    return (await this.attachCodRisk([shopOrder]))[0];
   }
 
   async listAdminOrders(query: QueryOrdersDto): Promise<PaginatedResult<unknown>> {
@@ -1233,7 +1286,7 @@ export class OrdersService {
       }),
       this.prisma.shopOrder.count({ where }),
     ]);
-    return paginate(rows, total, page, limit);
+    return paginate(await this.attachCodRisk(rows), total, page, limit);
   }
 
   async getAdminOrder(shopOrderId: string) {
@@ -1244,7 +1297,18 @@ export class OrdersService {
     if (!shopOrder) {
       throw AppException.notFound(ErrorCode.ORDER_NOT_FOUND, "Order not found");
     }
-    return shopOrder;
+    return (await this.attachCodRisk([shopOrder]))[0];
+  }
+
+  private async attachCodRisk<T extends { order: { contactPhone: string } }>(
+    rows: T[],
+  ): Promise<(T & { codRisk: CodRiskStatus | null })[]> {
+    const map = await this.codRisk.riskByPhones(rows.map((row) => row.order.contactPhone));
+    return rows.map((row) => {
+      const phone = this.codRisk.normalize(row.order.contactPhone);
+      const status = (phone ? map.get(phone) : undefined) ?? "OK";
+      return { ...row, codRisk: status === "OK" ? null : status };
+    });
   }
 
   private withOverallStatus<T extends { shopOrders: { status: OrderStatus }[] }>(
@@ -1259,7 +1323,15 @@ const SHOP_ORDER_INCLUDE = {
   statusHistory: { orderBy: { createdAt: "asc" } },
   payments: true,
   shop: { select: { id: true, name: true, slug: true } },
-  order: { select: { id: true, orderNumber: true, customerId: true, paymentMethod: true } },
+  order: {
+    select: {
+      id: true,
+      orderNumber: true,
+      customerId: true,
+      paymentMethod: true,
+      contactPhone: true,
+    },
+  },
   parent: { select: { id: true, orderId: true, shopOrderNumber: true } },
   replacements: { select: { id: true, orderId: true, shopOrderNumber: true } },
 } satisfies Prisma.ShopOrderInclude;

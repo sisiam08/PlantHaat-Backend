@@ -2,6 +2,7 @@ import { ApiProperty } from "@nestjs/swagger";
 
 import {
   CancellationRequestStatus,
+  CodRiskStatus,
   CancelledBy,
   OrderStatus,
   PaymentMethod,
@@ -120,6 +121,8 @@ export class SellerShopOrderDto {
   @ApiProperty({ type: SellerShopOrderRefDto, nullable: true })
   parent!: SellerShopOrderRefDto | null;
   @ApiProperty({ type: [SellerShopOrderRefDto] }) replacements!: SellerShopOrderRefDto[];
+  @ApiProperty({ enum: Object.values(CodRiskStatus), nullable: true })
+  codRisk!: CodRiskStatus | null;
 }
 
 export class SellerCancellationShopOrderRefDto {

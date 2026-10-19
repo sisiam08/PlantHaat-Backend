@@ -1,6 +1,7 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 import {
+  AreaScope,
   PayoutMethod,
   SellerDocumentType,
   SellerStatus,
@@ -68,6 +69,7 @@ export class DistrictRefDto {
   @ApiProperty() name!: string;
   @ApiProperty() nameBn!: string;
   @ApiProperty() division!: string;
+  @ApiPropertyOptional({ enum: Object.values(AreaScope) }) areaScope?: AreaScope;
 }
 
 export class DeliveryZoneDto {

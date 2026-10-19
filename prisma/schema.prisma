@@ -120,6 +120,25 @@ enum ShopOrderKind {
   REPLACEMENT
 }
 
+enum CodRiskStatus {
+  OK
+  WATCH
+  RESTRICTED
+  BLOCKED
+}
+
+enum CityScope {
+  CITY
+  OUTSIDE
+  NA
+}
+
+enum AreaScope {
+  ALL
+  CITY
+  OUTSIDE
+}
+
 enum CancelledBy {
   CUSTOMER
   SELLER
@@ -244,6 +263,7 @@ enum NotificationType {
   ANNOUNCEMENT
   QUESTION_ASKED
   QUESTION_ANSWERED
+  COD_RISK_FLAG
   REPLY_RECEIVED
   ORDER_DELAYED
   ORDER_STUCK
@@ -366,6 +386,7 @@ model Address {
   area          String
   addressLine   String
   postalCode    String?
+  cityScope     CityScope @default(NA)
   isDefault     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -374,6 +395,27 @@ model Address {
   district District @relation(fields: [districtId], references: [id])
 
   @@index([userId])
+}
+
+// COD risk is keyed by the normalized phone (phones are unverified, so this is
+// a deterrent, not proof of identity). The address fingerprint is a secondary
+// signal when a repeat offender uses a new phone at the same address.
+model PhoneRiskProfile {
+  id                 String        @id @default(uuid())
+  phoneNormalized    String        @unique
+  failedCount        Int           @default(0)
+  deliveredCount     Int           @default(0)
+  lastEventAt        DateTime?
+  status             CodRiskStatus @default(OK)
+  note               String?
+  setById            String?
+  isWhitelisted      Boolean       @default(false)
+  addressFingerprint String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([status])
+  @@index([addressFingerprint])
 }
 
 // ───────────────────────── SELLERS & SHOPS ─────────────────────────
@@ -495,6 +537,7 @@ model ShopDeliveryZone {
 model ZoneDistrict {
   zoneId     String
   districtId Int
+  areaScope  AreaScope @default(ALL)
 
   zone     ShopDeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   district District         @relation(fields: [districtId], references: [id], onDelete: Cascade)

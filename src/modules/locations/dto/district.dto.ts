@@ -5,4 +5,5 @@ export class DistrictDto {
   @ApiProperty() name!: string;
   @ApiProperty() nameBn!: string;
   @ApiProperty() division!: string;
+  @ApiProperty({ description: "Metro district (city/outside scope applies)" }) metro!: boolean;
 }

@@ -35,17 +35,23 @@ export class DeliveryService {
   async create(userId: string, dto: CreateDeliveryZoneDto) {
     const { shop } = await this.sellerContext.requireShop(userId);
     const isNationwide = dto.isNationwide ?? false;
-    const districtIds = isNationwide ? [] : (dto.districtIds ?? []);
+    const entries = isNationwide
+      ? []
+      : (dto.districtAreaScopes ??
+        (dto.districtIds ?? []).map((districtId) => ({
+          districtId,
+          areaScope: "ALL" as const,
+        })));
 
-    if (!isNationwide && districtIds.length === 0) {
+    if (!isNationwide && entries.length === 0) {
       throw AppException.badRequest(
         ErrorCode.VALIDATION_FAILED,
         "Select at least one district or enable nationwide delivery",
       );
     }
-    await this.assertDistricts(districtIds);
+    await this.assertDistricts(entries.map((entry) => entry.districtId));
     if (!isNationwide) {
-      await this.assertNoOverlap(shop.id, districtIds);
+      await this.assertNoOverlap(shop.id, entries);
     }
 
     const zone = await this.prisma.shopDeliveryZone.create({
@@ -57,7 +63,12 @@ export class DeliveryService {
         freeDeliveryAbove: dto.freeDeliveryAbove ?? null,
         estimatedDaysMin: dto.estimatedDaysMin ?? 1,
         estimatedDaysMax: dto.estimatedDaysMax ?? 3,
-        districts: { create: districtIds.map((districtId) => ({ districtId })) },
+        districts: {
+          create: entries.map((entry) => ({
+            districtId: entry.districtId,
+            areaScope: entry.areaScope,
+          })),
+        },
       },
       include: ZONE_INCLUDE,
     });
@@ -74,13 +85,20 @@ export class DeliveryService {
     }
 
     const isNationwide = dto.isNationwide ?? zone.isNationwide;
-    const districtIds = dto.districtIds;
+    const entries =
+      dto.districtAreaScopes ??
+      (dto.districtIds !== undefined
+        ? dto.districtIds.map((districtId) => ({
+            districtId,
+            areaScope: "ALL" as const,
+          }))
+        : undefined);
 
     if (isNationwide && dto.isNationwide === true) {
       // switching to nationwide clears districts
-    } else if (districtIds !== undefined) {
-      await this.assertDistricts(districtIds);
-      await this.assertNoOverlap(shop.id, districtIds, zoneId);
+    } else if (entries !== undefined) {
+      await this.assertDistricts(entries.map((entry) => entry.districtId));
+      await this.assertNoOverlap(shop.id, entries, zoneId);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -100,10 +118,14 @@ export class DeliveryService {
 
       if (dto.isNationwide === true) {
         await tx.zoneDistrict.deleteMany({ where: { zoneId } });
-      } else if (districtIds !== undefined) {
+      } else if (entries !== undefined) {
         await tx.zoneDistrict.deleteMany({ where: { zoneId } });
         await tx.zoneDistrict.createMany({
-          data: districtIds.map((districtId) => ({ zoneId, districtId })),
+          data: entries.map((entry) => ({
+            zoneId,
+            districtId: entry.districtId,
+            areaScope: entry.areaScope,
+          })),
         });
       }
     });
@@ -142,27 +164,30 @@ export class DeliveryService {
 
   private async assertNoOverlap(
     shopId: string,
-    districtIds: number[],
+    entries: { districtId: number; areaScope: "ALL" | "CITY" | "OUTSIDE" }[],
     excludeZoneId?: string,
   ): Promise<void> {
-    if (districtIds.length === 0) {
+    if (entries.length === 0) {
       return;
     }
+    const districts = [...new Set(entries.map((entry) => entry.districtId))];
+    const scopes = [...new Set(entries.map((entry) => entry.areaScope))];
     const conflicting = await this.prisma.zoneDistrict.findFirst({
       where: {
-        districtId: { in: districtIds },
+        districtId: { in: districts },
+        areaScope: { in: scopes },
         zone: {
           shopId,
           isActive: true,
           ...(excludeZoneId ? { id: { not: excludeZoneId } } : {}),
         },
       },
-      select: { districtId: true },
+      select: { districtId: true, areaScope: true },
     });
     if (conflicting) {
       throw AppException.conflict(
         ErrorCode.DELIVERY_ZONE_CONFLICT,
-        "A selected district is already covered by another active zone",
+        "A selected district/area scope is already covered by another active zone",
       );
     }
   }
@@ -178,7 +203,10 @@ interface ZoneRow {
   estimatedDaysMax: number;
   isActive: boolean;
   createdAt: Date;
-  districts: { district: { id: number; name: string; nameBn: string; division: string } }[];
+  districts: {
+    areaScope: "ALL" | "CITY" | "OUTSIDE";
+    district: { id: number; name: string; nameBn: string; division: string };
+  }[];
 }
 
 function toZoneView(zone: ZoneRow) {
@@ -191,7 +219,10 @@ function toZoneView(zone: ZoneRow) {
     estimatedDaysMin: zone.estimatedDaysMin,
     estimatedDaysMax: zone.estimatedDaysMax,
     isActive: zone.isActive,
-    districts: zone.districts.map((link) => link.district),
+    districts: zone.districts.map((link) => ({
+      ...link.district,
+      areaScope: link.areaScope,
+    })),
     createdAt: zone.createdAt,
   };
 }

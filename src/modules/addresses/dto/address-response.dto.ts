@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 
+import { CityScope } from "../../../generated/prisma/enums";
 import { DistrictDto } from "../../locations/dto/district.dto";
 
 export class AddressDto {
@@ -12,6 +13,7 @@ export class AddressDto {
   @ApiProperty() area!: string;
   @ApiProperty() addressLine!: string;
   @ApiProperty({ nullable: true, type: String }) postalCode!: string | null;
+  @ApiProperty({ enum: Object.values(CityScope) }) cityScope!: CityScope;
   @ApiProperty() isDefault!: boolean;
   @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
 }

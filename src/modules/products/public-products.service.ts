@@ -11,6 +11,7 @@ import { paginate } from "../../common/types/paginated";
 import type { Prisma } from "../../generated/prisma/client";
 import type { CareDifficulty, LightRequirement } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
+import type { CityScope } from "../../generated/prisma/enums";
 import { resolveDeliveryZone } from "../orders/delivery-zone.resolver";
 import type { FilterOptionsQueryDto } from "./dto/filter-options-query.dto";
 import type { QueryProductsDto } from "./dto/query-products.dto";
@@ -462,7 +463,7 @@ export class PublicProductsService {
     return rows.map((row) => row.id);
   }
 
-  async getDeliveryQuote(slug: string, districtId: number) {
+  async getDeliveryQuote(slug: string, districtId: number, cityScope: CityScope = "NA") {
     const shop = await this.prisma.shop.findFirst({
       where: { slug, ...PUBLIC_SHOP_FILTER },
       select: { id: true },
@@ -479,7 +480,7 @@ export class PublicProductsService {
       throw AppException.unprocessable(ErrorCode.VALIDATION_FAILED, "Unknown district");
     }
 
-    const zone = await resolveDeliveryZone(this.prisma, shop.id, districtId);
+    const zone = await resolveDeliveryZone(this.prisma, shop.id, districtId, cityScope);
     if (!zone) {
       return {
         deliverable: false,

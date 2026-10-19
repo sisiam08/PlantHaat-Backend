@@ -112,7 +112,7 @@ export class PublicProductsController {
   })
   @ApiEnvelopeResponse(DeliveryQuoteDto)
   deliveryQuote(@Param("slug") slug: string, @Query() query: DeliveryQuoteQueryDto) {
-    return this.products.getDeliveryQuote(slug, query.districtId);
+    return this.products.getDeliveryQuote(slug, query.districtId, query.cityScope);
   }
 
   @Public()

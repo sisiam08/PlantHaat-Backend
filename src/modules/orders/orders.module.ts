@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { CodRiskModule } from "../cod-risk/cod-risk.module";
 import { CommissionsModule } from "../commissions/commissions.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { AdminOrdersController } from "./admin-orders.controller";
@@ -10,7 +11,7 @@ import { OrdersService } from "./orders.service";
 import { SellerOrdersController } from "./seller-orders.controller";
 
 @Module({
-  imports: [CommissionsModule, NotificationsModule],
+  imports: [CommissionsModule, NotificationsModule, CodRiskModule],
   controllers: [
     CheckoutController,
     OrdersController,

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -11,6 +12,7 @@ import {
 } from "class-validator";
 
 import { BD_PHONE_REGEX } from "../../auth/dto/register.dto";
+import { CityScope } from "../../../generated/prisma/enums";
 
 export class CreateAddressDto {
   @ApiPropertyOptional({ example: "Home" })
@@ -52,6 +54,11 @@ export class CreateAddressDto {
   @IsString()
   @MaxLength(20)
   postalCode?: string;
+
+  @ApiPropertyOptional({ enum: CityScope, description: "Only meaningful for metro districts (Dhaka)" })
+  @IsOptional()
+  @IsEnum(CityScope)
+  cityScope?: CityScope;
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()

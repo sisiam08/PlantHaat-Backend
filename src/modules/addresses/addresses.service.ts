@@ -3,8 +3,10 @@ import { Injectable } from "@nestjs/common";
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import { normalizeBdPhone } from "../../common/utils/phone";
+import type { CityScope } from "../../generated/prisma/enums";
 import { Prisma, type PrismaClient } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { SettingsService } from "../settings/settings.service";
 import { toAddressView, type AddressView } from "./address.mapper";
 import type { CreateAddressDto } from "./dto/create-address.dto";
 import type { UpdateAddressDto } from "./dto/update-address.dto";
@@ -15,7 +17,10 @@ const ADDRESS_INCLUDE = {
 
 @Injectable()
 export class AddressesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
+  ) {}
 
   async list(userId: string): Promise<AddressView[]> {
     const addresses = await this.prisma.address.findMany({
@@ -27,7 +32,7 @@ export class AddressesService {
   }
 
   async create(userId: string, dto: CreateAddressDto): Promise<AddressView> {
-    await this.assertDistrict(dto.districtId);
+    const cityScope = await this.resolveCityScope(dto.districtId, dto.cityScope);
     const count = await this.prisma.address.count({ where: { userId } });
     const isDefault = dto.isDefault ?? count === 0;
 
@@ -42,6 +47,7 @@ export class AddressesService {
           recipientName: dto.recipientName.trim(),
           phone: this.normalizePhone(dto.phone),
           districtId: dto.districtId,
+          cityScope,
           area: dto.area.trim(),
           addressLine: dto.addressLine.trim(),
           postalCode: dto.postalCode ?? null,
@@ -55,11 +61,19 @@ export class AddressesService {
 
   async update(userId: string, id: string, dto: UpdateAddressDto): Promise<AddressView> {
     await this.assertOwned(userId, id);
-    if (dto.districtId !== undefined) {
-      await this.assertDistrict(dto.districtId);
-    }
 
     const data: Prisma.AddressUpdateInput = {};
+    if (dto.districtId !== undefined || dto.cityScope !== undefined) {
+      const current = await this.prisma.address.findFirst({
+        where: { id, userId },
+        select: { districtId: true },
+      });
+      const districtId = dto.districtId ?? current?.districtId;
+      if (districtId === undefined) {
+        throw AppException.notFound(ErrorCode.ADDRESS_NOT_FOUND, "Address not found");
+      }
+      data.cityScope = await this.resolveCityScope(districtId, dto.cityScope);
+    }
     if (dto.label !== undefined) data.label = dto.label;
     if (dto.recipientName !== undefined) data.recipientName = dto.recipientName.trim();
     if (dto.phone !== undefined) data.phone = this.normalizePhone(dto.phone);
@@ -117,14 +131,22 @@ export class AddressesService {
     }
   }
 
-  private async assertDistrict(districtId: number): Promise<void> {
+  private async resolveCityScope(
+    districtId: number,
+    requested?: CityScope,
+  ): Promise<CityScope> {
     const district = await this.prisma.district.findUnique({
       where: { id: districtId },
-      select: { id: true },
+      select: { name: true },
     });
     if (!district) {
       throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Unknown district");
     }
+    const metro = await this.settings.get<string[]>("metroDistricts");
+    if (!Array.isArray(metro) || !metro.includes(district.name)) {
+      return "NA";
+    }
+    return requested === "CITY" || requested === "OUTSIDE" ? requested : "NA";
   }
 
   private normalizePhone(phone: string): string {

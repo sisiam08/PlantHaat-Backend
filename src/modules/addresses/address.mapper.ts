@@ -1,3 +1,5 @@
+import type { CityScope } from "../../generated/prisma/enums";
+
 export interface AddressDistrictView {
   id: number;
   name: string;
@@ -14,6 +16,7 @@ export interface AddressSource {
   area: string;
   addressLine: string;
   postalCode: string | null;
+  cityScope: CityScope;
   isDefault: boolean;
   createdAt: Date;
   district: AddressDistrictView;
@@ -29,6 +32,7 @@ export interface AddressView {
   area: string;
   addressLine: string;
   postalCode: string | null;
+  cityScope: CityScope;
   isDefault: boolean;
   createdAt: Date;
 }
@@ -44,6 +48,7 @@ export function toAddressView(address: AddressSource): AddressView {
     area: address.area,
     addressLine: address.addressLine,
     postalCode: address.postalCode,
+    cityScope: address.cityScope,
     isDefault: address.isDefault,
     createdAt: address.createdAt,
   };

@@ -5,6 +5,7 @@ import { ErrorCode } from "../../common/errors/error-codes";
 import { Prisma } from "../../generated/prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
+import type { CodRiskService } from "../cod-risk/cod-risk.service";
 import type { CommissionsService } from "../commissions/commissions.service";
 import type { LedgerService } from "../ledger/ledger.service";
 import type { MailService } from "../mail/mail.service";
@@ -76,7 +77,7 @@ function createPrismaMock() {
       count: mockFn(),
     },
     notification: { create: mockFn(), createMany: mockFn() },
-    user: { findMany: mockFn() },
+    user: { findMany: mockFn(), findUnique: mockFn() },
     sellerProfile: { findUnique: mockFn(), update: mockFn() },
     refund: { create: mockFn() },
   } satisfies Record<string, Record<string, PrismaMockFn>>;
@@ -93,6 +94,7 @@ function createPrismaMock() {
   // Sensible defaults so transaction bodies do not crash on mock reads;
   // tests override these where they care.
   bag.order.create.mockResolvedValue({ id: "order-1" });
+  bag.user.findUnique.mockResolvedValue({ phone: null });
   bag.shopOrder.create.mockResolvedValue({ id: "shop-order-1" });
   bag.productVariant.update.mockResolvedValue({ stockQty: 5 });
   bag.productVariant.updateMany.mockResolvedValue({ count: 1 });
@@ -111,6 +113,20 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
   const ledger = { record: jest.fn<() => Promise<void>>() } as never as LedgerService;
   const events = { emit: jest.fn() } as unknown as EventEmitter2;
   const mail = { queue: jest.fn() } as never as MailService;
+  const codRiskMock = {
+    assess: jest.fn(),
+    fingerprint: jest.fn(),
+    recordFailure: jest.fn(),
+    recordDelivery: jest.fn(),
+    riskByPhones: jest.fn(),
+    normalize: jest.fn((value: string | null) => value),
+  };
+  (codRiskMock.riskByPhones as unknown as { mockResolvedValue: (value: unknown) => void }).mockResolvedValue(new Map());
+  (codRiskMock.assess as unknown as { mockResolvedValue: (value: unknown) => void }).mockResolvedValue({
+    status: "OK",
+    capExceeded: false,
+  });
+  const codRisk = codRiskMock as unknown as CodRiskService;
   const service = new OrdersService(
     prismaBag.prisma as unknown as PrismaService,
     commissions,
@@ -119,6 +135,7 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     ledger,
     events,
     mail,
+    codRisk,
   );
   return { service, commissions, settings, ledger, events, mail };
 }

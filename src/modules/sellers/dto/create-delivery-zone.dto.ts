@@ -4,6 +4,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -12,7 +13,21 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
+
+import { AreaScope } from "../../../generated/prisma/enums";
+
+export class DistrictAreaScopeDto {
+  @ApiProperty({ example: 1 })
+  @IsInt()
+  @Min(1)
+  districtId!: number;
+
+  @ApiProperty({ enum: AreaScope, default: AreaScope.ALL })
+  @IsEnum(AreaScope)
+  areaScope!: AreaScope;
+}
 
 export class CreateDeliveryZoneDto {
   @ApiProperty({ example: "Dhaka metro" })
@@ -33,6 +48,17 @@ export class CreateDeliveryZoneDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   districtIds?: number[];
+
+  @ApiPropertyOptional({
+    type: [DistrictAreaScopeDto],
+    description:
+      "Per-district area scope. When provided it replaces districtIds and allows CITY + OUTSIDE + ALL zones for the same district.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DistrictAreaScopeDto)
+  districtAreaScopes?: DistrictAreaScopeDto[];
 
   @ApiProperty({ example: 60 })
   @Type(() => Number)

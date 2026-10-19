@@ -1,6 +1,8 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsInt, Min } from "class-validator";
+import { IsEnum, IsInt, IsOptional, Min } from "class-validator";
+
+import { CityScope } from "../../../generated/prisma/enums";
 
 export class DeliveryQuoteQueryDto {
   @ApiProperty({ description: "Destination district id", minimum: 1 })
@@ -8,4 +10,9 @@ export class DeliveryQuoteQueryDto {
   @IsInt()
   @Min(1)
   districtId!: number;
+
+  @ApiPropertyOptional({ enum: CityScope, description: "Dhaka city/outside scope (optional)" })
+  @IsOptional()
+  @IsEnum(CityScope)
+  cityScope?: CityScope;
 }
