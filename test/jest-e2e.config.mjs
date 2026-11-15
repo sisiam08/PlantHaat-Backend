@@ -6,6 +6,7 @@ export default {
   rootDir: "..",
   testRegex: "test/.*\\.e2e-spec\\.ts$",
   testTimeout: 30000,
+  globalSetup: "<rootDir>/test/global-setup.mjs",
   setupFiles: ["<rootDir>/test/setup-env.ts"],
   testPathIgnorePatterns: ["/node_modules/", "/dist/"],
 };
