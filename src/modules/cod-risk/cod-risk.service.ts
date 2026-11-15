@@ -216,7 +216,7 @@ export class CodRiskService {
     return new Map(
       profiles.map((profile) => [
         profile.phoneNormalized,
-        profile.isWhitelisted ? ("OK" as CodRiskStatus) : profile.status,
+        profile.isWhitelisted ? "OK" : profile.status,
       ]),
     );
   }

@@ -284,7 +284,7 @@ export class PublicProductsService {
     const where = await this.buildWhere({
       category: query.category,
       q: query.q,
-    } as QueryProductsDto);
+    });
 
     const [priceAgg, lightRows, difficultyRows] = await Promise.all([
       this.prisma.product.aggregate({

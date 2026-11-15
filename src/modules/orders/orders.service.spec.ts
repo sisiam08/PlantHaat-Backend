@@ -106,8 +106,10 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     resolveRatePercent: jest.fn<() => Promise<unknown>>().mockResolvedValue(dec(10)),
   } as unknown as CommissionsService;
   const settings = {
-    getBoolean: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
-    getNumber: jest.fn<() => Promise<number>>().mockResolvedValue(24),
+    getBoolean: jest
+      .fn<(key: string) => Promise<boolean>>()
+      .mockImplementation(async (key) => key === "payment.cod.enabled"),
+    getNumber: jest.fn<() => Promise<number>>().mockResolvedValue(0),
   } as unknown as SettingsService;
   const notifications = { create: jest.fn() } as never as NotificationsService;
   const ledger = { record: jest.fn<() => Promise<void>>() } as never as LedgerService;

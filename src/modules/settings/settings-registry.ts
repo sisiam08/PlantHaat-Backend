@@ -56,6 +56,14 @@ export class SettingValidationError extends Error {
 
 const BD_MOBILE = /^01[3-9]\d{8}$/;
 
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function advanceIsLive(): boolean {
+  return false;
+}
+
 export function validateSettingValue(key: string, value: unknown): void {
   const definition = SETTINGS_REGISTRY.find((setting) => setting.key === key);
   if (!definition) throw new SettingValidationError(`Unknown setting: ${key}`);
@@ -126,10 +134,11 @@ export function validateSettingsMap(
       ["payment.nagad.enabled", "payment.nagad.number"],
     ].some(
       ([enabled, number]) =>
-        merged[enabled] === true && BD_MOBILE.test(String(merged[number] ?? "").trim()),
+        merged[enabled] === true && BD_MOBILE.test(stringValue(merged[number])),
     );
     // Part 3 is not live yet; effectiveAdvance stays false regardless of the flag.
-    const effectiveAdvance = false && merged["payment.advance.enabled"] === true && providerReady;
+    const effectiveAdvance =
+      advanceIsLive() && merged["payment.advance.enabled"] === true && providerReady;
     if (!effectiveAdvance) {
       throw new SettingValidationError(
         "COD cannot be disabled until Advance payment is live and a provider number is configured",
@@ -142,7 +151,7 @@ export function validateSettingsMap(
   ];
   for (const provider of providers) {
     if (merged[provider.enabled] === true) {
-      const number = String(merged[provider.number] ?? "").trim();
+      const number = stringValue(merged[provider.number]);
       if (!BD_MOBILE.test(number)) {
         throw new SettingValidationError(
           `${provider.label} cannot be enabled without a valid receiving number`,
@@ -152,7 +161,7 @@ export function validateSettingsMap(
   }
   if (merged["payment.advance.enabled"] === true) {
     const hasProvider = providers.some((provider) => {
-      const number = String(merged[provider.number] ?? "").trim();
+      const number = stringValue(merged[provider.number]);
       return merged[provider.enabled] === true && BD_MOBILE.test(number);
     });
     if (!hasProvider) {

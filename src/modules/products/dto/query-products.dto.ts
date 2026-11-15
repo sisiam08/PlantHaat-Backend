@@ -31,7 +31,7 @@ const toStringArray = ({ value }: { value: unknown }): string[] | undefined => {
   if (value === undefined || value === null || value === "") {
     return undefined;
   }
-  const raw = Array.isArray(value) ? value : String(value).split(",");
+  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
   const seen = new Set<string>();
   for (const entry of raw) {
     const trimmed = String(entry).trim();

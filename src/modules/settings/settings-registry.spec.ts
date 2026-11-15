@@ -1,6 +1,4 @@
-import { jest } from "@jest/globals";
-
-﻿import {
+import {
   SETTINGS_REGISTRY,
   SETTING_DEFAULTS,
   maskSensitive,

@@ -95,7 +95,7 @@ describe("ComplaintsService", () => {
   });
 
   it("rejects NOT_DELIVERED on a delivered order outside the complaint window", async () => {
-    const { service, prisma } = createService();
+    const { service, prisma, settings } = createService();
     prisma.shopOrder.findUnique.mockResolvedValue({
       ...deliveredShopOrder,
       deliveredAt: new Date(Date.now() - 72 * 3_600_000),
@@ -105,6 +105,7 @@ describe("ComplaintsService", () => {
       code: ErrorCode.COMPLAINT_WINDOW_CLOSED,
     });
     expect(prisma.complaint.create).not.toHaveBeenCalled();
+    expect(settings.getNumber).toHaveBeenCalledWith("return.windowHours");
   });
 
   it("rejects NOT_DELIVERED on a pending order", async () => {

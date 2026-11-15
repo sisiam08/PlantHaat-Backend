@@ -68,6 +68,6 @@ describe("SettingsService", () => {
     const service = new SettingsService(prisma);
     await expect(
       service.update({ "payment.cod.enabled": false, "payment.advance.enabled": false }, "admin-1"),
-    ).rejects.toThrow(/At least one payment/);
+    ).rejects.toThrow(/COD cannot be disabled/);
   });
 });

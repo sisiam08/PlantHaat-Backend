@@ -159,7 +159,7 @@ export class ComplaintsService {
   }
 
   private async assertWithinComplaintWindow(deliveredAt: Date | null): Promise<void> {
-    const windowHours = await this.settings.getNumber("complaint.windowHours");
+    const windowHours = await this.settings.getNumber("return.windowHours");
     if (!deliveredAt || Date.now() > deliveredAt.getTime() + windowHours * 3_600_000) {
       throw AppException.badRequest(
         ErrorCode.COMPLAINT_WINDOW_CLOSED,

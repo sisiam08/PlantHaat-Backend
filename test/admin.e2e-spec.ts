@@ -9,6 +9,7 @@ import { hashPassword } from "../src/common/utils/password";
 import { AppConfigService } from "../src/config/app-config.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { resetDatabase } from "./cleanup";
+import { clearSettings } from "./settings-test-helper";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
@@ -41,6 +42,11 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
 
   beforeEach(async () => {
     await resetDatabase(prisma);
+    await clearSettings(app, prisma);
+  });
+
+  afterEach(async () => {
+    await clearSettings(app, prisma);
   });
 
   async function adminAgent() {
