@@ -1,19 +1,30 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Patch, Post, Query, Req } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { IsObject } from "class-validator";
+import { IsObject, IsString } from "class-validator";
 import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { AppException } from "../../common/errors/app.exception";
+import { ErrorCode } from "../../common/errors/error-codes";
 import { Roles } from "../../common/decorators/roles.decorator";
 import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import { getRequestMeta } from "../../common/utils/request-meta";
 import { Role } from "../../generated/prisma/enums";
 import { AuditService } from "../audit/audit.service";
+import { SettingsReauthService } from "./settings-reauth.service";
 import { SettingsService } from "./settings.service";
 
 class UpdateSettingsDto {
   @IsObject()
   values!: Record<string, unknown>;
+}
+
+class ReauthDto {
+  @IsString()
+  key!: string;
+
+  @IsString()
+  password!: string;
 }
 
 /** `{ success: true, data: { "<setting.key>": <json value>, ... } }` */
@@ -38,6 +49,7 @@ export class AdminSettingsController {
   constructor(
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly reauth: SettingsReauthService,
   ) {}
 
   @Get()
@@ -45,6 +57,12 @@ export class AdminSettingsController {
   @ApiOkResponse({ schema: settingsEnvelopeSchema })
   get() {
     return this.settings.getAll();
+  }
+
+  @Post("reauth")
+  @HttpCode(HttpStatus.OK)
+  reauthenticate(@Body() dto: ReauthDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.reauth.issue(actor.id, dto.password, dto.key);
   }
 
   @Get("registry")
@@ -65,7 +83,16 @@ export class AdminSettingsController {
     @Body() dto: UpdateSettingsDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
+    @Headers("x-settings-reauth") reauthToken?: string,
   ) {
+    const sensitiveKeys = this.settings
+      .getRegistry()
+      .filter((setting) => setting.isSensitive && setting.key in dto.values)
+      .map((setting) => setting.key);
+    if (sensitiveKeys.length > 1) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Submit sensitive settings one at a time");
+    }
+    for (const key of sensitiveKeys) this.reauth.assert(reauthToken, actor.id, key);
     const values = await this.settings.update(dto.values, actor.id, {
       ...getRequestMeta(request),
     });

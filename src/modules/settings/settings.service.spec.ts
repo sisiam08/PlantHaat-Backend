@@ -48,6 +48,16 @@ describe("SettingsService", () => {
     expect(history[0]).toMatchObject({ key: "commission.default", newValue: 12, reason: "test" });
   });
 
+  it("leaves no history when the write transaction fails", async () => {
+    const { prisma, history, tx } = fakePrisma();
+    tx.systemSettingHistory.create.mockImplementationOnce(async () => {
+      throw new Error("write failed");
+    });
+    const service = new SettingsService(prisma);
+    await expect(service.update({ "commission.default": 15 }, "admin-1")).rejects.toThrow(/write failed/);
+    expect(history).toHaveLength(0);
+  });
+
   it("rejects both payment methods disabled", async () => {
     const { prisma } = fakePrisma();
     const service = new SettingsService(prisma);
