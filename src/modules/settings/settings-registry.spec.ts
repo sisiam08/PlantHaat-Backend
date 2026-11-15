@@ -34,10 +34,21 @@ describe("settings registry", () => {
         { "payment.cod.enabled": false, "payment.advance.enabled": false },
         {},
       ),
-    ).toThrow(/At least one payment/);
+    ).toThrow(/COD cannot be disabled/);
     expect(() =>
       validateSettingsMap({ "payment.nagad.enabled": true }, {}),
     ).toThrow(/valid receiving number/);
+    expect(() =>
+      validateSettingsMap(
+        {
+          "payment.cod.enabled": false,
+          "payment.advance.enabled": true,
+          "payment.bkash.enabled": true,
+          "payment.bkash.number": "01712345678",
+        },
+        {},
+      ),
+    ).toThrow(/COD cannot be disabled/);
     expect(() =>
       validateSettingsMap({ "payment.advance.enabled": true }, {}),
     ).toThrow(/requires at least one enabled provider/);

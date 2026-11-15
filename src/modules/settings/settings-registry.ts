@@ -11,10 +11,11 @@ export interface SettingDefinition {
   helpBn?: string;
   isPublic?: boolean;
   isSensitive?: boolean;
+  wired?: boolean;
 }
 
 export const SETTINGS_REGISTRY: SettingDefinition[] = [
-  { key: "payment.cod.enabled", type: "boolean", default: true, group: "payments", labelEn: "Cash on delivery enabled", labelBn: "ক্যাশ অন ডেলিভারি চালু", isPublic: true },
+  { key: "payment.cod.enabled", type: "boolean", default: true, group: "payments", labelEn: "Cash on delivery enabled", labelBn: "ক্যাশ অন ডেলিভারি চালু", isPublic: true, wired: true },
   { key: "payment.advance.enabled", type: "boolean", default: false, group: "payments", labelEn: "Advance payment enabled", labelBn: "অ্যাডভান্স পেমেন্ট চালু", isPublic: true },
   { key: "payment.bkash.enabled", type: "boolean", default: false, group: "payments", labelEn: "bKash enabled", labelBn: "বিকাশ চালু", isPublic: true },
   { key: "payment.bkash.number", type: "string", default: "", group: "payments", labelEn: "bKash receiving number", labelBn: "বিকাশ নম্বর", isSensitive: true },
@@ -25,7 +26,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "payment.slaHours", type: "number", default: 24, group: "payments", labelEn: "Pending verification SLA (hours)", labelBn: "যাচাইয়ের SLA (ঘণ্টা)" },
   { key: "payment.lateGraceHours", type: "number", default: 48, group: "payments", labelEn: "Late payment grace (hours)", labelBn: "দেরি পেমেন্ট গ্রেস (ঘণ্টা)" },
   { key: "payment.verificationText", type: "string", default: "Verification usually takes a few hours.", group: "payments", labelEn: "Verification time text", labelBn: "যাচাইয়ের সময়" , isPublic: true },
-  { key: "order.codMaxAmount", type: "number", default: 0, group: "orders", labelEn: "COD maximum amount (0 = no limit)", labelBn: "COD সর্বোচ্চ (০ = সীমা নেই)", isPublic: true },
+  { key: "order.codMaxAmount", type: "number", default: 0, group: "orders", labelEn: "COD maximum amount (0 = no limit)", labelBn: "COD সর্বোচ্চ (০ = সীমা নেই)", isPublic: true, wired: true },
   { key: "return.windowHours", type: "number", default: 48, group: "orders", labelEn: "Return/objection window (hours)", labelBn: "ফেরতের সময় (ঘণ্টা)", isPublic: true },
   { key: "return.earlyRelease", type: "boolean", default: true, group: "orders", labelEn: "Allow early release confirmation", labelBn: "আগে রিলিজ নিশ্চিতকরণ" , isPublic: true },
   { key: "return.photoRequired", type: "boolean", default: true, group: "orders", labelEn: "Photo required for disputes", labelBn: "বিরোধে ছবি আবশ্যক" , isPublic: true },
@@ -119,8 +120,21 @@ export function validateSettingsMap(
 ): void {
   for (const [key, value] of Object.entries(values)) validateSettingValue(key, value);
   const merged = { ...current, ...values };
-  if (merged["payment.cod.enabled"] === false && merged["payment.advance.enabled"] === false) {
-    throw new SettingValidationError("At least one payment method must stay enabled");
+  if (merged["payment.cod.enabled"] === false) {
+    const providerReady = [
+      ["payment.bkash.enabled", "payment.bkash.number"],
+      ["payment.nagad.enabled", "payment.nagad.number"],
+    ].some(
+      ([enabled, number]) =>
+        merged[enabled] === true && BD_MOBILE.test(String(merged[number] ?? "").trim()),
+    );
+    // Part 3 is not live yet; effectiveAdvance stays false regardless of the flag.
+    const effectiveAdvance = false && merged["payment.advance.enabled"] === true && providerReady;
+    if (!effectiveAdvance) {
+      throw new SettingValidationError(
+        "COD cannot be disabled until Advance payment is live and a provider number is configured",
+      );
+    }
   }
   const providers = [
     { enabled: "payment.bkash.enabled", number: "payment.bkash.number", label: "bKash" },
