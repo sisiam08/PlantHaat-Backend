@@ -236,6 +236,21 @@ export class OrdersService {
     const totals = cartTotals(shopGroups);
 
     if (dto.paymentMethod === "COD") {
+      const codEnabled = await this.settings.getBoolean("payment.cod.enabled");
+      if (!codEnabled) {
+        throw AppException.badRequest(
+          ErrorCode.PAYMENT_METHOD_NOT_AVAILABLE,
+          "Cash on delivery is currently unavailable",
+        );
+      }
+      const codMax = await this.settings.getNumber("order.codMaxAmount");
+      if (codMax > 0 && totals.grandTotal.gt(codMax)) {
+        throw AppException.badRequest(
+          ErrorCode.PAYMENT_METHOD_NOT_AVAILABLE,
+          `Cash on delivery is available for orders up to ${codMax}`,
+        );
+      }
+
       const account = await this.prisma.user.findUnique({
         where: { id: customerId },
         select: { phone: true },
