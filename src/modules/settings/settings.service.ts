@@ -4,7 +4,7 @@ import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
-import { SETTING_DEFAULTS, SETTINGS_REGISTRY } from "./settings-registry";
+import { SETTING_DEFAULTS, SETTINGS_REGISTRY, validateSettingsMap } from "./settings-registry";
 
 const CACHE_TTL_MS = 30_000;
 
@@ -58,11 +58,13 @@ export class SettingsService {
     updatedById: string,
     meta?: { reason?: string; ipAddress?: string; userAgent?: string },
   ): Promise<Record<string, unknown>> {
-    const allowed = new Set(Object.keys(SETTING_DEFAULTS));
-    for (const key of Object.keys(values)) {
-      if (!allowed.has(key)) {
-        throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, `Unknown setting: ${key}`);
-      }
+    try {
+      validateSettingsMap(values, Object.fromEntries(await this.ensureCache()));
+    } catch (error) {
+      throw AppException.badRequest(
+        ErrorCode.VALIDATION_FAILED,
+        error instanceof Error ? error.message : "Invalid setting",
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {

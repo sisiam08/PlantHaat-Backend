@@ -44,3 +44,93 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
 export const SETTING_DEFAULTS = Object.fromEntries(
   SETTINGS_REGISTRY.map((setting) => [setting.key, setting.default]),
 );
+export class SettingValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SettingValidationError";
+  }
+}
+
+const BD_MOBILE = /^01[3-9]\d{8}$/;
+
+export function validateSettingValue(key: string, value: unknown): void {
+  const definition = SETTINGS_REGISTRY.find((setting) => setting.key === key);
+  if (!definition) throw new SettingValidationError(`Unknown setting: ${key}`);
+  if (definition.type === "boolean" && typeof value !== "boolean") {
+    throw new SettingValidationError(`${key} must be a boolean`);
+  }
+  if (definition.type === "number" && (typeof value !== "number" || !Number.isFinite(value))) {
+    throw new SettingValidationError(`${key} must be a finite number`);
+  }
+  if (definition.type === "string" && typeof value !== "string") {
+    throw new SettingValidationError(`${key} must be a string`);
+  }
+  if (definition.type === "json" && value === undefined) {
+    throw new SettingValidationError(`${key} must be JSON`);
+  }
+
+  if (typeof value === "number") {
+    if (key === "commission.default" && (value < 0 || value > 100)) {
+      throw new SettingValidationError("Commission must be between 0 and 100");
+    }
+    if (key === "payment.expiryHours" && (value < 1 || value > 168)) {
+      throw new SettingValidationError("Payment expiry must be 1–168 hours");
+    }
+    if (key === "payment.slaHours" && (value < 1 || value > 720)) {
+      throw new SettingValidationError("Payment SLA must be 1–720 hours");
+    }
+    if (key === "payment.lateGraceHours" && (value < 0 || value > 720)) {
+      throw new SettingValidationError("Late grace must be 0–720 hours");
+    }
+    if (key === "return.windowHours" && (value < 1 || value > 720)) {
+      throw new SettingValidationError("Return window must be 1–720 hours");
+    }
+    if (key === "payout.cooldownHours" && (value < 0 || value > 720)) {
+      throw new SettingValidationError("Payout cooldown must be 0–720 hours");
+    }
+    if (key === "payout.minimumAmount" && value < 0) {
+      throw new SettingValidationError("Minimum withdrawal cannot be negative");
+    }
+    if (key === "order.codMaxAmount" && value < 0) {
+      throw new SettingValidationError("COD maximum cannot be negative");
+    }
+    if (key === "wallet.codDuesLimit" && value < 0) {
+      throw new SettingValidationError("COD dues limit cannot be negative");
+    }
+  }
+
+  if (
+    ["payment.bkash.number", "payment.nagad.number", "support.whatsapp", "support.phone"].includes(
+      key,
+    ) &&
+    typeof value === "string" &&
+    value.trim() !== "" &&
+    !BD_MOBILE.test(value.trim())
+  ) {
+    throw new SettingValidationError(`${key} must be a valid Bangladesh mobile number`);
+  }
+}
+
+export function validateSettingsMap(
+  values: Record<string, unknown>,
+  current: Record<string, unknown>,
+): void {
+  for (const [key, value] of Object.entries(values)) validateSettingValue(key, value);
+  const merged = { ...current, ...values };
+  if (merged["payment.cod.enabled"] === false && merged["payment.advance.enabled"] === false) {
+    throw new SettingValidationError("At least one payment method must stay enabled");
+  }
+}
+
+export function publicSettingKeys(): string[] {
+  return SETTINGS_REGISTRY.filter((setting) => setting.isPublic).map((setting) => setting.key);
+}
+
+export function maskSensitive(values: Record<string, unknown>): Record<string, unknown> {
+  const sensitive = new Set(
+    SETTINGS_REGISTRY.filter((setting) => setting.isSensitive).map((setting) => setting.key),
+  );
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [key, sensitive.has(key) ? "••••••" : value]),
+  );
+}
