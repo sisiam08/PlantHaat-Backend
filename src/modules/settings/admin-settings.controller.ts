@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Req } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Query, Req } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { IsObject } from "class-validator";
 import type { Request } from "express";
@@ -47,6 +47,16 @@ export class AdminSettingsController {
     return this.settings.getAll();
   }
 
+  @Get("registry")
+  registry() {
+    return this.settings.getRegistry();
+  }
+
+  @Get("history")
+  history(@Query("key") key?: string, @Query("limit") limit?: string) {
+    return this.settings.history(key, limit ? Number(limit) : 100);
+  }
+
   @Patch()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Update system settings" })
@@ -56,7 +66,9 @@ export class AdminSettingsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    const values = await this.settings.update(dto.values, actor.id);
+    const values = await this.settings.update(dto.values, actor.id, {
+      ...getRequestMeta(request),
+    });
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,

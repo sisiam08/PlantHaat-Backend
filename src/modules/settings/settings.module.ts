@@ -1,11 +1,12 @@
 import { Global, Module } from "@nestjs/common";
 
 import { AdminSettingsController } from "./admin-settings.controller";
+import { PublicSettingsController } from "./public-settings.controller";
 import { SettingsService } from "./settings.service";
 
 @Global()
 @Module({
-  controllers: [AdminSettingsController],
+  controllers: [AdminSettingsController, PublicSettingsController],
   providers: [SettingsService],
   exports: [SettingsService],
 })

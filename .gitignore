@@ -42,3 +42,8 @@ skills-lock.json
 .gemini/
 .aider*
 .continue/
+
+# local database dumps — never commit
+backups/
+*.dump
+

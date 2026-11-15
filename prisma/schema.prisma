@@ -1303,3 +1303,18 @@ model UploadedAsset {
   @@index([status, createdAt])
   @@index([ownerId])
 }
+model SystemSettingHistory {
+  id          String   @id @default(uuid())
+  key         String
+  oldValue    Json?
+  newValue    Json?
+  updatedById String?
+  reason      String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+
+  @@index([key, createdAt])
+  @@index([updatedById])
+}

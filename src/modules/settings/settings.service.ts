@@ -1,31 +1,10 @@
-import { Injectable } from "@nestjs/common";
+﻿import { Injectable } from "@nestjs/common";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
-
-export const SETTING_DEFAULTS: Record<string, unknown> = {
-  "commission.default": 10,
-  "product.autoApprove": true,
-  "order.sellerConfirmTimeoutHours": 48,
-  "complaint.windowHours": 48,
-  "review.windowDays": 60,
-  "payout.holdHours": 48,
-  "stuck.confirmedHours": 48,
-  "stuck.packedHours": 48,
-  "stuck.shippedGraceDays": 2,
-  "stuck.reminderHours": 24,
-  "stuck.maxReminders": 3,
-  "codRisk.watchAfter": 2,
-  "codRisk.blockAfter": 4,
-  "codRisk.windowDays": 90,
-  "codRisk.restrictCap": 2000,
-  "metroDistricts": ["Dhaka"],
-  "checkout.maxQtyPerItem": 20,
-  "payments.online.enabled": false,
-  "shop.maxPerSeller": 1,
-};
+import { SETTING_DEFAULTS, SETTINGS_REGISTRY } from "./settings-registry";
 
 const CACHE_TTL_MS = 30_000;
 
@@ -37,8 +16,7 @@ export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async get<T>(key: string): Promise<T> {
-    const cache = await this.ensureCache();
-    return cache.get(key) as T;
+    return (await this.ensureCache()).get(key) as T;
   }
 
   async getBoolean(key: string): Promise<boolean> {
@@ -53,9 +31,32 @@ export class SettingsService {
     return Object.fromEntries(await this.ensureCache());
   }
 
+  getRegistry() {
+    return SETTINGS_REGISTRY;
+  }
+
+  async getPublic(): Promise<Record<string, unknown>> {
+    const all = await this.getAll();
+    return Object.fromEntries(
+      SETTINGS_REGISTRY.filter((setting) => setting.isPublic).map((setting) => [
+        setting.key,
+        all[setting.key],
+      ]),
+    );
+  }
+
+  async history(key?: string, limit = 100) {
+    return this.prisma.systemSettingHistory.findMany({
+      where: key ? { key } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: Math.min(Math.max(limit, 1), 200),
+    });
+  }
+
   async update(
     values: Record<string, unknown>,
     updatedById: string,
+    meta?: { reason?: string; ipAddress?: string; userAgent?: string },
   ): Promise<Record<string, unknown>> {
     const allowed = new Set(Object.keys(SETTING_DEFAULTS));
     for (const key of Object.keys(values)) {
@@ -63,15 +64,33 @@ export class SettingsService {
         throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, `Unknown setting: ${key}`);
       }
     }
-    await this.prisma.$transaction(
-      Object.entries(values).map(([key, value]) =>
-        this.prisma.systemSetting.upsert({
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.systemSetting.findMany({
+        where: { key: { in: Object.keys(values) } },
+      });
+      const oldValues = new Map(existing.map((row) => [row.key, row.value]));
+      for (const [key, value] of Object.entries(values)) {
+        await tx.systemSetting.upsert({
           where: { key },
           update: { value: value as Prisma.InputJsonValue, updatedById },
           create: { key, value: value as Prisma.InputJsonValue, updatedById },
-        }),
-      ),
-    );
+        });
+        await tx.systemSettingHistory.create({
+          data: {
+            key,
+            oldValue: oldValues.has(key)
+              ? (oldValues.get(key) as Prisma.InputJsonValue)
+              : (SETTING_DEFAULTS[key] as Prisma.InputJsonValue),
+            newValue: value as Prisma.InputJsonValue,
+            updatedById,
+            reason: meta?.reason,
+            ipAddress: meta?.ipAddress,
+            userAgent: meta?.userAgent,
+          },
+        });
+      }
+    });
     this.invalidate();
     return this.getAll();
   }
@@ -89,9 +108,7 @@ export class SettingsService {
       select: { key: true, value: true },
     });
     const map = new Map<string, unknown>(Object.entries(SETTING_DEFAULTS));
-    for (const row of rows) {
-      map.set(row.key, row.value);
-    }
+    for (const row of rows) map.set(row.key, row.value);
     this.cache = map;
     this.loadedAt = Date.now();
     return map;
