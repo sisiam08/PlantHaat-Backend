@@ -6,11 +6,16 @@ function fakePrisma() {
   const rows = new Map<string, unknown>();
   const history: Array<Record<string, unknown>> = [];
   const tx = {
+    $executeRaw: jest.fn(async () => 1),
+    $queryRaw: jest.fn(async () => {
+      const entry = [...rows.entries()][0];
+      return entry ? [{ value: entry[1] }] : [];
+    }),
     systemSetting: {
       findMany: jest.fn(async () => [...rows.entries()].map(([key, value]) => ({ key, value }))),
-      upsert: jest.fn(async ({ where, update, create }) => {
-        rows.set(where.key, update?.value ?? create.value);
-        return { key: where.key, value: rows.get(where.key) };
+      update: jest.fn(async ({ where, data }) => {
+        rows.set(where.key, data.value);
+        return { key: where.key, value: data.value };
       }),
     },
     systemSettingHistory: { create: jest.fn(async ({ data }) => history.push(data)) },

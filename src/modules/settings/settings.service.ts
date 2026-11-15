@@ -4,6 +4,7 @@ import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { applySettingChange } from "./settings-history";
 import { SETTING_DEFAULTS, SETTINGS_REGISTRY, validateSettingsMap } from "./settings-registry";
 
 const CACHE_TTL_MS = 30_000;
@@ -68,29 +69,15 @@ export class SettingsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.systemSetting.findMany({
-        where: { key: { in: Object.keys(values) } },
-      });
-      const oldValues = new Map(existing.map((row) => [row.key, row.value]));
       for (const [key, value] of Object.entries(values)) {
-        await tx.systemSetting.upsert({
-          where: { key },
-          update: { value: value as Prisma.InputJsonValue, updatedById },
-          create: { key, value: value as Prisma.InputJsonValue, updatedById },
-        });
-        await tx.systemSettingHistory.create({
-          data: {
-            key,
-            oldValue: oldValues.has(key)
-              ? (oldValues.get(key) as Prisma.InputJsonValue)
-              : (SETTING_DEFAULTS[key] as Prisma.InputJsonValue),
-            newValue: value as Prisma.InputJsonValue,
-            updatedById,
-            reason: meta?.reason,
-            ipAddress: meta?.ipAddress,
-            userAgent: meta?.userAgent,
-          },
-        });
+        await applySettingChange(
+          tx,
+          key,
+          value,
+          updatedById,
+          meta,
+          SETTING_DEFAULTS[key],
+        );
       }
     });
     this.invalidate();
