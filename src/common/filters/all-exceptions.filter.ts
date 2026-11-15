@@ -63,6 +63,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const resolved = this.resolve(exception);
+    if (request.url.includes("/admin/settings") && resolved.status >= 400) {
+      this.logger.error(`RAW settings error: ${String(exception)}`, exception instanceof Error ? exception.stack : undefined);
+    }
 
     if (resolved.status >= 500) {
       const stack = exception instanceof Error ? exception.stack : undefined;

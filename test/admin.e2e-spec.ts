@@ -64,9 +64,21 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
     const before = await admin.get(`${API}/admin/settings`).expect(200);
     expect(before.body.data["commission.default"]).toBe(10);
 
+    await admin
+      .patch(`${API}/admin/settings`)
+      .set("Origin", ORIGIN)
+      .send({ values: { "commission.default": 12 } })
+      .expect(400);
+
+    const reauth = await admin
+      .post(`${API}/admin/settings/reauth`)
+      .set("Origin", ORIGIN)
+      .send({ key: "commission.default", password: "AdminStr0ng1" })
+      .expect(200);
     const after = await admin
       .patch(`${API}/admin/settings`)
       .set("Origin", ORIGIN)
+      .set("x-settings-reauth", reauth.body.data.token)
       .send({ values: { "commission.default": 12 } })
       .expect(200);
     expect(after.body.data["commission.default"]).toBe(12);
@@ -76,6 +88,37 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
       .set("Origin", ORIGIN)
       .send({ values: { "unknown.key": 1 } })
       .expect(400);
+  });
+
+  it("enforces settings access and public-key isolation", async () => {
+    const customerEmail = `customer_${suffix()}@example.com`;
+    await prisma.user.create({
+      data: {
+        email: customerEmail,
+        name: "Customer",
+        passwordHash: await hashPassword("Customer1"),
+        role: "CUSTOMER",
+        emailVerifiedAt: new Date(),
+      },
+    });
+    const customer = request.agent(server);
+    await customer.post(`${API}/auth/login`).send({ email: customerEmail, password: "Customer1" }).expect(200);
+    await customer.get(`${API}/admin/settings`).expect(403);
+    await customer.get(`${API}/admin/settings/registry`).expect(403);
+    await customer.get(`${API}/admin/settings/history`).expect(403);
+    await customer.patch(`${API}/admin/settings`).set("Origin", ORIGIN).send({ values: {} }).expect(403);
+
+    const publicRes = await request(server).get(`${API}/settings/public`).expect(200);
+    const keys = Object.keys(publicRes.body.data);
+    expect(keys).toContain("payment.advance.enabled");
+    for (const privateKey of [
+      "payment.bkash.number",
+      "payment.nagad.number",
+      "commission.default",
+      "wallet.codDuesLimit",
+      "payout.minimumAmount",
+      "payout.methods",
+    ]) expect(keys).not.toContain(privateKey);
   });
 
   it("manages categories and content", async () => {
