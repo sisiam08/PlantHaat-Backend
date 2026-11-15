@@ -35,6 +35,12 @@ describe("settings registry", () => {
         {},
       ),
     ).toThrow(/At least one payment/);
+    expect(() =>
+      validateSettingsMap({ "payment.nagad.enabled": true }, {}),
+    ).toThrow(/valid receiving number/);
+    expect(() =>
+      validateSettingsMap({ "payment.advance.enabled": true }, {}),
+    ).toThrow(/requires at least one enabled provider/);
   });
 
   it("never exposes a key that is both public and sensitive", () => {

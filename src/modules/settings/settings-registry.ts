@@ -7,6 +7,8 @@ export interface SettingDefinition {
   group: "payments" | "orders" | "wallet" | "payouts" | "support" | "platform";
   labelEn: string;
   labelBn: string;
+  helpEn?: string;
+  helpBn?: string;
   isPublic?: boolean;
   isSensitive?: boolean;
 }
@@ -14,9 +16,9 @@ export interface SettingDefinition {
 export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "payment.cod.enabled", type: "boolean", default: true, group: "payments", labelEn: "Cash on delivery enabled", labelBn: "ক্যাশ অন ডেলিভারি চালু", isPublic: true },
   { key: "payment.advance.enabled", type: "boolean", default: false, group: "payments", labelEn: "Advance payment enabled", labelBn: "অ্যাডভান্স পেমেন্ট চালু", isPublic: true },
-  { key: "payment.bkash.enabled", type: "boolean", default: true, group: "payments", labelEn: "bKash enabled", labelBn: "বিকাশ চালু", isPublic: true },
+  { key: "payment.bkash.enabled", type: "boolean", default: false, group: "payments", labelEn: "bKash enabled", labelBn: "বিকাশ চালু", isPublic: true },
   { key: "payment.bkash.number", type: "string", default: "", group: "payments", labelEn: "bKash receiving number", labelBn: "বিকাশ নম্বর", isSensitive: true },
-  { key: "payment.nagad.enabled", type: "boolean", default: true, group: "payments", labelEn: "Nagad enabled", labelBn: "নগদ চালু", isPublic: true },
+  { key: "payment.nagad.enabled", type: "boolean", default: false, group: "payments", labelEn: "Nagad enabled", labelBn: "নগদ চালু", isPublic: true },
   { key: "payment.nagad.number", type: "string", default: "", group: "payments", labelEn: "Nagad receiving number", labelBn: "নগদ নম্বর", isSensitive: true },
   { key: "payment.accountNote", type: "string", default: "Personal", group: "payments", labelEn: "Account type note", labelBn: "অ্যাকাউন্টের ধরন" },
   { key: "payment.expiryHours", type: "number", default: 12, group: "payments", labelEn: "Unpaid advance expiry (hours)", labelBn: "অপরিশোধিত মেয়াদ (ঘণ্টা)" },
@@ -119,6 +121,31 @@ export function validateSettingsMap(
   const merged = { ...current, ...values };
   if (merged["payment.cod.enabled"] === false && merged["payment.advance.enabled"] === false) {
     throw new SettingValidationError("At least one payment method must stay enabled");
+  }
+  const providers = [
+    { enabled: "payment.bkash.enabled", number: "payment.bkash.number", label: "bKash" },
+    { enabled: "payment.nagad.enabled", number: "payment.nagad.number", label: "Nagad" },
+  ];
+  for (const provider of providers) {
+    if (merged[provider.enabled] === true) {
+      const number = String(merged[provider.number] ?? "").trim();
+      if (!BD_MOBILE.test(number)) {
+        throw new SettingValidationError(
+          `${provider.label} cannot be enabled without a valid receiving number`,
+        );
+      }
+    }
+  }
+  if (merged["payment.advance.enabled"] === true) {
+    const hasProvider = providers.some((provider) => {
+      const number = String(merged[provider.number] ?? "").trim();
+      return merged[provider.enabled] === true && BD_MOBILE.test(number);
+    });
+    if (!hasProvider) {
+      throw new SettingValidationError(
+        "Advance payment requires at least one enabled provider with a valid number",
+      );
+    }
   }
 }
 
