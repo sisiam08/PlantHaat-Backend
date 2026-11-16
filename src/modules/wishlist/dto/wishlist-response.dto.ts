@@ -18,6 +18,8 @@ export class WishlistedProductDto {
   @ApiProperty() inStock!: boolean;
   @ApiProperty({ type: String, description: "Decimal as string" }) minPrice!: string;
   @ApiProperty({ type: String, description: "Decimal as string" }) maxPrice!: string;
+  @ApiProperty({ type: String, description: "Decimal as string" }) ratingAvg!: string;
+  @ApiProperty() ratingCount!: number;
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
   deletedAt!: string | null;
   @ApiProperty({ type: WishlistedShopRefDto }) shop!: WishlistedShopRefDto;

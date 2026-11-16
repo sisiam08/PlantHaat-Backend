@@ -51,6 +51,8 @@ export class WishlistService {
               inStock: true,
               minPrice: true,
               maxPrice: true,
+              ratingAvg: true,
+              ratingCount: true,
               deletedAt: true,
               shop: { select: { id: true, name: true, slug: true, status: true } },
             },

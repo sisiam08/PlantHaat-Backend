@@ -22,6 +22,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:seed:demo": "tsx ./prisma/seed-demo.ts",
+    "db:seed:demo:reviews": "node scripts/db-guard.mjs && tsx ./prisma/seed-demo-reviews.ts",
+    "db:seed:demo:reviews:cleanup": "node scripts/db-guard.mjs && tsx ./prisma/seed-demo-reviews-cleanup.ts",
     "docs:export": "npm run build && node --import tsx dist/openapi.export.js",
     "uploads:smoke": "tsx scripts/uploads-smoke.ts",
     "uploads:migrate": "tsx scripts/migrate-uploads-to-cloudinary.ts",

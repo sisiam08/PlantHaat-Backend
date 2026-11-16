@@ -220,6 +220,20 @@ describe("Wishlist, reviews & complaints (e2e)", () => {
       .expect(200);
     expect(publicReviews.body.data).toHaveLength(1);
 
+    // The wishlist list item carries the denormalized rating fields so cards
+    // can render the rating row without a second request.
+    await customer.agent
+      .post(`${API}/wishlist/${seller.product.id}`)
+      .set("Origin", ORIGIN)
+      .expect(200);
+    const wishlist = await customer.agent.get(`${API}/wishlist`).expect(200);
+    const wishlisted = wishlist.body.data.find(
+      (item: { product: { id: string } }) => item.product.id === seller.product.id,
+    );
+    expect(wishlisted).toBeDefined();
+    expect(Number(wishlisted.product.ratingAvg)).toBe(4);
+    expect(wishlisted.product.ratingCount).toBe(1);
+
     // A different customer cannot review this order item.
     const other = await createCustomer();
     await other.agent

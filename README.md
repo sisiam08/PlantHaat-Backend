@@ -59,7 +59,18 @@ openssl rand -base64 32   # DATA_ENCRYPTION_KEY (must decode to 32 bytes)
 | `npm run db:deploy` | `prisma migrate deploy` |
 | `npm run db:seed` | Seed the database (districts, categories, admin, settings) |
 | `npm run db:seed:demo` | Dev-only demo data (3 sellers, 60+ plants across all categories, 5 customers, a sample order) |
+| `npm run db:seed:demo:reviews` | Optional dev-only demo reviews (20 reviews across 8 existing products, 5 marker orders). Idempotent; guarded to the dev database. |
+| `npm run db:seed:demo:reviews:cleanup` | Deletes only the rows created by the demo-review seed (reviews `seedrvw_*`, orders `DEMO-RVW-*`) and recomputes product/shop rating aggregates. |
 | `npm run docs:export` | Build and write the OpenAPI document to `openapi.json` |
+
+Demo reviews are separate from `seed-demo.ts` so the owner can add or remove
+them independently. The seed uses only existing demo customers/products,
+creates one delivered marker order per involved customer (`DEMO-RVW-*`), writes
+reviews with ids starting `seedrvw_`, and recomputes the denormalized
+`Product.ratingAvg` / `Shop.ratingAvg` columns. Running it twice is a no-op
+while the marker orders exist; run the cleanup first to reseed. Both scripts
+refuse to run with `NODE_ENV=production` and the npm scripts run
+`scripts/db-guard.mjs` first, so they cannot touch another database.
 
 ## Production
 
