@@ -32,6 +32,7 @@ const PURPOSE_FOLDER: Record<UploadPurpose, string> = {
   [UploadPurpose.SHOP_BANNER]: "shops",
   [UploadPurpose.REVIEW]: "reviews",
   [UploadPurpose.COMPLAINT]: "complaints",
+  [UploadPurpose.PAYMENT]: "payments",
   [UploadPurpose.BANNER]: "banners",
   [UploadPurpose.CATEGORY]: "categories",
 };

@@ -25,3 +25,14 @@ Still hard-coded / not wired: payout hold hours, payout methods, wallet COD dues
 - Re-auth token scope = the sorted set of sensitive keys in that save; it is short-lived, single-use and rejects any added key.
 - History writes one row per changed key with a shared batchId; sensitive history values are masked.
 - Validation failures return per-key details under error.details, rendered inline; the form keeps its state.
+## Operational defaults restored (2026-11-16)
+| Key | Default |
+|---|---:|
+| checkout.maxQtyPerItem | 20 |
+| order.sellerConfirmTimeoutHours | 48 |
+| review.windowDays | 14 |
+| product.autoApprove | true |
+| payout.holdHours | 48 |
+| codRisk.watchAfter / blockAfter / windowDays / restrictCap | 2 / 4 / 90 / 2000 |
+| stuck.confirmedHours / packedHours / shippedGraceDays / reminderHours / maxReminders | 48 / 48 / 2 / 24 / 3 |
+| payment.instructions / warningText | public text snapshotted on the intent |

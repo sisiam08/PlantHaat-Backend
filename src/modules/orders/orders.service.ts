@@ -22,6 +22,7 @@ import { CommissionsService } from "../commissions/commissions.service";
 import { LedgerService } from "../ledger/ledger.service";
 import { MailService } from "../mail/mail.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { PaymentsService } from "../payments/payments.service";
 import { recomputeProductAggregates } from "../products/product-aggregates";
 import { SettingsService } from "../settings/settings.service";
 import { resolveDeliveryZone, type ResolvedDelivery } from "./delivery-zone.resolver";
@@ -70,6 +71,7 @@ export class OrdersService {
     private readonly events: EventEmitter2,
     private readonly mail: MailService,
     private readonly codRisk: CodRiskService,
+    private readonly payments: PaymentsService,
   ) {}
 
   async checkout(customerId: string, dto: CheckoutDto, idempotencyKey: string | undefined) {
@@ -79,14 +81,18 @@ export class OrdersService {
         "Idempotency-Key header is required",
       );
     }
-    if (dto.paymentMethod !== "COD") {
-      const onlineEnabled = await this.settings.getBoolean("payments.online.enabled");
-      if (!onlineEnabled) {
+    if (dto.paymentMethod === "ADVANCE") {
+      if (!(await this.settings.getEffectiveAdvance())) {
         throw AppException.badRequest(
           ErrorCode.PAYMENT_METHOD_NOT_AVAILABLE,
-          "Only Cash on Delivery is available",
+          "Advance payment is not available",
         );
       }
+    } else if (dto.paymentMethod !== "COD") {
+      throw AppException.badRequest(
+        ErrorCode.PAYMENT_METHOD_NOT_AVAILABLE,
+        "Only Cash on Delivery and Advance payment are available",
+      );
     }
 
     const existing = await this.prisma.order.findFirst({
@@ -536,6 +542,8 @@ export class OrdersService {
     const { customerId, address, dto, idempotencyKey, cartId, groups } = params;
 
     const { subtotal, deliveryTotal, grandTotal } = cartTotals(groups);
+    const advanceSnapshot =
+      dto.paymentMethod === "ADVANCE" ? await this.payments.snapshot() : null;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const orderNumber = generateOrderNumber();
@@ -563,6 +571,7 @@ export class OrdersService {
             },
           });
 
+          const allocations: { shopOrderId: string; amount: Prisma.Decimal }[] = [];
           let index = 1;
           for (const group of groups) {
             const free =
@@ -589,6 +598,8 @@ export class OrdersService {
                 estimatedDeliveryTo: addDays(new Date(), group.delivery.estimatedDaysMax),
               },
             });
+
+            allocations.push({ shopOrderId: shopOrder.id, amount: total });
 
             for (const line of group.lines) {
               await tx.orderItem.create({
@@ -649,6 +660,15 @@ export class OrdersService {
                 status: "PENDING",
                 amount: total,
               },
+            });
+          }
+
+          if (advanceSnapshot) {
+            await this.payments.createIntent(tx, {
+              orderId: order.id,
+              amountDue: grandTotal,
+              allocations,
+              snapshot: advanceSnapshot,
             });
           }
 
@@ -1116,6 +1136,22 @@ export class OrdersService {
     if (actorRole === "SELLER" && shopOrder.shop.sellerProfile.userId !== actorId) {
       throw AppException.notFound(ErrorCode.ORDER_NOT_FOUND, "Order not found");
     }
+    if (
+      actorRole === "SELLER" &&
+      shopOrder.order.paymentMethod === "ADVANCE" &&
+      ["CONFIRMED", "PACKED", "SHIPPED"].includes(dto.status)
+    ) {
+      const intent = await this.prisma.paymentIntent.findUnique({
+        where: { orderId: shopOrder.order.id },
+        select: { status: true },
+      });
+      if (intent?.status !== "PAID" && intent?.status !== "PARTIALLY_REFUNDED") {
+        throw AppException.badRequest(
+          ErrorCode.PAYMENT_REQUIRED,
+          "Advance payment must be verified before this order can move forward",
+        );
+      }
+    }
 
     const from = shopOrder.status;
     const to = dto.status;
@@ -1197,6 +1233,13 @@ export class OrdersService {
       }
 
       if (cancelling) {
+        if (shopOrder.order.paymentMethod === "ADVANCE") {
+          await this.payments.createCancellationRefund(
+            tx,
+            shopOrderId,
+            dto.note ?? "Shop order cancelled",
+          );
+        }
         await tx.payment.updateMany({
           where: { shopOrderId, status: { in: ["PENDING", "FAILED"] } },
           data: { status: "CANCELLED" },

@@ -103,3 +103,8 @@ pg_restore -h localhost -p 55432 -U postgres -d scratch_verify --no-owner --no-p
 The temporary server crashed during/after startup with Windows exception `0xC0000142` (DLL initialization failure); restore/count verification did **not** complete.
 
 **Blocker:** no migration until a scratch DB is available for verified restore.
+## Part 3 implementation notes
+- `PaymentIntent.providerSnapshot` stores the provider numbers/instructions/account note/verification text/expiry/SLA/grace at order creation. Changing settings later never changes an existing payment.
+- Partial refunds use `RefundObligation`; the intent remains PAID with `refundedAmount` and derives PARTIALLY_REFUNDED/REFUNDED.
+- Overpayment is recorded as REFUND_PAYABLE for the excess; underpayment returns the submission to REJECTED and exposes remainingAmount.
+- Late payment follows A1: grace window only, reinstate when stock can be held again, otherwise REFUND_REQUIRED.

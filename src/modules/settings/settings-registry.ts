@@ -1,4 +1,4 @@
-﻿export type SettingType = "boolean" | "number" | "string" | "json";
+export type SettingType = "boolean" | "number" | "string" | "json";
 
 export interface SettingDefinition {
   key: string;
@@ -16,16 +16,18 @@ export interface SettingDefinition {
 
 export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "payment.cod.enabled", type: "boolean", default: true, group: "payments", labelEn: "Cash on delivery enabled", labelBn: "ক্যাশ অন ডেলিভারি চালু", isPublic: true, wired: true },
-  { key: "payment.advance.enabled", type: "boolean", default: false, group: "payments", labelEn: "Advance payment enabled", labelBn: "অ্যাডভান্স পেমেন্ট চালু", isPublic: true },
+  { key: "payment.advance.enabled", type: "boolean", default: false, group: "payments", labelEn: "Advance payment enabled", labelBn: "অ্যাডভান্স পেমেন্ট চালু", isPublic: true, wired: true },
   { key: "payment.bkash.enabled", type: "boolean", default: false, group: "payments", labelEn: "bKash enabled", labelBn: "বিকাশ চালু", isPublic: true },
-  { key: "payment.bkash.number", type: "string", default: "", group: "payments", labelEn: "bKash receiving number", labelBn: "বিকাশ নম্বর", isSensitive: true },
+  { key: "payment.bkash.number", type: "string", default: "", group: "payments", labelEn: "bKash receiving number", labelBn: "বিকাশ নম্বর", isSensitive: true, wired: true },
   { key: "payment.nagad.enabled", type: "boolean", default: false, group: "payments", labelEn: "Nagad enabled", labelBn: "নগদ চালু", isPublic: true },
-  { key: "payment.nagad.number", type: "string", default: "", group: "payments", labelEn: "Nagad receiving number", labelBn: "নগদ নম্বর", isSensitive: true },
-  { key: "payment.accountNote", type: "string", default: "Personal", group: "payments", labelEn: "Account type note", labelBn: "অ্যাকাউন্টের ধরন" },
-  { key: "payment.expiryHours", type: "number", default: 12, group: "payments", labelEn: "Unpaid advance expiry (hours)", labelBn: "অপরিশোধিত মেয়াদ (ঘণ্টা)" },
-  { key: "payment.slaHours", type: "number", default: 24, group: "payments", labelEn: "Pending verification SLA (hours)", labelBn: "যাচাইয়ের SLA (ঘণ্টা)" },
-  { key: "payment.lateGraceHours", type: "number", default: 48, group: "payments", labelEn: "Late payment grace (hours)", labelBn: "দেরি পেমেন্ট গ্রেস (ঘণ্টা)" },
-  { key: "payment.verificationText", type: "string", default: "Verification usually takes a few hours.", group: "payments", labelEn: "Verification time text", labelBn: "যাচাইয়ের সময়" , isPublic: true },
+  { key: "payment.nagad.number", type: "string", default: "", group: "payments", labelEn: "Nagad receiving number", labelBn: "নগদ নম্বর", isSensitive: true, wired: true },
+  { key: "payment.instructions", type: "string", default: "Send the exact order total to the number shown and submit the transaction ID.", group: "payments", labelEn: "Payment instructions", labelBn: "পেমেন্ট নির্দেশনা", isPublic: true, wired: true },
+  { key: "payment.warningText", type: "string", default: "Send from your own number and keep the receipt until the order is verified.", group: "payments", labelEn: "Payment warning", labelBn: "পেমেন্ট সতর্কতা", isPublic: true, wired: true },
+  { key: "payment.accountNote", type: "string", default: "Personal", group: "payments", labelEn: "Account type note", labelBn: "অ্যাকাউন্টের ধরন", wired: true },
+  { key: "payment.expiryHours", type: "number", default: 12, group: "payments", labelEn: "Unpaid advance expiry (hours)", labelBn: "অপরিশোধিত মেয়াদ (ঘণ্টা)", wired: true },
+  { key: "payment.slaHours", type: "number", default: 24, group: "payments", labelEn: "Pending verification SLA (hours)", labelBn: "যাচাইয়ের SLA (ঘণ্টা)", wired: true },
+  { key: "payment.lateGraceHours", type: "number", default: 48, group: "payments", labelEn: "Late payment grace (hours)", labelBn: "দেরি পেমেন্ট গ্রেস (ঘণ্টা)", wired: true },
+  { key: "payment.verificationText", type: "string", default: "Verification usually takes a few hours.", group: "payments", labelEn: "Verification time text", labelBn: "যাচাইয়ের সময়" , isPublic: true, wired: true },
   { key: "order.codMaxAmount", type: "number", default: 0, group: "orders", labelEn: "COD maximum amount (0 = no limit)", labelBn: "COD সর্বোচ্চ (০ = সীমা নেই)", isPublic: true, wired: true },
   { key: "return.windowHours", type: "number", default: 48, group: "orders", labelEn: "Return/objection window (hours)", labelBn: "ফেরতের সময় (ঘণ্টা)", isPublic: true },
   { key: "return.earlyRelease", type: "boolean", default: true, group: "orders", labelEn: "Allow early release confirmation", labelBn: "আগে রিলিজ নিশ্চিতকরণ" , isPublic: true },
@@ -39,6 +41,20 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "payout.cooldownHours", type: "number", default: 24, group: "payouts", labelEn: "Payout profile cooldown (hours)", labelBn: "প্রোফাইল কুলডাউন (ঘণ্টা)", isSensitive: true },
   { key: "payout.maxPendingRequests", type: "number", default: 3, group: "payouts", labelEn: "Maximum pending withdrawals", labelBn: "সর্বোচ্চ অপেক্ষমাণ উইথড্র", isSensitive: true },
   { key: "payout.processingText", type: "string", default: "Payouts are processed within 2 business days.", group: "payouts", labelEn: "Payout processing text", labelBn: "পেআউট প্রসেসিং বার্তা", isPublic: true },
+  { key: "checkout.maxQtyPerItem", type: "number", default: 20, group: "orders", labelEn: "Max quantity per item", labelBn: "Max quantity per item", wired: true },
+  { key: "order.sellerConfirmTimeoutHours", type: "number", default: 48, group: "orders", labelEn: "Seller confirm timeout (hours)", labelBn: "Seller confirm timeout (hours)", wired: true },
+  { key: "review.windowDays", type: "number", default: 14, group: "orders", labelEn: "Review window (days)", labelBn: "Review window (days)", wired: true },
+  { key: "product.autoApprove", type: "boolean", default: true, group: "orders", labelEn: "Auto-approve products", labelBn: "Auto-approve products", wired: true },
+  { key: "payout.holdHours", type: "number", default: 48, group: "payouts", labelEn: "Payout hold (hours)", labelBn: "Payout hold (hours)", wired: true },
+  { key: "codRisk.watchAfter", type: "number", default: 2, group: "orders", labelEn: "COD risk watch after failures", labelBn: "COD risk watch after failures", wired: true },
+  { key: "codRisk.blockAfter", type: "number", default: 4, group: "orders", labelEn: "COD risk block after failures", labelBn: "COD risk block after failures", wired: true },
+  { key: "codRisk.windowDays", type: "number", default: 90, group: "orders", labelEn: "COD risk window (days)", labelBn: "COD risk window (days)", wired: true },
+  { key: "codRisk.restrictCap", type: "number", default: 2000, group: "orders", labelEn: "COD restricted cap", labelBn: "COD restricted cap", wired: true },
+  { key: "stuck.confirmedHours", type: "number", default: 48, group: "orders", labelEn: "Stuck CONFIRMED hours", labelBn: "Stuck CONFIRMED hours", wired: true },
+  { key: "stuck.packedHours", type: "number", default: 48, group: "orders", labelEn: "Stuck PACKED hours", labelBn: "Stuck PACKED hours", wired: true },
+  { key: "stuck.shippedGraceDays", type: "number", default: 2, group: "orders", labelEn: "Stuck SHIPPED grace days", labelBn: "Stuck SHIPPED grace days", wired: true },
+  { key: "stuck.reminderHours", type: "number", default: 24, group: "orders", labelEn: "Stuck reminder hours", labelBn: "Stuck reminder hours", wired: true },
+  { key: "stuck.maxReminders", type: "number", default: 3, group: "orders", labelEn: "Stuck max reminders", labelBn: "Stuck max reminders", wired: true },
   { key: "support.whatsapp", type: "string", default: "", group: "support", labelEn: "WhatsApp number", labelBn: "হোয়াটসঅ্যাপ নম্বর", isPublic: true },
   { key: "support.phone", type: "string", default: "", group: "support", labelEn: "Support phone", labelBn: "সাপোর্ট ফোন", isPublic: true },
   { key: "support.email", type: "string", default: "", group: "support", labelEn: "Support email", labelBn: "সাপোর্ট ইমেইল", isPublic: true },
@@ -64,7 +80,15 @@ function stringValue(value: unknown): string {
 }
 
 function advanceIsLive(): boolean {
-  return false;
+  return true;
+}
+
+export function effectiveAdvanceFrom(values: Record<string, unknown>): boolean {
+  if (!advanceIsLive() || values["payment.advance.enabled"] !== true) return false;
+  return [
+    ["payment.bkash.enabled", "payment.bkash.number"],
+    ["payment.nagad.enabled", "payment.nagad.number"],
+  ].some(([enabled, number]) => values[enabled] === true && BD_MOBILE.test(stringValue(values[number])));
 }
 
 export function validateSettingValue(key: string, value: unknown): void {
@@ -161,10 +185,7 @@ export function validateSettingsMap(
       "Advance payment requires at least one enabled provider with a valid number";
   }
   if (merged["payment.cod.enabled"] === false) {
-    const effectiveAdvance =
-      advanceIsLive() &&
-      merged["payment.advance.enabled"] === true &&
-      readyProviders.length > 0;
+    const effectiveAdvance = effectiveAdvanceFrom(merged);
     if (!effectiveAdvance) {
       details["payment.cod.enabled"] =
         "COD cannot be disabled until Advance payment is live and a provider number is configured";

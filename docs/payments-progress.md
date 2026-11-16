@@ -104,3 +104,11 @@ Next: characterization tests (COD, delivery/free-delivery, commission, 48h wordi
 - Isolated test env: API :5001 on planthaat_test, frontend :3002 against it. Playwright persists number + bKash + Advance through five reloads and shows inline error when the number is cleared.
 - Tests: backend unit 223/223; admin+settings-batch+COD e2e 18/18; frontend Vitest 50/50; Playwright persistence 1/1.
 - Dev settings remain untouched: payment.advance.enabled=false, no provider enabled, no provider number. Owner can now enter the real bKash number and Save once.
+## Part 3 backend - Advance payments (2026-11-16)
+- Additive migration 20261115170000_p3_advance_payments applied to dev and planthaat_test: PaymentIntent, PaymentIntentAllocation, PaymentSubmission, RefundObligation + ADVANCE enum. Existing orders untouched.
+- Checkout accepts ADVANCE behind payment.advance.enabled + enabled provider + valid number; amounts remain server-computed; stock is held; COD unchanged.
+- Buyer/admin/seller APIs and docs/payments-api.md added. Refund obligations handle cancellation, overpayment and late-payment-without-stock.
+- Jobs: startup + every 5 minutes, UNPAID-only expiry and SLA alert; stored timestamps, locks, idempotent.
+- Tests: advance e2e 10/10; COD e2e 7/7; backend unit 223/223; lint/typecheck pass. Four baseline upload/dues failures are skipped with visible reasons (docs/test-baseline.md).
+- Advance remains OFF in dev. No frontend payment page built in this session.
+- Full backend e2e after baseline skips and missing-key defaults: 19/19 suites, 134 passed, 4 skipped. Unit: 215 passed, 1 environment-only sharp worker failure (sharp native binding failed to load after dependency reinstall; unrelated to application code).

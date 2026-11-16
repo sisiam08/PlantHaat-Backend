@@ -129,6 +129,11 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     capExceeded: false,
   });
   const codRisk = codRiskMock as unknown as CodRiskService;
+  const payments = {
+    snapshot: jest.fn(async () => ({ providers: [] })),
+    createIntent: jest.fn(),
+    createCancellationRefund: jest.fn(),
+  } as never;
   const service = new OrdersService(
     prismaBag.prisma as unknown as PrismaService,
     commissions,
@@ -138,6 +143,7 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     events,
     mail,
     codRisk,
+    payments,
   );
   return { service, commissions, settings, ledger, events, mail };
 }

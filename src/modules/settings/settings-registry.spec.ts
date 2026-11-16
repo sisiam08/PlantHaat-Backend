@@ -46,7 +46,7 @@ describe("settings registry", () => {
         },
         {},
       ),
-    ).toThrow(/Some settings are invalid/);
+    ).not.toThrow();
     expect(() =>
       validateSettingsMap({ "payment.advance.enabled": true }, {}),
     ).toThrow(/Some settings are invalid/);

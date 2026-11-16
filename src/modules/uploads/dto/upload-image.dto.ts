@@ -8,6 +8,7 @@ export enum UploadPurpose {
   SHOP_BANNER = "shop-banner",
   REVIEW = "review",
   COMPLAINT = "complaint",
+  PAYMENT = "payment",
   BANNER = "banner",
   CATEGORY = "category",
 }

@@ -1,11 +1,11 @@
-﻿import { Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import { PrismaService } from "../../prisma/prisma.service";
 import { applySettingChange } from "./settings-history";
-import { SETTING_DEFAULTS, SETTINGS_REGISTRY, validateSettingsMap } from "./settings-registry";
+import { effectiveAdvanceFrom, SETTING_DEFAULTS, SETTINGS_REGISTRY, validateSettingsMap } from "./settings-registry";
 
 const CACHE_TTL_MS = 30_000;
 
@@ -30,6 +30,10 @@ export class SettingsService {
 
   async getAll(): Promise<Record<string, unknown>> {
     return Object.fromEntries(await this.ensureCache());
+  }
+
+  async getEffectiveAdvance(): Promise<boolean> {
+    return effectiveAdvanceFrom(await this.getAll());
   }
 
   getRegistry() {
