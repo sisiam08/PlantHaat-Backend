@@ -111,4 +111,9 @@ Next: characterization tests (COD, delivery/free-delivery, commission, 48h wordi
 - Jobs: startup + every 5 minutes, UNPAID-only expiry and SLA alert; stored timestamps, locks, idempotent.
 - Tests: advance e2e 10/10; COD e2e 7/7; backend unit 223/223; lint/typecheck pass. Four baseline upload/dues failures are skipped with visible reasons (docs/test-baseline.md).
 - Advance remains OFF in dev. No frontend payment page built in this session.
-- Full backend e2e after baseline skips and missing-key defaults: 19/19 suites, 134 passed, 4 skipped. Unit: 215 passed, 1 environment-only sharp worker failure (sharp native binding failed to load after dependency reinstall; unrelated to application code).
+
+## Customer-facing fixes (2026-11-16)
+- Product cards: shop name removed; rating row now shows one marigold star + one-decimal average + (count), with reserved height for unreviewed products. Shared card used by home rails, feed, catalog, wishlist, related and shop grids.
+- Digits: all customer/admin numbers use Latin digits in both locales. Shared helpers force `bn-BD-u-nu-latn` + `numberingSystem: latn`; ৳ always precedes the amount. ICU plural counts now receive preformatted strings.
+- Auth entry: /login, /register and /register/seller server-redirect valid sessions to a sanitized next/callback/returnTo or role home; stale cookies are cleared through /auth/continue; bfcache is covered by a client guard.
+- Cart replay: backend order transaction already deletes only purchased lines atomically; idempotent retry leaves newer lines. Client now marks the guest snapshot handled on merge and order, clears guest storage + React Query cart caches on success, and never replays a snapshot older than the last merge/order. No duplicate orders were found for the demo customer.
