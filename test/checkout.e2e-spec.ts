@@ -183,6 +183,52 @@ describe("Checkout & orders (e2e)", () => {
     expect(cart.body.data.shops).toHaveLength(0);
   });
 
+  it("clears purchased lines atomically and an idempotent retry never clears newer lines", async () => {
+    const shopA = await createShopWithProduct(850, 5);
+    const shopB = await createShopWithProduct(500, 5);
+    const customer = await createCustomer();
+    const key = randomUUID();
+
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shopA.variant.id, quantity: 1 })
+      .expect(200);
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shopB.variant.id, quantity: 1 })
+      .expect(200);
+
+    const first = await customer.agent
+      .post(`${API}/checkout`)
+      .set("Origin", ORIGIN)
+      .set("Idempotency-Key", key)
+      .send({ addressId: customer.addressId, paymentMethod: "COD" })
+      .expect(200);
+    expect(await prisma.order.count({ where: { customerId: customer.userId } })).toBe(1);
+    const empty = await customer.agent.get(`${API}/cart`).expect(200);
+    expect(empty.body.data.shops).toHaveLength(0);
+
+    // A newer line added after the order must survive an idempotent retry.
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shopA.variant.id, quantity: 1 })
+      .expect(200);
+    const retry = await customer.agent
+      .post(`${API}/checkout`)
+      .set("Origin", ORIGIN)
+      .set("Idempotency-Key", key)
+      .send({ addressId: customer.addressId, paymentMethod: "COD" })
+      .expect(200);
+    expect(retry.body.data.id).toBe(first.body.data.id);
+    expect(await prisma.order.count({ where: { customerId: customer.userId } })).toBe(1);
+    const afterRetry = await customer.agent.get(`${API}/cart`).expect(200);
+    expect(afterRetry.body.data.shops).toHaveLength(1);
+    expect(Number(afterRetry.body.data.shops[0].items[0].quantity)).toBe(1);
+  });
+
   it("returns the free-delivery threshold per shop group", async () => {
     const shop = await createShopWithProduct(300, 10);
     await prisma.shopDeliveryZone.updateMany({
