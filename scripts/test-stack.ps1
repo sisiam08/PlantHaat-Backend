@@ -39,7 +39,7 @@ switch ($Action) {
     Stop-Port 5001
     Stop-Port 3002
     Start-Sleep -Seconds 2
-    Start-Process -FilePath node -ArgumentList "scripts/run-test-api.mjs" -WorkingDirectory $backend `
+    Start-Process -FilePath node -ArgumentList "--import", "tsx", "scripts/run-test-api.mjs" -WorkingDirectory $backend `
       -RedirectStandardInput $empty -RedirectStandardOutput (Join-Path $logDir "ph-test-api.log") `
       -RedirectStandardError (Join-Path $logDir "ph-test-api.err.log") -WindowStyle Hidden
     if (-not (Wait-Health "http://127.0.0.1:5001/api/v1/health" 120)) {

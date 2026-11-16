@@ -128,7 +128,7 @@ export class PaymentsService {
     }
 
     const keyPattern = /^payments\/[A-Za-z0-9-]+\/[A-Za-z0-9-]+\.(?:webp|jpe?g|png|heic|heif)$/i;
-    let key: string | null = null;
+    let key: string | null;
     if (value.startsWith("payments/")) {
       key = value;
     } else {

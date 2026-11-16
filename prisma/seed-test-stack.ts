@@ -71,8 +71,11 @@ async function upsertUser(prisma: PrismaClient, email: string, name: string, rol
 async function main(): Promise<void> {
   const prisma = createPrismaClient();
   try {
-    const district = await prisma.district.findFirst({ orderBy: { id: "asc" } });
-    if (!district) throw new Error("No districts in the test database; run migrations/seed first");
+    const district = await prisma.district.upsert({
+      where: { name: "Dhaka" },
+      update: {},
+      create: { name: "Dhaka", nameBn: "ঢাকা", division: "Dhaka" },
+    });
     const category = await prisma.category.upsert({
       where: { slug: "test-plants" },
       update: {},
@@ -98,6 +101,9 @@ async function main(): Promise<void> {
       }
     }
 
+    // Remove variants from an earlier seed that used non-UUID ids.
+    await prisma.productVariant.deleteMany({ where: { id: { startsWith: "teststack-" } } });
+
     const shops: string[] = [];
     for (const [index, seller] of SELLERS.entries()) {
       const user = await upsertUser(prisma, seller.email, seller.name, "SELLER", seller.password);
@@ -110,7 +116,7 @@ async function main(): Promise<void> {
           contactPhone: "01722222222",
           businessAddress: "Test Road",
           status: "APPROVED",
-          approvedAt: new Date(),
+          verifiedAt: new Date(),
         },
       });
       const shopSlug = slugify(seller.shop);
@@ -156,11 +162,12 @@ async function main(): Promise<void> {
             maxPrice: product.price,
           },
         });
+        const variantId = `00000000-0000-4000-8000-0000000000${String(index * 10 + productIndex).padStart(2, "0")}`;
         await prisma.productVariant.upsert({
-          where: { id: `teststack-${index}-${productIndex}` },
+          where: { id: variantId },
           update: { price: product.price, stockQty: 25, isActive: true },
           create: {
-            id: `teststack-${index}-${productIndex}`,
+            id: variantId,
             productId: row.id,
             name: "Standard",
             sku: `TESTSTACK-${index}-${productIndex}`,
@@ -172,6 +179,9 @@ async function main(): Promise<void> {
       }
     }
     void shops;
+
+    // Remove variants from an earlier seed that used non-UUID ids.
+    await prisma.productVariant.deleteMany({ where: { id: { startsWith: "teststack-" } } });
 
     for (const [key, value] of SETTINGS) {
       await prisma.systemSetting.upsert({
