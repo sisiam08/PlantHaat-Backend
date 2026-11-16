@@ -1387,6 +1387,7 @@ const SHOP_ORDER_INCLUDE = {
       orderNumber: true,
       customerId: true,
       paymentMethod: true,
+      paymentStatus: true,
       contactPhone: true,
     },
   },

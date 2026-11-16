@@ -3,6 +3,7 @@ import type { PrismaService } from "../src/prisma/prisma.service";
 /** Deletes rows in dependency order so Restrict foreign keys never block. */
 export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.auditLog.deleteMany();
+  await prisma.uploadedAsset.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.systemSetting.deleteMany();

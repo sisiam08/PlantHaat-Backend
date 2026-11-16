@@ -17,9 +17,9 @@ export interface SettingDefinition {
 export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "payment.cod.enabled", type: "boolean", default: true, group: "payments", labelEn: "Cash on delivery enabled", labelBn: "ক্যাশ অন ডেলিভারি চালু", isPublic: true, wired: true },
   { key: "payment.advance.enabled", type: "boolean", default: false, group: "payments", labelEn: "Advance payment enabled", labelBn: "অ্যাডভান্স পেমেন্ট চালু", isPublic: true, wired: true },
-  { key: "payment.bkash.enabled", type: "boolean", default: false, group: "payments", labelEn: "bKash enabled", labelBn: "বিকাশ চালু", isPublic: true },
+  { key: "payment.bkash.enabled", type: "boolean", default: false, group: "payments", labelEn: "bKash enabled", labelBn: "বিকাশ চালু", isPublic: true, wired: true },
   { key: "payment.bkash.number", type: "string", default: "", group: "payments", labelEn: "bKash receiving number", labelBn: "বিকাশ নম্বর", isSensitive: true, wired: true },
-  { key: "payment.nagad.enabled", type: "boolean", default: false, group: "payments", labelEn: "Nagad enabled", labelBn: "নগদ চালু", isPublic: true },
+  { key: "payment.nagad.enabled", type: "boolean", default: false, group: "payments", labelEn: "Nagad enabled", labelBn: "নগদ চালু", isPublic: true, wired: true },
   { key: "payment.nagad.number", type: "string", default: "", group: "payments", labelEn: "Nagad receiving number", labelBn: "নগদ নম্বর", isSensitive: true, wired: true },
   { key: "payment.instructions", type: "string", default: "Send the exact order total to the number shown and submit the transaction ID.", group: "payments", labelEn: "Payment instructions", labelBn: "পেমেন্ট নির্দেশনা", isPublic: true, wired: true },
   { key: "payment.warningText", type: "string", default: "Send from your own number and keep the receipt until the order is verified.", group: "payments", labelEn: "Payment warning", labelBn: "পেমেন্ট সতর্কতা", isPublic: true, wired: true },

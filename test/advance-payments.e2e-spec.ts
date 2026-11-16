@@ -130,11 +130,17 @@ describe("Advance payments (real DB)", () => {
     return order.body.data;
   }
 
-  function submit(customer: Awaited<ReturnType<typeof createCustomer>>, orderId: string, trxId = randomUUID().replace(/-/g, "").slice(0, 10)) {
+  function submit(
+    customer: Awaited<ReturnType<typeof createCustomer>>,
+    orderId: string,
+    trxId = randomUUID().replace(/-/g, "").slice(0, 10),
+    proofUrl?: string,
+  ) {
     return customer.agent.post(`${API}/advance-payments/orders/${orderId}/submissions`).set("Origin", ORIGIN).send({
       provider: "BKASH",
       trxId,
       senderNumber: "01712345678",
+      ...(proofUrl ? { proofUrl } : {}),
     });
   }
 
@@ -291,6 +297,49 @@ describe("Advance payments (real DB)", () => {
     expect(queue.body.data[0].amount).toBe("160");
     const completed = await admin.post(`${API}/admin/advance-refunds/${queue.body.data[0].id}/complete`).set("Origin", ORIGIN).send({ refundTrxId: "REF12345" }).expect(200);
     expect(completed.body.data.status).toBe("PARTIALLY_REFUNDED");
+  });
+
+  it("accepts only payment proofs uploaded through our own storage", async () => {
+    const shop = await createShop();
+    const customer = await createCustomer();
+    const other = await createCustomer();
+    const order = await placeAdvance(customer, [shop], [1]);
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    const upload = await customer.agent
+      .post(`${API}/uploads/images`)
+      .set("Origin", ORIGIN)
+      .field("purpose", "payment")
+      .attach("file", png, { filename: "proof.png", contentType: "image/png" })
+      .expect(201);
+    const key = upload.body.data.key as string;
+    expect(key).toMatch(new RegExp(`^payments/${customer.userId}/`));
+
+    const external = await submit(customer, order.id, undefined, "https://evil.example/proof.png");
+    expect(external.status).toBe(400);
+    expect(external.body.error.code).toBe("PAYMENT_PROOF_INVALID");
+
+    const dataUrl = await submit(customer, order.id, undefined, "data:image/png;base64,AAAA");
+    expect(dataUrl.status).toBe(400);
+    expect(dataUrl.body.error.code).toBe("PAYMENT_PROOF_INVALID");
+
+    const otherUpload = await other.agent
+      .post(`${API}/uploads/images`)
+      .set("Origin", ORIGIN)
+      .field("purpose", "payment")
+      .attach("file", png, { filename: "proof.png", contentType: "image/png" })
+      .expect(201);
+    const wrongOwner = await submit(customer, order.id, undefined, otherUpload.body.data.key as string);
+    expect(wrongOwner.status).toBe(400);
+    expect(wrongOwner.body.error.code).toBe("PAYMENT_PROOF_INVALID");
+
+    await submit(customer, order.id, undefined, key).expect(201);
+    const stored = await prisma.paymentSubmission.findFirstOrThrow({ where: { intent: { orderId: order.id } } });
+    expect(stored.proofUrl).toBeTruthy();
+    expect(stored.proofUrl).not.toContain("evil.example");
+    expect(stored.proofUrl).toContain("/payments/");
   });
 
   it("snapshots provider details and enforces permissions", async () => {

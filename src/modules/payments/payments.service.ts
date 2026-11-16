@@ -109,6 +109,61 @@ export class PaymentsService {
     return value as unknown as ProviderSnapshot;
   }
 
+  /**
+   * Payment proofs must reference an image uploaded through our own storage.
+   * Accepts a storage key (`payments/<ownerId>/<file>`) or a URL whose path
+   * points at that key, resolves it through `UploadedAsset` (same owner,
+   * purpose "payment") and returns the canonical stored URL. Anything else
+   * (external hosts, data:/javascript: URLs, another user's upload) is
+   * rejected so admins never render arbitrary remote content.
+   */
+  private async resolveProofUrl(customerId: string, raw: string | undefined): Promise<string | null> {
+    const value = (raw ?? "").trim();
+    if (!value) return null;
+    if (value.length > 700) {
+      throw AppException.badRequest(ErrorCode.PAYMENT_PROOF_INVALID, "Payment proof reference is too long");
+    }
+    if (/^(?:data|javascript|file|vbscript|blob):/i.test(value)) {
+      throw AppException.badRequest(ErrorCode.PAYMENT_PROOF_INVALID, "Payment proof must be an uploaded image");
+    }
+
+    const keyPattern = /^payments\/[A-Za-z0-9-]+\/[A-Za-z0-9-]+\.(?:webp|jpe?g|png|heic|heif)$/i;
+    let key: string | null = null;
+    if (value.startsWith("payments/")) {
+      key = value;
+    } else {
+      let url: URL;
+      try {
+        url = new URL(value);
+      } catch {
+        throw AppException.badRequest(ErrorCode.PAYMENT_PROOF_INVALID, "Payment proof must be an uploaded image");
+      }
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw AppException.badRequest(ErrorCode.PAYMENT_PROOF_INVALID, "Payment proof must be an uploaded image");
+      }
+      const match = /\/(payments\/[A-Za-z0-9-]+\/[A-Za-z0-9-]+\.(?:webp|jpe?g|png|heic|heif))$/i.exec(
+        url.pathname,
+      );
+      key = match?.[1] ?? null;
+    }
+    if (!key || !keyPattern.test(key)) {
+      throw AppException.badRequest(ErrorCode.PAYMENT_PROOF_INVALID, "Payment proof must be an uploaded image");
+    }
+    if (!key.startsWith(`payments/${customerId}/`)) {
+      throw AppException.badRequest(ErrorCode.PAYMENT_PROOF_INVALID, "Payment proof belongs to another account");
+    }
+    const asset = await this.prisma.uploadedAsset.findFirst({
+      where: { publicId: key, ownerId: customerId, purpose: "payment" },
+    });
+    if (!asset?.url) {
+      throw AppException.badRequest(
+        ErrorCode.PAYMENT_PROOF_INVALID,
+        "Upload the payment proof again through the app",
+      );
+    }
+    return asset.url;
+  }
+
   private submissionTotals(submissions: { amountReceived: Prisma.Decimal | null; status: string }[]) {
     return submissions
       .filter((row) => row.amountReceived != null && row.status !== "PENDING")
@@ -155,6 +210,7 @@ export class PaymentsService {
         status: submission.status,
         amountReceived: submission.amountReceived?.toString() ?? null,
         rejectReason: submission.rejectReason,
+        reviewedAt: submission.reviewedAt,
         createdAt: submission.createdAt,
       })),
     };
@@ -198,6 +254,7 @@ export class PaymentsService {
     }
 
     let submission;
+    const proofUrl = await this.resolveProofUrl(customerId, dto.proofUrl);
     try {
       submission = await this.prisma.$transaction(async (tx) => {
         await this.lockIntent(tx, intent.id);
@@ -207,7 +264,7 @@ export class PaymentsService {
             provider: dto.provider,
             trxId,
             senderNumber: dto.senderNumber.replace(/^\+?88/, ""),
-            proofUrl: dto.proofUrl ?? null,
+            proofUrl,
           },
         });
         await tx.paymentIntent.update({
@@ -250,7 +307,14 @@ export class PaymentsService {
             ? { status: { in: ["UNPAID", "PENDING_VERIFICATION", "REJECTED"] } }
             : {},
       include: {
-        order: { select: { orderNumber: true, customerId: true, contactPhone: true } },
+        order: {
+          select: {
+            orderNumber: true,
+            customerId: true,
+            contactPhone: true,
+            customer: { select: { name: true } },
+          },
+        },
         submissions: { orderBy: { createdAt: "desc" } },
       },
       orderBy: { createdAt: "desc" },
@@ -266,6 +330,8 @@ export class PaymentsService {
       expiresAt: row.expiresAt,
       createdAt: row.createdAt,
       slaAlertedAt: row.slaAlertedAt,
+      buyer: { id: row.order.customerId, name: row.order.customer?.name ?? "" },
+      contactPhone: row.order.contactPhone,
       underSla:
         row.status === "PENDING_VERIFICATION" &&
         row.submissions[0] != null &&
@@ -276,8 +342,11 @@ export class PaymentsService {
         provider: submission.provider,
         trxId: submission.trxId,
         senderNumber: submission.senderNumber,
+        proofUrl: submission.proofUrl,
         status: submission.status,
         amountReceived: submission.amountReceived?.toString() ?? null,
+        rejectReason: submission.rejectReason,
+        reviewedAt: submission.reviewedAt,
         createdAt: submission.createdAt,
       })),
     }));
@@ -428,7 +497,7 @@ export class PaymentsService {
           result.status === "UNDERPAID"
             ? `Remaining amount: ${result.remainingAmount}. Submit another transaction ID.`
             : "Your advance payment has been verified.",
-        data: { intentId, status: result.status },
+        data: { intentId, orderId: intent.orderId, status: result.status },
       });
     }
     return result;
@@ -459,12 +528,39 @@ export class PaymentsService {
       after: { reason },
       ...meta,
     });
+    const rejected = await this.prisma.paymentIntent.findUnique({
+      where: { id: intentId },
+      select: { orderId: true, order: { select: { customerId: true } } },
+    });
+    if (rejected) {
+      await this.notifications.create({
+        userId: rejected.order.customerId,
+        type: "ORDER_STATUS_CHANGED",
+        title: "Payment rejected",
+        body: reason,
+        data: { intentId, orderId: rejected.orderId, status: "REJECTED" },
+      });
+    }
   }
 
   async refundQueue() {
     return this.prisma.refundObligation.findMany({
       where: { status: { in: ["REFUND_REQUIRED", "REFUND_PAYABLE"] } },
-      include: { intent: { select: { orderId: true, amountDue: true } } },
+      include: {
+        intent: {
+          select: {
+            orderId: true,
+            amountDue: true,
+            order: {
+              select: {
+                orderNumber: true,
+                customerId: true,
+                customer: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
   }

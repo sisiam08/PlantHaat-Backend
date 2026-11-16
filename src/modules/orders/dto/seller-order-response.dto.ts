@@ -68,6 +68,7 @@ export class SellerOrderRefDto {
   @ApiProperty() orderNumber!: string;
   @ApiProperty() customerId!: string;
   @ApiProperty({ enum: Object.values(PaymentMethod) }) paymentMethod!: PaymentMethod;
+  @ApiProperty({ enum: Object.values(PaymentStatus) }) paymentStatus!: PaymentStatus;
 }
 
 export class SellerShopOrderRefDto {
