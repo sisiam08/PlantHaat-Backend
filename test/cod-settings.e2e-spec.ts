@@ -238,7 +238,7 @@ describe("COD settings (real DB)", () => {
     const settings = app.get(SettingsService);
     await expect(
       settings.update({ "payment.cod.enabled": false }, admin.id),
-    ).rejects.toThrow(/COD cannot be disabled/);
+    ).rejects.toThrow(/Some settings are invalid/);
   });
 
   it("applies commission.default to new orders with strict money rounding", async () => {

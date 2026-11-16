@@ -1,4 +1,5 @@
 ﻿import { Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
@@ -46,11 +47,19 @@ export class SettingsService {
   }
 
   async history(key?: string, limit = 100) {
-    return this.prisma.systemSettingHistory.findMany({
+    const rows = await this.prisma.systemSettingHistory.findMany({
       where: key ? { key } : undefined,
       orderBy: { createdAt: "desc" },
       take: Math.min(Math.max(limit, 1), 200),
     });
+    const sensitive = new Set(
+      SETTINGS_REGISTRY.filter((setting) => setting.isSensitive).map((setting) => setting.key),
+    );
+    return rows.map((row) =>
+      sensitive.has(row.key)
+        ? { ...row, oldValue: row.oldValue == null ? null : "•••", newValue: row.newValue == null ? null : "•••" }
+        : row,
+    );
   }
 
   async update(
@@ -58,16 +67,26 @@ export class SettingsService {
     updatedById: string,
     meta?: { reason?: string; ipAddress?: string; userAgent?: string },
   ): Promise<Record<string, unknown>> {
-    try {
-      validateSettingsMap(values, Object.fromEntries(await this.ensureCache()));
-    } catch (error) {
-      throw AppException.badRequest(
-        ErrorCode.VALIDATION_FAILED,
-        error instanceof Error ? error.message : "Invalid setting",
-      );
-    }
-
+    const batchId = randomUUID();
     await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.systemSetting.findMany({ select: { key: true, value: true } });
+      const current = {
+        ...SETTING_DEFAULTS,
+        ...Object.fromEntries(rows.map((row) => [row.key, row.value])),
+      };
+      try {
+        validateSettingsMap(values, current);
+      } catch (error) {
+        const details =
+          error && typeof error === "object" && "details" in error
+            ? (error as { details?: Record<string, string> }).details
+            : undefined;
+        throw AppException.badRequest(
+          ErrorCode.VALIDATION_FAILED,
+          error instanceof Error ? error.message : "Invalid setting",
+          details,
+        );
+      }
       for (const [key, value] of Object.entries(values)) {
         await applySettingChange(
           tx,
@@ -76,6 +95,7 @@ export class SettingsService {
           updatedById,
           meta,
           SETTING_DEFAULTS[key],
+          batchId,
         );
       }
     });

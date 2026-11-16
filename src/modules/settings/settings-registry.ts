@@ -48,7 +48,10 @@ export const SETTING_DEFAULTS = Object.fromEntries(
   SETTINGS_REGISTRY.map((setting) => [setting.key, setting.default]),
 );
 export class SettingValidationError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly details?: Record<string, string>,
+  ) {
     super(message);
     this.name = "SettingValidationError";
   }
@@ -126,49 +129,49 @@ export function validateSettingsMap(
   values: Record<string, unknown>,
   current: Record<string, unknown>,
 ): void {
-  for (const [key, value] of Object.entries(values)) validateSettingValue(key, value);
-  const merged = { ...current, ...values };
-  if (merged["payment.cod.enabled"] === false) {
-    const providerReady = [
-      ["payment.bkash.enabled", "payment.bkash.number"],
-      ["payment.nagad.enabled", "payment.nagad.number"],
-    ].some(
-      ([enabled, number]) =>
-        merged[enabled] === true && BD_MOBILE.test(stringValue(merged[number])),
-    );
-    // Part 3 is not live yet; effectiveAdvance stays false regardless of the flag.
-    const effectiveAdvance =
-      advanceIsLive() && merged["payment.advance.enabled"] === true && providerReady;
-    if (!effectiveAdvance) {
-      throw new SettingValidationError(
-        "COD cannot be disabled until Advance payment is live and a provider number is configured",
-      );
+  const details: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) {
+    try {
+      validateSettingValue(key, value);
+    } catch (error) {
+      details[key] = error instanceof Error ? error.message : "Invalid setting";
     }
   }
+
+  const merged = { ...current, ...values };
   const providers = [
     { enabled: "payment.bkash.enabled", number: "payment.bkash.number", label: "bKash" },
     { enabled: "payment.nagad.enabled", number: "payment.nagad.number", label: "Nagad" },
   ];
+  const readyProviders = providers.filter((provider) => {
+    const number = stringValue(merged[provider.number]);
+    return merged[provider.enabled] === true && BD_MOBILE.test(number);
+  });
   for (const provider of providers) {
     if (merged[provider.enabled] === true) {
       const number = stringValue(merged[provider.number]);
       if (!BD_MOBILE.test(number)) {
-        throw new SettingValidationError(
-          `${provider.label} cannot be enabled without a valid receiving number`,
-        );
+        details[provider.enabled] =
+          `${provider.label} cannot be enabled without a valid receiving number`;
       }
     }
   }
-  if (merged["payment.advance.enabled"] === true) {
-    const hasProvider = providers.some((provider) => {
-      const number = stringValue(merged[provider.number]);
-      return merged[provider.enabled] === true && BD_MOBILE.test(number);
-    });
-    if (!hasProvider) {
-      throw new SettingValidationError(
-        "Advance payment requires at least one enabled provider with a valid number",
-      );
+  if (merged["payment.advance.enabled"] === true && readyProviders.length === 0) {
+    details["payment.advance.enabled"] =
+      "Advance payment requires at least one enabled provider with a valid number";
+  }
+  if (merged["payment.cod.enabled"] === false) {
+    const effectiveAdvance =
+      advanceIsLive() &&
+      merged["payment.advance.enabled"] === true &&
+      readyProviders.length > 0;
+    if (!effectiveAdvance) {
+      details["payment.cod.enabled"] =
+        "COD cannot be disabled until Advance payment is live and a provider number is configured";
     }
+  }
+  if (Object.keys(details).length > 0) {
+    throw new SettingValidationError("Some settings are invalid", details);
   }
 }
 

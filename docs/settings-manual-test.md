@@ -91,3 +91,17 @@ Open http://localhost:3000 with an admin account, then **Admin → Settings**. S
 - `return.windowHours = 48`
 - previous `commission.default`
 - provider numbers and payment methods unchanged
+
+## 7. Advance + bKash persistence (corrected) / অ্যাডভান্স ও বিকাশ সংরক্ষণ
+
+**English**
+1. enter the bKash receiving number, tick bKash enabled, tick Advance payment enabled.
+2. Press Save once, enter your admin password once, and wait for "Saved. Customers will see this on new page loads".
+3. Reload five times; the number and both toggles must stay.
+4. Clear the number and press Save; the form must show an inline number error and must not report success. Restore the values afterwards.
+
+**বাংলা**
+1. bKash receiving number দিন, bKash enabled ও Advance payment enabled টিক দিন।
+2. একবার Save চেপে একবার অ্যাডমিন পাসওয়ার্ড দিন; "Saved. Customers will see this on new page loads" দেখা পর্যন্ত অপেক্ষা করুন।
+3. পাঁচবার রিলোড করুন; নম্বর ও দুটি টগল একই থাকতে হবে।
+4. নম্বর মুছে Save চাপলে ইনলাইন নম্বর ত্রুটি দেখাবে, সফল বার্তা দেখাবে না। পরে মান ফিরিয়ে দিন।

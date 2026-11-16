@@ -19,3 +19,9 @@ Still hard-coded / not wired: payout hold hours, payout methods, wallet COD dues
 
 - Backend: `src/modules/settings/settings-wiring.spec.ts` fails if the removed `complaint.windowHours` key returns or COD/commission settings are bypassed.
 - Frontend: `src/lib/business-constants.test.ts` fails if “48 hours”, “48-hour” or “৪৮ ঘণ্টা” is hard-coded in messages or customer pages.
+
+## Save batching and re-auth (2026-11-16)
+- One Save is one PATCH with all changed keys, applied in one transaction and validated against the merged result.
+- Re-auth token scope = the sorted set of sensitive keys in that save; it is short-lived, single-use and rejects any added key.
+- History writes one row per changed key with a shared batchId; sensitive history values are masked.
+- Validation failures return per-key details under error.details, rendered inline; the form keeps its state.

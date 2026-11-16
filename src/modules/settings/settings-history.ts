@@ -7,6 +7,7 @@ export async function applySettingChange(
   updatedById: string,
   meta: { reason?: string; ipAddress?: string; userAgent?: string } | undefined,
   fallback: unknown,
+  batchId?: string,
 ): Promise<void> {
   // Create the row first so SELECT ... FOR UPDATE always has a row to lock.
   await tx.$executeRaw`
@@ -25,6 +26,7 @@ export async function applySettingChange(
   await tx.systemSettingHistory.create({
     data: {
       key,
+      batchId,
       oldValue: oldValue as Prisma.InputJsonValue,
       newValue: value as Prisma.InputJsonValue,
       updatedById,

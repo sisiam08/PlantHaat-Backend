@@ -32,10 +32,10 @@ describe("settings registry", () => {
         { "payment.cod.enabled": false, "payment.advance.enabled": false },
         {},
       ),
-    ).toThrow(/COD cannot be disabled/);
+    ).toThrow(/Some settings are invalid/);
     expect(() =>
       validateSettingsMap({ "payment.nagad.enabled": true }, {}),
-    ).toThrow(/valid receiving number/);
+    ).toThrow(/Some settings are invalid/);
     expect(() =>
       validateSettingsMap(
         {
@@ -46,10 +46,10 @@ describe("settings registry", () => {
         },
         {},
       ),
-    ).toThrow(/COD cannot be disabled/);
+    ).toThrow(/Some settings are invalid/);
     expect(() =>
       validateSettingsMap({ "payment.advance.enabled": true }, {}),
-    ).toThrow(/requires at least one enabled provider/);
+    ).toThrow(/Some settings are invalid/);
   });
 
   it("never exposes a key that is both public and sensitive", () => {

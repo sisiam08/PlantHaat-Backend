@@ -79,7 +79,7 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
     const reauth = await admin
       .post(`${API}/admin/settings/reauth`)
       .set("Origin", ORIGIN)
-      .send({ key: "commission.default", password: "AdminStr0ng1" })
+      .send({ keys: ["commission.default"], password: "AdminStr0ng1" })
       .expect(200);
     const after = await admin
       .patch(`${API}/admin/settings`)

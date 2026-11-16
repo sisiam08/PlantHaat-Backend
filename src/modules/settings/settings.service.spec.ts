@@ -1,4 +1,4 @@
-﻿import { jest } from "@jest/globals";
+import { jest } from "@jest/globals";
 import type { PrismaService } from "../../prisma/prisma.service";
 import { SettingsService } from "./settings.service";
 
@@ -68,6 +68,6 @@ describe("SettingsService", () => {
     const service = new SettingsService(prisma);
     await expect(
       service.update({ "payment.cod.enabled": false, "payment.advance.enabled": false }, "admin-1"),
-    ).rejects.toThrow(/COD cannot be disabled/);
+    ).rejects.toThrow(/Some settings are invalid/);
   });
 });

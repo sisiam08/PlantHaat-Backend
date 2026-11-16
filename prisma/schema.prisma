@@ -1307,6 +1307,7 @@ model SystemSettingHistory {
   id          String   @id @default(uuid())
   key         String
   sequence    Int      @default(autoincrement()) @unique
+  batchId     String?
   oldValue    Json?
   newValue    Json?
   updatedById String?
@@ -1317,5 +1318,6 @@ model SystemSettingHistory {
 
 
   @@index([key, createdAt])
+  @@index([batchId])
   @@index([updatedById])
-}
+}

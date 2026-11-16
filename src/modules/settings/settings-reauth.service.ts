@@ -1,4 +1,4 @@
-﻿import { Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 
 import { AppException } from "../../common/errors/app.exception";
@@ -12,7 +12,7 @@ const FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class SettingsReauthService {
-  private tokens = new Map<string, { adminId: string; key: string; expiresAt: number }>();
+  private tokens = new Map<string, { adminId: string; keys: string[]; expiresAt: number }>();
   private failures = new Map<string, { count: number; firstAt: number }>();
 
   constructor(private readonly prisma: PrismaService) {}
@@ -21,7 +21,11 @@ export class SettingsReauthService {
     return createHash("sha256").update(token).digest("hex");
   }
 
-  async issue(adminId: string, password: string, key: string) {
+  async issue(adminId: string, password: string, keys: string[]) {
+    const scope = [...new Set(keys)].sort();
+    if (scope.length === 0) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Re-authentication scope is empty");
+    }
     const failure = this.failures.get(adminId);
     if (failure && Date.now() - failure.firstAt < FAILURE_WINDOW_MS && failure.count >= MAX_FAILURES) {
       throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Too many re-auth attempts");
@@ -41,11 +45,12 @@ export class SettingsReauthService {
     }
     this.failures.delete(adminId);
     const token = randomBytes(24).toString("hex");
-    this.tokens.set(this.hash(token), { adminId, key, expiresAt: Date.now() + TTL_MS });
+    this.tokens.set(this.hash(token), { adminId, keys: scope, expiresAt: Date.now() + TTL_MS });
     return { token, expiresAt: new Date(Date.now() + TTL_MS).toISOString() };
   }
 
-  assert(token: string | undefined, adminId: string, key: string): void {
+  assert(token: string | undefined, adminId: string, keys: string[]): void {
+    const scope = [...new Set(keys)].sort();
     if (!token) throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Re-authentication required");
     const hash = this.hash(token);
     const record = this.tokens.get(hash);
@@ -53,7 +58,11 @@ export class SettingsReauthService {
       this.tokens.delete(hash);
       throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Re-authentication expired");
     }
-    if (record.adminId !== adminId || record.key !== key) {
+    if (
+      record.adminId !== adminId ||
+      record.keys.length !== scope.length ||
+      record.keys.some((key, index) => key !== scope[index])
+    ) {
       throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Re-authentication token does not match this setting");
     }
     this.tokens.delete(hash);
