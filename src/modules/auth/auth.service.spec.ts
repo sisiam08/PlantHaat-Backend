@@ -14,7 +14,7 @@ const config = {
   values: {
     REFRESH_TTL_DAYS: 30,
     JWT_ACCESS_TTL: 900,
-    REFRESH_REUSE_GRACE_SECONDS: 10,
+    REFRESH_REUSE_GRACE_SECONDS: 20,
     APP_URL: "http://localhost:3000",
   },
   isProduction: false,

@@ -46,7 +46,7 @@ export const envSchema = z.object({
   JWT_ISSUER: z.string().min(1).default("planthaat"),
   JWT_AUDIENCE: z.string().min(1).default("planthaat-web"),
   REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
-  REFRESH_REUSE_GRACE_SECONDS: z.coerce.number().int().nonnegative().default(10),
+  REFRESH_REUSE_GRACE_SECONDS: z.coerce.number().int().nonnegative().default(20),
 
   DATA_ENCRYPTION_KEY: z.string().min(1, "DATA_ENCRYPTION_KEY is required"),
 
