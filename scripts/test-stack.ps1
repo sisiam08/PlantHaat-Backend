@@ -34,8 +34,20 @@ switch ($Action) {
     try { & npm.cmd run db:seed:test-stack } finally { Pop-Location }
   }
   "start" {
+    # Production builds first: the specs must not wait on compile-on-demand.
     Push-Location $backend
-    try { & npm.cmd run db:seed:test-stack } finally { Pop-Location }
+    try {
+      & npm.cmd run build
+      if ($LASTEXITCODE -ne 0) { Write-Output "Backend build failed"; exit 1 }
+      & npm.cmd run db:seed:test-stack
+      if ($LASTEXITCODE -ne 0) { Write-Output "Test seed failed"; exit 1 }
+    } finally { Pop-Location }
+    Push-Location $frontend
+    try {
+      & node scripts/run-test-frontend.mjs build
+      if ($LASTEXITCODE -ne 0) { Write-Output "Frontend build failed"; exit 1 }
+    } finally { Pop-Location }
+
     Stop-Port 5001
     Stop-Port 3002
     Start-Sleep -Seconds 2
@@ -46,10 +58,18 @@ switch ($Action) {
       Write-Output "Test API did not become healthy; see ph-test-api.err.log"
       exit 1
     }
-    Start-Process -FilePath node -ArgumentList "scripts/run-test-frontend.mjs" -WorkingDirectory $frontend `
+    Start-Process -FilePath node -ArgumentList "scripts/run-test-frontend.mjs", "start" -WorkingDirectory $frontend `
       -RedirectStandardInput $empty -RedirectStandardOutput (Join-Path $logDir "ph-test-web.log") `
       -RedirectStandardError (Join-Path $logDir "ph-test-web.err.log") -WindowStyle Hidden
-    Write-Output "Test stack: API :5001, frontend :3002. Logs in $logDir."
+    for ($i = 0; $i -lt 24; $i += 2) {
+      try {
+        $response = Invoke-WebRequest -Uri "http://localhost:3002/" -UseBasicParsing -TimeoutSec 5
+        if ($response.StatusCode -eq 200) { Write-Output "Test stack ready: API :5001, production frontend :3002."; exit 0 }
+      } catch {}
+      Start-Sleep -Seconds 2
+    }
+    Write-Output "Test frontend did not become healthy; see ph-test-web.err.log"
+    exit 1
   }
   "stop" {
     Stop-Port 5001

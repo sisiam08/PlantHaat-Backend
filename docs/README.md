@@ -20,8 +20,12 @@ Canonical docs for the backend repo (`feature/payments`). Documentation lives on
 | `payments/live-report.md` | Advance live verification report (12/12 scenarios) | backend | 2026-11-18 |
 | `settings/reference.md` | Every settings key, old hard-coded value, wiring location and guards | backend | 2026-11-18 |
 | `settings/manual-test.md` | Owner manual test script for settings effects | backend | 2026-11-18 |
-| `testing/baseline.md` | Backend e2e baseline, known skips, safe test-running rules | backend | 2026-11-18 |
+| `testing/baseline.md` | Backend e2e baseline, known skips, safe test-running rules, isolated production settings stack | backend | 2026-11-18 |
 | `AGENTS-root.md` | Versioned copy of the workspace-root `AGENTS.md` (the root file is the live agent config) | workspace | 2026-11-18 |
+
+## Isolated settings/test stack
+
+`backend/scripts/test-stack.ps1 start|stop|status|seed` builds the backend and a production frontend (`NEXT_DIST_DIR=.next-test`) and runs API `:5001` (test DB) + frontend `:3002`. Never point settings specs at dev `:5000`/`:3000`. Full commands and fixtures are in `frontend/docs/testing/live-log.md` and `testing/baseline.md`.
 
 ## Frontend canonical docs
 

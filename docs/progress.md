@@ -316,3 +316,10 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 ## Docs cleanup (2026-11-18)
 
 - Documentation moved into `backend/docs/` and `frontend/docs/`; duplicate audits/progress/perf/typography docs consolidated; screenshots and measurement dumps deleted. Undo archive: workspace `_cleanup-archive/` (outside both repos).
+
+## 2026-11-18 money-path stability pass
+
+- Cart/checkout CLS fixed at the source: server-rendered first paint, reserved skeletons for shops/summary/addresses/payment, in-place quote refresh, Inter optional + metric fallback. Production 5-run medians: cart CLS 0.0042-0.0108, checkout CLS 0.0073-0.0093, checkout LCP 1.83-1.99 s (targets met). Guest cart 0, 6-shop cart 0.0083.
+- Shared PasswordInput and keyboard-only card focus rings landed with Playwright guards.
+- Settings harness: production isolated stack; settings 4/4, payments-advance 12/12, session-refresh 8/8. Fixed public-settings staleness (60 s -> 1 s).
+- Warning: the dev settings still have Advance enabled with the owner's real bKash number; with these settings a real customer on the dev app could send real money to that number, so the dev app must not be exposed publicly while Advance is enabled. Do not change these settings from tests.

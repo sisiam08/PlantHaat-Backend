@@ -61,3 +61,12 @@ Suites were re-run with the API restarted between groups; every rerun passed.
 - Frontend Vitest 52/52. Payment Playwright 12 scenarios all passed (serial runs): COD, advance UI journey, reject/resubmit, duplicate, under/overpay, expiry vs pending, late payment, partial refund, permissions, settings snapshot, screenshots.
 - Existing suites on dev :3000 (desktop project): checkout 32/32 after raising its timeout for the extra payment card, messages 8/8, typography 8/8, overflow 9 pass/1 admin skip, scroll-restore 6/6 after stabilising the mobile filter-sheet wait, cart-quantity 2/2, digits 1/1.
 - Known environment note: long dev runs still hit navigation timeouts under load; the failing cases passed on warm reruns. The isolated stack is stopped after the run.
+
+## 2026-11-18 settings/session harness on the production stack
+
+- `backend/scripts/test-stack.ps1 start` now builds the backend and a production frontend (`NEXT_DIST_DIR=.next-test`) before starting API `:5001` and frontend `:3002`. No compile-on-demand, so the specs wait on elements/responses instead of bundling.
+- Settings specs (serial): **4/4 passed** - grouping/discard/reset/validation/history, sensitive re-auth (wrong password then correct), Nagad-without-number rejection, and the customer-side effects (COD limit, WhatsApp, 24 h return window) with values restored. `settings-persist`: one save across five reloads.
+- Real bug found and fixed: `getPublicSettings` cached for 60 s, so a saved return window/WhatsApp reached server-rendered pages only after the safety expiry. Now `revalidate: 1` plus the existing tag invalidation; the customer-side spec passes immediately.
+- `payments-advance.spec.ts`: **12/12 passed** on the same stack (strict-mode locator fixed to `.first()`).
+- `session-refresh.spec.ts` with the documented short-TTL overrides: **8/8 passed**. The revoked-session case now accepts `auth-required` (logout-all clears both cookies) as well as `session-expired`.
+- The stack is stopped after the run; dev settings and the dev database were never used for these writes.
