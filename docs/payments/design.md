@@ -125,7 +125,7 @@ Part 4 must use **one source of truth for the money hold**. Recommended:
 
 ---
 
-## Part 4 implementation (2026-11-18) — final ledger design
+## Part 4 implementation (2026-11-18) ï¿½ final ledger design
 
 ### Source of truth and compatibility
 
@@ -176,6 +176,7 @@ Amounts are deltas to one account bucket (Decimal 12,2, no floats). A business e
 | Dispute rejected / return to seller | `SELLER_ON_HOLD -amount`, `SELLER_PENDING` or `SELLER_AVAILABLE +amount` | `dispute_release:<complaintId>:<to>` |
 | Refund accepted | `REFUND_PAYABLE +amount`, seller source `-sellerShare`, `PLATFORM_COMMISSION -commissionShare` | `refund_payable:<refundId>` |
 | Refund paid | `REFUND_PAYABLE -amount`, `REFUNDS_PAID +amount` | `refund_paid:<refundId>` |
+| Part 3 obligation completed (overpay/cancel/late no-stock) | `PLATFORM_HOLDINGS -amount`, `REFUNDS_PAID +amount` | `refund_obligation_paid:<obligationId>` |
 | Withdrawal requested | `SELLER_AVAILABLE -amount`, `SELLER_WITHDRAWAL_RESERVED +amount` | `withdrawal_reserve:<payoutId>` |
 | Withdrawal paid | reserved `-amount`, `SELLER_PAID_OUT +amount` | `withdrawal_paid:<payoutId>` |
 | Withdrawal rejected | reserved `-amount`, `SELLER_AVAILABLE +amount` | `withdrawal_rejected:<payoutId>` |

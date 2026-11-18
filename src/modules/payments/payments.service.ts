@@ -593,6 +593,25 @@ export class PaymentsService {
         where: { id: obligation.intentId },
         data: { refundedAmount: { increment: obligation.amount } },
       });
+      await this.ledger.postBatch(tx, `refund_obligation_paid:${id}`, [
+        {
+          account: "PLATFORM_HOLDINGS",
+          amount: obligation.amount.negated(),
+          type: "REFUND_PAID",
+          orderId: intent.orderId,
+          refundId: null,
+          description: `Manual refund ${refundTrxId} paid from platform holdings`,
+          createdById: actor.id,
+        },
+        {
+          account: "REFUNDS_PAID",
+          amount: obligation.amount,
+          type: "REFUND_PAID",
+          orderId: intent.orderId,
+          description: `Manual refund ${refundTrxId} paid to buyer`,
+          createdById: actor.id,
+        },
+      ]);
       const status = intent.refundedAmount.gte(intent.amountDue) ? "REFUNDED" : "PARTIALLY_REFUNDED";
       return tx.paymentIntent.update({ where: { id: intent.id }, data: { status } });
     });
