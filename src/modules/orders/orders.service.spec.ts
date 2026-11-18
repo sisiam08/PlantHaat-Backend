@@ -68,6 +68,8 @@ function createPrismaMock() {
     orderItem: { create: mockFn() },
     orderStatusHistory: { create: mockFn() },
     payment: { create: mockFn(), findMany: mockFn(), updateMany: mockFn() },
+    paymentIntent: { findUnique: mockFn() },
+    paymentSubmission: { aggregate: mockFn() },
     cancellationRequest: {
       findFirst: mockFn(),
       findUnique: mockFn(),
@@ -112,7 +114,13 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     getNumber: jest.fn<() => Promise<number>>().mockResolvedValue(0),
   } as unknown as SettingsService;
   const notifications = { create: jest.fn() } as never as NotificationsService;
-  const ledger = { record: jest.fn<() => Promise<void>>() } as never as LedgerService;
+  const ledger = {
+    record: jest.fn<() => Promise<void>>(),
+    postCodDues: jest.fn<() => Promise<void>>(),
+    postAdvanceDelivery: jest.fn<() => Promise<void>>(),
+    postPaymentReceipt: jest.fn<() => Promise<void>>(),
+    releaseAtFor: jest.fn(async () => new Date()),
+  } as never as LedgerService;
   const events = { emit: jest.fn() } as unknown as EventEmitter2;
   const mail = { queue: jest.fn() } as never as MailService;
   const codRiskMock = {
@@ -692,12 +700,11 @@ describe("OrdersService", () => {
         where: { shopOrderId: string; method: string; status: string };
       };
       expect(manyArg.where).toEqual({ shopOrderId, method: "COD", status: "PENDING" });
-      const ledgerCall = (deps.ledger.record as unknown as jest.Mock).mock.calls[0][1] as {
-        type: string;
-        amount: Prisma.Decimal;
+      const ledgerCall = (deps.ledger.postCodDues as unknown as jest.Mock).mock.calls[0][1] as {
+        commission: Prisma.Decimal;
       };
-      expect(ledgerCall.type).toBe("COD_COMMISSION_DUE");
-      expect(`${ledgerCall.amount}`).toBe("-10");
+      expect(`${ledgerCall.commission}`).toBe("10");
+      expect(deps.ledger.record).not.toHaveBeenCalled();
       expect(bag.prisma.product.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ soldCount: { increment: 1 } }),
@@ -715,12 +722,11 @@ describe("OrdersService", () => {
 
       await deps.service.transitionByAdmin(shopOrderId, { status: "DELIVERED" } as never);
 
-      const ledgerCall = (deps.ledger.record as unknown as jest.Mock).mock.calls[0][1] as {
-        type: string;
-        amount: Prisma.Decimal;
-      };
-      expect(ledgerCall.type).toBe("ORDER_EARNING");
-      expect(`${ledgerCall.amount}`).toBe("150");
+      const ledgerCall = (deps.ledger.postAdvanceDelivery as unknown as jest.Mock).mock
+        .calls[0][1] as { net: Prisma.Decimal; commission: Prisma.Decimal };
+      expect(`${ledgerCall.net}`).toBe("150");
+      expect(`${ledgerCall.commission}`).toBe("10");
+      expect(deps.ledger.record).not.toHaveBeenCalled();
     });
 
     it("requires the customer to own the order before cancelling", async () => {

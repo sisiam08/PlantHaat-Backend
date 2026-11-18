@@ -17,6 +17,7 @@ import { SettingsService } from "../settings/settings.service";
 import type {
   ComplaintCommentDto,
   CreateComplaintDto,
+  DecideDisputeDto,
   QueryComplaintsDto,
   ResolveComplaintDto,
   UpdateComplaintStatusDto,
@@ -24,6 +25,7 @@ import type {
 
 const ATTACHMENT_REQUIRED_TYPES = new Set(["DAMAGED_PLANT", "NOT_AS_DESCRIBED"]);
 const SHIPPED_ONLY_TYPES = new Set(["NOT_DELIVERED", "LATE_DELIVERY"]);
+const OPEN_DISPUTE_STATUSES = ["OPEN", "SELLER_RESPONDED", "UNDER_REVIEW"] as const;
 
 @Injectable()
 export class ComplaintsService {
@@ -40,7 +42,7 @@ export class ComplaintsService {
     const shopOrder = await this.prisma.shopOrder.findUnique({
       where: { id: dto.shopOrderId },
       include: {
-        order: { select: { customerId: true } },
+        order: { select: { customerId: true, paymentMethod: true } },
         shop: {
           select: {
             id: true,
@@ -91,6 +93,38 @@ export class ComplaintsService {
         "At least one photo is required for this complaint type",
       );
     }
+    const photoRequired = await this.settings.getBoolean("return.photoRequired");
+    if (
+      shopOrder.status === "DELIVERED" &&
+      photoRequired &&
+      (dto.attachments?.length ?? 0) === 0
+    ) {
+      throw AppException.badRequest(
+        ErrorCode.COMPLAINT_ATTACHMENT_REQUIRED,
+        "At least one photo is required for a dispute",
+      );
+    }
+    const maxPhotos = await this.settings.getNumber("return.maxEvidencePhotos");
+    if ((dto.attachments?.length ?? 0) > maxPhotos) {
+      throw AppException.badRequest(
+        ErrorCode.VALIDATION_FAILED,
+        `At most ${maxPhotos} photos are allowed`,
+      );
+    }
+    const openDispute = await this.prisma.complaint.findFirst({
+      where: {
+        shopOrderId: shopOrder.id,
+        customerId,
+        status: { in: [...OPEN_DISPUTE_STATUSES] },
+      },
+      select: { id: true },
+    });
+    if (openDispute) {
+      throw AppException.conflict(
+        ErrorCode.COMPLAINT_NOT_ALLOWED,
+        "A dispute is already open for this order",
+      );
+    }
 
     if (dto.orderItemId) {
       const item = await this.prisma.orderItem.findFirst({
@@ -102,7 +136,12 @@ export class ComplaintsService {
       }
     }
 
+    const responseHours = await this.settings.getNumber("return.disputeSellerHours");
+    const sellerResponseDueAt =
+      shopOrder.status === "DELIVERED" ? new Date(Date.now() + responseHours * 3_600_000) : null;
+
     const { complaint, falseDeliveryFlags } = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "ShopOrder" WHERE "id" = ${shopOrder.id} FOR UPDATE`;
       const created = await tx.complaint.create({
         data: {
           ticketNumber: generateComplaintTicket(),
@@ -113,11 +152,24 @@ export class ComplaintsService {
           type: dto.type,
           description: dto.description,
           status: "OPEN",
+          sellerResponseDueAt,
           attachments: dto.attachments?.length
             ? { create: dto.attachments.map((url) => ({ url })) }
             : undefined,
         },
       });
+      if (shopOrder.status === "DELIVERED" && shopOrder.order.paymentMethod === "ADVANCE") {
+        await this.ledger.holdForDispute(tx, {
+          disputeId: created.id,
+          shopOrderId: shopOrder.id,
+          sellerProfileId: shopOrder.shop.sellerProfile.id,
+          createdById: customerId,
+        });
+        await tx.complaint.update({
+          where: { id: created.id },
+          data: { fundsHeldAt: new Date() },
+        });
+      }
       let flags: number | null = null;
       if (isDeliveredNotDelivered) {
         const updated = await tx.sellerProfile.update({
@@ -239,10 +291,31 @@ export class ComplaintsService {
   }
 
   async addSellerComment(sellerUserId: string, id: string, dto: ComplaintCommentDto) {
-    await this.assertAccess({ id, shop: { sellerProfile: { userId: sellerUserId } } });
+    const complaint = await this.prisma.complaint.findFirst({
+      where: { id, shop: { sellerProfile: { userId: sellerUserId } } },
+      select: { id: true, sellerResponseDueAt: true, decision: true },
+    });
+    if (!complaint) {
+      throw AppException.notFound(ErrorCode.NOT_FOUND, "Complaint not found");
+    }
+    if (
+      complaint.sellerResponseDueAt &&
+      Date.now() > complaint.sellerResponseDueAt.getTime()
+    ) {
+      throw AppException.badRequest(
+        ErrorCode.COMPLAINT_NOT_ALLOWED,
+        "The seller response window has closed",
+      );
+    }
+    if (complaint.decision !== "PENDING") {
+      throw AppException.conflict(
+        ErrorCode.COMPLAINT_NOT_ALLOWED,
+        "This dispute has already been decided",
+      );
+    }
     await this.prisma.complaint.update({
       where: { id },
-      data: { status: "SELLER_RESPONDED" },
+      data: { status: "SELLER_RESPONDED", sellerRespondedAt: new Date() },
     });
     return this.addComment(id, sellerUserId, "SELLER", dto.body, false);
   }
@@ -284,6 +357,182 @@ export class ComplaintsService {
       after: { status: dto.status },
       ...meta,
     });
+    return this.getAny(id);
+  }
+
+  /**
+   * Admin dispute decision (Part 4). Locks the complaint and its ShopOrder,
+   * moves held funds and posts append-only ledger entries. Idempotent: a replay
+   * of the same decision returns the stored result.
+   */
+  async decide(
+    id: string,
+    dto: DecideDisputeDto,
+    actor: AuthenticatedUser,
+    meta: { ipAddress?: string; userAgent?: string },
+  ) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Complaint" WHERE "id" = ${id} FOR UPDATE`;
+      const complaint = await tx.complaint.findUnique({
+        where: { id },
+        include: {
+          shopOrder: {
+            select: {
+              id: true,
+              shopOrderNumber: true,
+              status: true,
+              total: true,
+              commissionAmount: true,
+              sellerNetAmount: true,
+              releaseAt: true,
+              fundsReleasedAt: true,
+              order: { select: { paymentMethod: true } },
+              shop: { select: { sellerProfileId: true } },
+            },
+          },
+        },
+      });
+      if (!complaint) {
+        throw AppException.notFound(ErrorCode.NOT_FOUND, "Dispute not found");
+      }
+      if (complaint.decision !== "PENDING") {
+        return { complaint, replay: true };
+      }
+      await tx.$queryRaw`SELECT "id" FROM "ShopOrder" WHERE "id" = ${complaint.shopOrderId} FOR UPDATE`;
+
+      const shopOrder = complaint.shopOrder;
+      const sellerProfileId = shopOrder.shop.sellerProfileId;
+      const held = await this.ledger.accountSum(
+        tx,
+        sellerProfileId,
+        "SELLER_ON_HOLD",
+        shopOrder.id,
+      );
+      const pending = await this.ledger.accountSum(
+        tx,
+        sellerProfileId,
+        "SELLER_PENDING",
+        shopOrder.id,
+      );
+      const available = await this.ledger.accountSum(
+        tx,
+        sellerProfileId,
+        "SELLER_AVAILABLE",
+        shopOrder.id,
+      );
+      const source =
+        held.gt(0) ? "SELLER_ON_HOLD" : pending.gt(0) ? "SELLER_PENDING" : "SELLER_AVAILABLE";
+      const sellerFunds = held.gt(0) ? held : pending.gt(0) ? pending : available;
+
+      if (dto.decision === "REJECTED" || dto.decision === "RETURN_TO_SELLER") {
+        const alreadyReleased =
+          shopOrder.fundsReleasedAt !== null ||
+          (shopOrder.releaseAt !== null && shopOrder.releaseAt <= new Date());
+        if (sellerFunds.gt(0)) {
+          await this.ledger.releaseDisputeHold(tx, {
+            disputeId: id,
+            shopOrderId: shopOrder.id,
+            sellerProfileId,
+            amount: sellerFunds,
+            to: alreadyReleased ? "SELLER_AVAILABLE" : "SELLER_PENDING",
+            releaseAt: shopOrder.releaseAt,
+            createdById: actor.id,
+          });
+        }
+        if (alreadyReleased && shopOrder.fundsReleasedAt === null) {
+          await tx.shopOrder.update({
+            where: { id: shopOrder.id },
+            data: { fundsReleasedAt: new Date() },
+          });
+        }
+        await tx.complaint.update({
+          where: { id },
+          data: {
+            status: dto.decision === "REJECTED" ? "REJECTED" : "CLOSED",
+            decision: dto.decision,
+            resolutionNote: dto.reason,
+            resolvedById: actor.id,
+            resolvedAt: new Date(),
+            decidedAt: new Date(),
+          },
+        });
+        return { complaint: await tx.complaint.findUniqueOrThrow({ where: { id } }), replay: false };
+      }
+
+      const isFull = dto.decision === "REFUND_FULL";
+      const refundAmount = isFull
+        ? new Prisma.Decimal(shopOrder.total)
+        : new Prisma.Decimal(dto.refundAmount ?? 0);
+      if (refundAmount.lte(0) || refundAmount.gt(shopOrder.total)) {
+        throw AppException.badRequest(
+          ErrorCode.VALIDATION_FAILED,
+          "Refund amount must be between 0.01 and the order total",
+        );
+      }
+      const commissionRemaining = await this.ledger.accountSum(
+        tx,
+        sellerProfileId,
+        "PLATFORM_COMMISSION",
+        shopOrder.id,
+      );
+      const refund = await tx.refund.create({
+        data: {
+          shopOrderId: shopOrder.id,
+          complaintId: id,
+          amount: refundAmount,
+          reason: dto.reason,
+          status: dto.refundTrxId ? "PROCESSED" : "REQUESTED",
+          method: dto.refundTrxId ? "BKASH" : null,
+          reference: dto.refundTrxId ?? null,
+          requestedById: actor.id,
+          processedById: dto.refundTrxId ? actor.id : null,
+          processedAt: dto.refundTrxId ? new Date() : null,
+        },
+      });
+      await this.ledger.postRefundObligation(tx, {
+        refundId: refund.id,
+        shopOrderId: shopOrder.id,
+        sellerProfileId,
+        amount: refundAmount,
+        refundableSellerFunds: sellerFunds,
+        commissionRemaining,
+        source,
+        createdById: actor.id,
+      });
+      if (dto.refundTrxId) {
+        await this.ledger.postRefundPaid(tx, {
+          refundId: refund.id,
+          amount: refundAmount,
+          createdById: actor.id,
+        });
+      }
+      await tx.complaint.update({
+        where: { id },
+        data: {
+          status: "RESOLVED_REFUND",
+          decision: isFull ? "REFUND_FULL" : "REFUND_PARTIAL",
+          resolutionNote: dto.reason,
+          refundAmount,
+          resolvedById: actor.id,
+          resolvedAt: new Date(),
+          decidedAt: new Date(),
+        },
+      });
+      return { complaint: await tx.complaint.findUniqueOrThrow({ where: { id } }), replay: false };
+    });
+
+    if (!result.replay) {
+      await this.notifyParticipants(id);
+      await this.audit.record({
+        actorId: actor.id,
+        actorRole: actor.role,
+        action: "dispute.decide",
+        entityType: "Complaint",
+        entityId: id,
+        after: { decision: dto.decision, refundAmount: dto.refundAmount ?? null },
+        ...meta,
+      });
+    }
     return this.getAny(id);
   }
 

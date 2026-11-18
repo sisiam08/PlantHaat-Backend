@@ -26,7 +26,7 @@ const HOUR = 60 * 60 * 1000;
 describe("LedgerService", () => {
   it("leaves negative entries immediately available", async () => {
     const prisma = createPrismaMock();
-    const service = new LedgerService(prisma as unknown as PrismaService, settings());
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(), {} as never);
     await service.record(prisma as unknown as PrismaService, {
       sellerProfileId: "s1",
       type: "COD_COMMISSION_DUE",
@@ -41,7 +41,7 @@ describe("LedgerService", () => {
     const prisma = createPrismaMock();
     const deliveredAt = new Date("2026-10-01T00:00:00Z");
     prisma.shopOrder.findUnique.mockResolvedValue({ deliveredAt });
-    const service = new LedgerService(prisma as unknown as PrismaService, settings(48));
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(48), {} as never);
     await service.record(prisma as unknown as PrismaService, {
       sellerProfileId: "s1",
       shopOrderId: "so1",
@@ -57,7 +57,7 @@ describe("LedgerService", () => {
   it("uses creation time for positive credits without a delivery", async () => {
     const prisma = createPrismaMock();
     const before = Date.now();
-    const service = new LedgerService(prisma as unknown as PrismaService, settings(48));
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(48), {} as never);
     await service.record(prisma as unknown as PrismaService, {
       sellerProfileId: "s1",
       type: "ADJUSTMENT",
@@ -77,7 +77,7 @@ describe("LedgerService", () => {
       { amount: new Prisma.Decimal(-30), availableAt: null, shopOrderId: "so-held" },
     ]);
     prisma.complaint.findMany.mockResolvedValue([{ shopOrderId: "so-held" }]);
-    const service = new LedgerService(prisma as unknown as PrismaService, settings());
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(), {} as never);
 
     const balance = await service.balances("s1");
     expect(balance.pending.toFixed(2)).toBe("150.00");
@@ -93,7 +93,7 @@ describe("LedgerService", () => {
       { amount: new Prisma.Decimal(-30), availableAt: null, shopOrderId: "so1" },
     ]);
     prisma.complaint.findMany.mockResolvedValue([]);
-    const service = new LedgerService(prisma as unknown as PrismaService, settings());
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(), {} as never);
 
     const balance = await service.balances("s1");
     expect(balance.pending.toFixed(2)).toBe("0.00");
@@ -106,7 +106,7 @@ describe("LedgerService", () => {
     prisma.ledgerEntry.findMany.mockResolvedValue([
       { amount: new Prisma.Decimal(10), availableAt: null, shopOrderId: null },
     ]);
-    const service = new LedgerService(prisma as unknown as PrismaService, settings());
+    const service = new LedgerService(prisma as unknown as PrismaService, settings(), {} as never);
     expect((await service.balance("s1")).toFixed(2)).toBe("10.00");
   });
 });

@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 
 import { ErrorCode } from "../../common/errors/error-codes";
+import { Prisma } from "../../generated/prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { AuditService } from "../audit/audit.service";
 import type { LedgerService } from "../ledger/ledger.service";
@@ -50,7 +51,14 @@ function createService(
   reverseRefund = jest.fn<() => Promise<boolean>>(),
 ) {
   const audit = { record: jest.fn() } as unknown as AuditService;
-  const ledger = { reverseRefund, balance: jest.fn(), list: jest.fn() } as never as LedgerService;
+  const ledger = {
+    reverseRefund,
+    balance: jest.fn(),
+    list: jest.fn(),
+    accountSum: jest.fn(async () => new Prisma.Decimal(0)),
+    postRefundObligation: jest.fn(),
+    postRefundPaid: jest.fn(),
+  } as never as LedgerService;
   return new RefundsService(prisma as unknown as PrismaService, ledger, audit);
 }
 

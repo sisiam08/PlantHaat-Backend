@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 
 import { resolvePagination } from "../../common/dto/pagination-query.dto";
 import { AppException } from "../../common/errors/app.exception";
@@ -142,12 +143,24 @@ export class PayoutsService {
     meta: RequestMeta,
   ): Promise<{ balance: string }> {
     await this.assertSeller(sellerProfileId);
-    await this.ledger.record(this.prisma, {
-      sellerProfileId,
-      type: "DUES_PAYMENT",
-      amount: new Prisma.Decimal(dto.amount),
-      description: dto.note ?? `Dues payment (${dto.method ?? "manual"})`,
-      createdById: actor.id,
+    const amount = new Prisma.Decimal(dto.amount);
+    await this.prisma.$transaction(async (tx) => {
+      await this.ledger.postBatch(
+        tx,
+        `cod_dues_payment:${sellerProfileId}:${dto.reference ?? randomUUID()}`,
+        [
+          {
+            account: "COD_DUES",
+            amount,
+            type: "COD_DUES_PAYMENT",
+            sellerProfileId,
+            description:
+              dto.note ??
+              `COD dues payment (${dto.method ?? "manual"}${dto.reference ? ` ${dto.reference}` : ""})`,
+            createdById: actor.id,
+          },
+        ],
+      );
     });
     await this.audit.record({
       actorId: actor.id,
@@ -155,7 +168,7 @@ export class PayoutsService {
       action: "seller.dues_payment",
       entityType: "SellerProfile",
       entityId: sellerProfileId,
-      after: { amount: dto.amount },
+      after: { amount: dto.amount, reference: dto.reference ?? null },
       ...meta,
     });
     return { balance: (await this.ledger.balance(sellerProfileId)).toFixed(2) };
@@ -168,12 +181,27 @@ export class PayoutsService {
     meta: RequestMeta,
   ): Promise<{ balance: string }> {
     await this.assertSeller(sellerProfileId);
-    await this.ledger.record(this.prisma, {
-      sellerProfileId,
-      type: "ADJUSTMENT",
-      amount: new Prisma.Decimal(dto.amount),
-      description: dto.note,
-      createdById: actor.id,
+    const amount = new Prisma.Decimal(dto.amount);
+    await this.prisma.$transaction(async (tx) => {
+      // Balanced manual adjustment: platform holdings move to/from the seller.
+      await this.ledger.postBatch(tx, `adjustment:${sellerProfileId}:${randomUUID()}`, [
+        {
+          account: "PLATFORM_HOLDINGS",
+          amount: amount.negated(),
+          type: amount.gt(0) ? "ADJUSTMENT_CREDIT" : "ADJUSTMENT_DEBIT",
+          sellerProfileId,
+          description: dto.note,
+          createdById: actor.id,
+        },
+        {
+          account: "SELLER_AVAILABLE",
+          amount,
+          type: amount.gt(0) ? "ADJUSTMENT_CREDIT" : "ADJUSTMENT_DEBIT",
+          sellerProfileId,
+          description: dto.note,
+          createdById: actor.id,
+        },
+      ]);
     });
     await this.audit.record({
       actorId: actor.id,

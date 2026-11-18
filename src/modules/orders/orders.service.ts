@@ -1105,6 +1105,54 @@ export class OrdersService {
     return paginate(rows, total, page, limit);
   }
 
+  async confirmReceipt(customerId: string, shopOrderId: string) {
+    if (!(await this.settings.getBoolean("return.earlyRelease"))) {
+      throw AppException.badRequest(
+        ErrorCode.COMPLAINT_NOT_ALLOWED,
+        "Early release is disabled",
+      );
+    }
+    const shopOrder = await this.prisma.shopOrder.findFirst({
+      where: { id: shopOrderId, order: { customerId } },
+      select: {
+        id: true,
+        status: true,
+        releaseAt: true,
+        order: { select: { paymentMethod: true } },
+        complaints: {
+          where: { status: { in: ["OPEN", "SELLER_RESPONDED", "UNDER_REVIEW"] } },
+          select: { id: true },
+        },
+      },
+    });
+    if (!shopOrder) {
+      throw AppException.notFound(ErrorCode.ORDER_NOT_FOUND, "Order not found");
+    }
+    if (shopOrder.status !== "DELIVERED") {
+      throw AppException.badRequest(
+        ErrorCode.INVALID_STATUS_TRANSITION,
+        "Only delivered orders can be confirmed",
+      );
+    }
+    if (shopOrder.complaints.length > 0) {
+      throw AppException.conflict(
+        ErrorCode.COMPLAINT_NOT_ALLOWED,
+        "A dispute is open for this order",
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "ShopOrder" WHERE "id" = ${shopOrderId} FOR UPDATE`;
+      await tx.shopOrder.update({
+        where: { id: shopOrderId },
+        data: { releaseAt: new Date() },
+      });
+    });
+    if (shopOrder.order.paymentMethod === "ADVANCE") {
+      await this.ledger.releaseDue();
+    }
+    return { released: true };
+  }
+
   private async transition(
     actorId: string | null,
     actorRole: OrderActor,
@@ -1164,6 +1212,11 @@ export class OrdersService {
 
     const cancelling = to === "CANCELLED";
     const restock = cancelling && shouldRestock(from, dto.restock);
+    const deliveredAt = to === "DELIVERED" ? new Date() : null;
+    const releaseAt =
+      to === "DELIVERED" && shopOrder.order.paymentMethod === "ADVANCE"
+        ? await this.ledger.releaseAtFor(deliveredAt as Date)
+        : null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.shopOrder.update({
@@ -1171,6 +1224,9 @@ export class OrdersService {
         data: {
           status: to,
           ...timestampFor(to),
+          ...(to === "DELIVERED"
+            ? { deliveredAt, deliveryVerifiedById: actorId, releaseAt }
+            : {}),
           ...(dto.note !== undefined ? { sellerNote: dto.note } : {}),
           ...(to === "DELIVERED" && dto.deliveryNote !== undefined
             ? { deliveryNote: dto.deliveryNote }
@@ -1263,22 +1319,59 @@ export class OrdersService {
             }
           }
           const isCod = shopOrder.order.paymentMethod === "COD";
-          await this.ledger.record(tx, {
-            sellerProfileId: shopOrder.shop.sellerProfile.id,
-            shopOrderId,
-            type: isCod ? "COD_COMMISSION_DUE" : "ORDER_EARNING",
-            amount: isCod ? shopOrder.commissionAmount.negated() : shopOrder.sellerNetAmount,
-            description: isCod
-              ? "COD commission due to platform"
-              : "Order earning (platform-collected payment)",
-            createdById: actorId,
-          });
+          if (isCod) {
+            await this.ledger.postCodDues(tx, {
+              shopOrderId,
+              orderId: shopOrder.order.id,
+              sellerProfileId: shopOrder.shop.sellerProfile.id,
+              commission: shopOrder.commissionAmount,
+              createdById: actorId,
+            });
+          } else {
+            const intent = await tx.paymentIntent.findUnique({
+              where: { orderId: shopOrder.order.id },
+              select: { id: true, status: true, amountDue: true },
+            });
+            if (intent && (intent.status === "PAID" || intent.status === "PARTIALLY_REFUNDED")) {
+              const received = await tx.paymentSubmission.aggregate({
+                where: { intentId: intent.id, status: "VERIFIED" },
+                _sum: { amountReceived: true },
+              });
+              await this.ledger.postPaymentReceipt(tx, {
+                intentId: intent.id,
+                orderId: shopOrder.order.id,
+                amount: received._sum.amountReceived ?? intent.amountDue,
+                createdById: actorId,
+              });
+            }
+            await this.ledger.postAdvanceDelivery(tx, {
+              shopOrderId,
+              orderId: shopOrder.order.id,
+              sellerProfileId: shopOrder.shop.sellerProfile.id,
+              total: shopOrder.total,
+              commission: shopOrder.commissionAmount,
+              net: shopOrder.sellerNetAmount,
+              releaseAt: releaseAt as Date,
+              createdById: actorId,
+            });
+          }
           await this.recomputeOrderPaymentStatus(tx, shopOrder.order.id);
         }
       }
     });
 
     if (to === "FAILED_DELIVERY" || to === "DELIVERED") {
+      if (to === "DELIVERED") {
+        await this.notifications.create({
+          userId: shopOrder.order.customerId,
+          type: "ORDER_STATUS_CHANGED",
+          title: "Order delivered",
+          body: releaseAt
+            ? `You can report a problem until ${releaseAt.toISOString()} (return window).`
+            : "Your order was delivered.",
+          data: { shopOrderId, releaseAt: releaseAt?.toISOString() ?? null },
+        });
+      }
       const fingerprint = this.codRisk.fingerprint({
         districtId: shopOrder.order.shippingDistrictId,
         area: shopOrder.order.shippingArea,

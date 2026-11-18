@@ -20,4 +20,25 @@ describe("settings wiring grep guard", () => {
     const source = read("src/modules/commissions/commissions.service.ts");
     expect(source).toContain('"commission.default"');
   });
+
+  it("the money hold reads return.windowHours (payout.holdHours is an alias)", () => {
+    const ledger = read("src/modules/ledger/ledger.service.ts");
+    expect(ledger).toContain('"return.windowHours"');
+    expect(ledger).not.toContain("48 * 60 * 60");
+    const settings = read("src/modules/settings/settings.service.ts");
+    expect(settings).toContain("payout.holdHours");
+    expect(settings).toContain("return.windowHours");
+  });
+
+  it("wallet and dispute rules are settings-driven", () => {
+    const wallet = read("src/modules/wallet/wallet.service.ts");
+    expect(wallet).toContain('"payout.minimumAmount"');
+    expect(wallet).toContain('"payout.maxPendingRequests"');
+    expect(wallet).toContain('"wallet.codDuesLimit"');
+    expect(wallet).toContain('"payout.methods"');
+    const complaints = read("src/modules/complaints/complaints.service.ts");
+    expect(complaints).toContain('"return.maxEvidencePhotos"');
+    expect(complaints).toContain('"return.disputeSellerHours"');
+    expect(complaints).toContain('"return.photoRequired"');
+  });
 });

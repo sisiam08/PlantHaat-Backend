@@ -24,6 +24,7 @@ import { Role } from "../../generated/prisma/enums";
 import { ComplaintsService } from "./complaints.service";
 import {
   ComplaintCommentDto,
+  DecideDisputeDto,
   QueryComplaintsDto,
   ResolveComplaintDto,
   UpdateComplaintStatusDto,
@@ -78,6 +79,19 @@ export class AdminComplaintsController {
     @Req() request: Request,
   ) {
     return this.complaintsService.resolve(id, dto, actor, getRequestMeta(request));
+  }
+
+  @Post(":id/decision")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Decide a Part 4 dispute (reject, refund, return)" })
+  @ApiEnvelopeResponse(AdminComplaintDetailDto)
+  decide(
+    @Param("id") id: string,
+    @Body() dto: DecideDisputeDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.complaintsService.decide(id, dto, actor, getRequestMeta(request));
   }
 
   @Post(":id/comment")

@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import type { RequestMeta } from "../../common/utils/request-meta";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { LedgerService } from "../ledger/ledger.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { SettingsService } from "../settings/settings.service";
 import type {
@@ -46,6 +47,7 @@ export class PaymentsService {
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly ledger: LedgerService,
   ) {}
 
   async snapshot(): Promise<ProviderSnapshot> {
@@ -446,6 +448,12 @@ export class PaymentsService {
             data: { status: "PAID", paidAt: new Date() },
           });
           await tx.order.update({ where: { id: intent.orderId }, data: { paymentStatus: "PAID" } });
+          await this.ledger.postPaymentReceipt(tx, {
+            intentId,
+            orderId: intent.orderId,
+            amount: totalAfter,
+            createdById: actor.id,
+          });
           return {
             status: "PAID_REFUND_REQUIRED",
             remainingAmount: "0",
@@ -470,6 +478,12 @@ export class PaymentsService {
         data: { status: "PAID", paidAt: new Date(), slaAlertedAt: null },
       });
       await tx.order.update({ where: { id: intent.orderId }, data: { paymentStatus: "PAID" } });
+      await this.ledger.postPaymentReceipt(tx, {
+        intentId,
+        orderId: intent.orderId,
+        amount: totalAfter,
+        createdById: actor.id,
+      });
       return {
         status: "PAID",
         remainingAmount: "0",

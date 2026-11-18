@@ -17,6 +17,10 @@ export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async get<T>(key: string): Promise<T> {
+    if (key === "payout.holdHours") {
+      // Deprecated alias: the single money hold is return.windowHours.
+      return (await this.ensureCache()).get("return.windowHours") as T;
+    }
     return (await this.ensureCache()).get(key) as T;
   }
 
@@ -29,7 +33,11 @@ export class SettingsService {
   }
 
   async getAll(): Promise<Record<string, unknown>> {
-    return Object.fromEntries(await this.ensureCache());
+    const map = await this.ensureCache();
+    return {
+      ...Object.fromEntries(map),
+      "payout.holdHours": map.get("return.windowHours"),
+    };
   }
 
   async getEffectiveAdvance(): Promise<boolean> {
@@ -71,6 +79,15 @@ export class SettingsService {
     updatedById: string,
     meta?: { reason?: string; ipAddress?: string; userAgent?: string },
   ): Promise<Record<string, unknown>> {
+    // Deprecated alias: writes to payout.holdHours drive the single hold setting.
+    const normalized = { ...values };
+    if ("payout.holdHours" in normalized) {
+      if (!("return.windowHours" in normalized)) {
+        normalized["return.windowHours"] = normalized["payout.holdHours"];
+      }
+      delete normalized["payout.holdHours"];
+    }
+    values = normalized;
     const batchId = randomUUID();
     await this.prisma.$transaction(async (tx) => {
       const rows = await tx.systemSetting.findMany({ select: { key: true, value: true } });

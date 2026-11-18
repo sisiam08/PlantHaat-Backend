@@ -105,6 +105,7 @@ export class RefundsService {
         where: { id: refund.shopOrderId },
         select: {
           commissionAmount: true,
+          sellerNetAmount: true,
           order: { select: { paymentMethod: true } },
           shop: { select: { sellerProfileId: true } },
         },
@@ -122,6 +123,56 @@ export class RefundsService {
         paymentMethod: shopOrder.order.paymentMethod,
         createdById: actor.id,
       });
+      if (shopOrder.order.paymentMethod !== "COD") {
+        const sellerProfileId = shopOrder.shop.sellerProfileId;
+        const onHold = await this.ledger.accountSum(
+          tx,
+          sellerProfileId,
+          "SELLER_ON_HOLD",
+          refund.shopOrderId,
+        );
+        const pending = await this.ledger.accountSum(
+          tx,
+          sellerProfileId,
+          "SELLER_PENDING",
+          refund.shopOrderId,
+        );
+        const available = await this.ledger.accountSum(
+          tx,
+          sellerProfileId,
+          "SELLER_AVAILABLE",
+          refund.shopOrderId,
+        );
+        const commissionRemaining = await this.ledger.accountSum(
+          tx,
+          sellerProfileId,
+          "PLATFORM_COMMISSION",
+          refund.shopOrderId,
+        );
+        await this.ledger.postRefundObligation(tx, {
+          refundId: id,
+          shopOrderId: refund.shopOrderId,
+          sellerProfileId,
+          amount: refund.amount,
+          refundableSellerFunds: onHold.gt(0)
+            ? onHold
+            : pending.gt(0)
+              ? pending
+              : available,
+          commissionRemaining,
+          source: onHold.gt(0)
+            ? "SELLER_ON_HOLD"
+            : pending.gt(0)
+              ? "SELLER_PENDING"
+              : "SELLER_AVAILABLE",
+          createdById: actor.id,
+        });
+        await this.ledger.postRefundPaid(tx, {
+          refundId: id,
+          amount: refund.amount,
+          createdById: actor.id,
+        });
+      }
     });
 
     await this.audit.record({

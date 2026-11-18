@@ -14,7 +14,7 @@ const mockFn = (): PrismaMockFn => jest.fn<(...args: unknown[]) => Promise<unkno
 const actor = { id: "admin-1", role: "ADMIN" } as never;
 
 function createPrismaMock() {
-  return {
+  const mock = {
     payout: {
       findMany: mockFn(),
       findUnique: mockFn(),
@@ -26,6 +26,10 @@ function createPrismaMock() {
     ledgerEntry: { findMany: mockFn() },
     $transaction: mockFn(),
   };
+  mock.$transaction.mockImplementation(async (op: unknown) =>
+    typeof op === "function" ? op(mock) : Promise.all(op as Promise<unknown>[]),
+  );
+  return mock;
 }
 
 function createService(
@@ -38,6 +42,7 @@ function createService(
 ) {
   const ledgerMock = ledger ?? {
     record: jest.fn<() => Promise<void>>(),
+      postBatch: jest.fn<() => Promise<number>>().mockResolvedValue(1),
       balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
     balance: jest.fn<() => Promise<unknown>>().mockResolvedValue("12.34"),
     list: jest.fn<() => Promise<unknown>>().mockResolvedValue({ data: [], meta: { total: 0 } }),
@@ -91,6 +96,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      postBatch: jest.fn<() => Promise<number>>().mockResolvedValue(1),
       balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue("0"),
       list: jest.fn(),
@@ -169,6 +175,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      postBatch: jest.fn<() => Promise<number>>().mockResolvedValue(1),
       balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue({ toFixed: () => "77.00" }),
       list: jest.fn(),
@@ -178,11 +185,10 @@ describe("PayoutsService", () => {
     const result = await service.recordDuesPayment("seller-1", { amount: 50 } as never, actor, {});
 
     expect(result).toEqual({ balance: "77.00" });
-    expect(ledger.record).toHaveBeenCalledTimes(1);
-    const recordMock = ledger.record as unknown as jest.Mock;
-    expect(recordMock.mock.calls[0][0]).toBe(prisma);
-    const entry = recordMock.mock.calls[0][1] as unknown as { type: string };
-    expect(entry.type).toBe("DUES_PAYMENT");
+    expect(ledger.postBatch).toHaveBeenCalledTimes(1);
+    const postBatchMock = ledger.postBatch as unknown as jest.Mock;
+    const entries = postBatchMock.mock.calls[0][2] as unknown as { account: string; type: string }[];
+    expect(entries[0]).toMatchObject({ account: "COD_DUES", type: "COD_DUES_PAYMENT" });
   });
 
   it("records a signed adjustment", async () => {
@@ -190,6 +196,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      postBatch: jest.fn<() => Promise<number>>().mockResolvedValue(1),
       balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue({ toFixed: () => "-20.00" }),
       list: jest.fn(),
@@ -204,9 +211,9 @@ describe("PayoutsService", () => {
     );
 
     expect(result).toEqual({ balance: "-20.00" });
-    const recordMock = ledger.record as unknown as jest.Mock;
-    const entry = recordMock.mock.calls[0][1] as unknown as { type: string };
-    expect(entry.type).toBe("ADJUSTMENT");
+    const postBatchMock = ledger.postBatch as unknown as jest.Mock;
+    const entries = postBatchMock.mock.calls[0][2] as unknown as { type: string }[];
+    expect(entries[0]?.type).toBe("ADJUSTMENT_DEBIT");
   });
 
   it("delegates the seller ledger query to the ledger service", async () => {
@@ -214,6 +221,7 @@ describe("PayoutsService", () => {
     prisma.sellerProfile.findUnique.mockResolvedValue({ id: "seller-1" });
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      postBatch: jest.fn<() => Promise<number>>().mockResolvedValue(1),
       balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>(),
       list: jest.fn<() => Promise<unknown>>().mockResolvedValue({ data: [], meta: { total: 0 } }),
@@ -235,6 +243,7 @@ describe("PayoutsService", () => {
     prisma.payout.findMany.mockResolvedValue([{ id: "p-1" }]);
     const ledger = {
       record: jest.fn<() => Promise<void>>(),
+      postBatch: jest.fn<() => Promise<number>>().mockResolvedValue(1),
       balances: jest.fn(async () => ({ pending: new Prisma.Decimal(0), available: new Prisma.Decimal(1000000), owedToPlatform: new Prisma.Decimal(0), net: new Prisma.Decimal(33) })),
       balance: jest.fn<() => Promise<unknown>>().mockResolvedValue("33.00"),
       list: jest.fn(),

@@ -21,22 +21,38 @@ const meta = {};
 function createService(overrides: Record<string, unknown> = {}) {
   const prisma = {
     shopOrder: { findUnique: mockFn() },
-    complaint: { create: mockFn(), update: mockFn(), findUnique: mockFn() },
+    complaint: {
+      create: mockFn(),
+      update: mockFn(),
+      findUnique: mockFn(),
+      findFirst: mockFn(),
+    },
     sellerProfile: { update: mockFn() },
     refund: { create: mockFn() },
+    $queryRaw: mockFn().mockResolvedValue([]),
     $transaction: mockFn(),
     ...overrides,
   };
   prisma.$transaction.mockImplementation(async (op: unknown) =>
     typeof op === "function" ? (op(prisma) as unknown) : Promise.all(op as never),
   );
-  const settings = { getNumber: mockFn().mockResolvedValue(48) } as unknown as SettingsService;
+  const settings = {
+    getNumber: mockFn().mockResolvedValue(48),
+    getBoolean: mockFn().mockResolvedValue(false),
+  } as unknown as SettingsService;
   const notifications = {
     create: mockFn(),
     createForAdmins: mockFn(),
   } as unknown as NotificationsService;
   const audit = { record: mockFn() } as unknown as AuditService;
-  const ledger = { reverseRefund: mockFn().mockResolvedValue(true) } as unknown as LedgerService;
+  const ledger = {
+    reverseRefund: mockFn().mockResolvedValue(true),
+    holdForDispute: mockFn().mockResolvedValue(dec(0)),
+    accountSum: mockFn().mockResolvedValue(dec(0)),
+    releaseDisputeHold: mockFn(),
+    postRefundObligation: mockFn(),
+    postRefundPaid: mockFn(),
+  } as unknown as LedgerService;
   const orders = {
     createReplacementFromComplaint: mockFn().mockResolvedValue({
       orderId: "replacement-order",

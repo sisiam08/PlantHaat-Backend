@@ -176,7 +176,7 @@ describe("Earnings & ledger (e2e)", () => {
     return agent;
   }
 
-  it.skip("records COD commission on delivery, payouts, dues and refunds — KNOWN-FAILING baseline: dues payment 422", async () => {
+  it("records COD dues on delivery, blocks payout, clears dues and reverses a refund", async () => {
     const seller = await setupSeller(1000);
     await placeDeliveredOrder(seller);
 
@@ -184,7 +184,8 @@ describe("Earnings & ledger (e2e)", () => {
       where: { sellerProfileId: seller.profile.id },
     });
     expect(ledger).toHaveLength(1);
-    expect(ledger[0].type).toBe("COD_COMMISSION_DUE");
+    expect(ledger[0].type).toBe("COD_DUES_ACCRUAL");
+    expect(ledger[0].account).toBe("COD_DUES");
     expect(Number(ledger[0].amount)).toBe(-100);
 
     await seller.agent
@@ -195,15 +196,17 @@ describe("Earnings & ledger (e2e)", () => {
       });
 
     const admin = await adminAgent();
-    await admin
+    // No platform-collected balance: paying out must be rejected, not forced.
+    const payout = await admin
       .post(`${API}/admin/payouts`)
       .set("Origin", ORIGIN)
-      .send({ sellerProfileId: seller.profile.id, amount: 100, method: "BKASH" })
-      .expect(201);
+      .send({ sellerProfileId: seller.profile.id, amount: 100, method: "BKASH" });
+    expect(payout.status).toBe(422);
+    expect(payout.body.error.code).toBe("PAYOUT_EXCEEDS_AVAILABLE");
     await admin
       .post(`${API}/admin/sellers/${seller.profile.id}/dues-payments`)
       .set("Origin", ORIGIN)
-      .send({ amount: 200 })
+      .send({ amount: 100, reference: "DUES-1" })
       .expect(200);
 
     const afterSettle = await prisma.ledgerEntry.aggregate({
@@ -260,7 +263,7 @@ describe("Earnings & ledger (e2e)", () => {
     await placeDeliveredOrder(seller);
 
     const ledger = await prisma.ledgerEntry.findFirstOrThrow({
-      where: { sellerProfileId: seller.profile.id, type: "COD_COMMISSION_DUE" },
+      where: { sellerProfileId: seller.profile.id, type: "COD_DUES_ACCRUAL" },
     });
     // 5% of 1000
     expect(Number(ledger.amount)).toBe(-50);

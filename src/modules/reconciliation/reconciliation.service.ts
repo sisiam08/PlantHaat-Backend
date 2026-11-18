@@ -68,7 +68,7 @@ export class ReconciliationService {
         sellerNetAmount: true,
         deliveredAt: true,
         order: { select: { paymentMethod: true } },
-        ledgerEntries: { select: { type: true, amount: true } },
+        ledgerEntries: { select: { type: true, amount: true, account: true } },
       },
     });
     for (const shopOrder of shopOrders) {
@@ -87,39 +87,53 @@ export class ReconciliationService {
       }
 
       if (shopOrder.status === "DELIVERED") {
-        const expectedType =
-          shopOrder.order.paymentMethod === "COD" ? "COD_COMMISSION_DUE" : "ORDER_EARNING";
-        const expectedAmount =
-          expectedType === "COD_COMMISSION_DUE"
-            ? money(dec(shopOrder.commissionAmount).negated())
-            : money(dec(shopOrder.sellerNetAmount));
-        const matching = shopOrder.ledgerEntries.filter((entry) => entry.type === expectedType);
-        if (matching.length === 0) {
-          violations.push({
-            code: "LEDGER_MISSING",
-            entityType: "ShopOrder",
-            entityId: shopOrder.id,
-            message: `Delivered shop order ${shopOrder.shopOrderNumber} has no ${expectedType} ledger entry`,
-            expected: expectedAmount.toFixed(2),
-          });
-        } else if (matching.length > 1) {
-          violations.push({
-            code: "LEDGER_DUPLICATE",
-            entityType: "ShopOrder",
-            entityId: shopOrder.id,
-            message: `Delivered shop order ${shopOrder.shopOrderNumber} has ${matching.length} ${expectedType} entries`,
-          });
-        } else {
-          const amount = money(dec(matching[0].amount));
-          if (!amount.equals(expectedAmount)) {
+        const accounting = shopOrder.ledgerEntries.filter((entry) => entry.account);
+        if (accounting.length > 0) {
+          const expectedAccount =
+            shopOrder.order.paymentMethod === "COD" ? "COD_DUES" : "SELLER_PENDING";
+          if (!accounting.some((entry) => entry.account === expectedAccount)) {
             violations.push({
-              code: "LEDGER_AMOUNT_MISMATCH",
+              code: "LEDGER_MISSING",
               entityType: "ShopOrder",
               entityId: shopOrder.id,
-              message: `Ledger entry amount does not match the delivered shop order (${shopOrder.shopOrderNumber})`,
-              expected: expectedAmount.toFixed(2),
-              actual: amount.toFixed(2),
+              message: `Delivered shop order ${shopOrder.shopOrderNumber} has no ${expectedAccount} ledger entry`,
             });
+          }
+        } else {
+          const expectedType =
+            shopOrder.order.paymentMethod === "COD" ? "COD_COMMISSION_DUE" : "ORDER_EARNING";
+          const expectedAmount =
+            expectedType === "COD_COMMISSION_DUE"
+              ? money(dec(shopOrder.commissionAmount).negated())
+              : money(dec(shopOrder.sellerNetAmount));
+          const matching = shopOrder.ledgerEntries.filter((entry) => entry.type === expectedType);
+          if (matching.length === 0) {
+            violations.push({
+              code: "LEDGER_MISSING",
+              entityType: "ShopOrder",
+              entityId: shopOrder.id,
+              message: `Delivered shop order ${shopOrder.shopOrderNumber} has no ${expectedType} ledger entry`,
+              expected: expectedAmount.toFixed(2),
+            });
+          } else if (matching.length > 1) {
+            violations.push({
+              code: "LEDGER_DUPLICATE",
+              entityType: "ShopOrder",
+              entityId: shopOrder.id,
+              message: `Delivered shop order ${shopOrder.shopOrderNumber} has ${matching.length} ${expectedType} entries`,
+            });
+          } else {
+            const amount = money(dec(matching[0].amount));
+            if (!amount.equals(expectedAmount)) {
+              violations.push({
+                code: "LEDGER_AMOUNT_MISMATCH",
+                entityType: "ShopOrder",
+                entityId: shopOrder.id,
+                message: `Ledger entry amount does not match the delivered shop order (${shopOrder.shopOrderNumber})`,
+                expected: expectedAmount.toFixed(2),
+                actual: amount.toFixed(2),
+              });
+            }
           }
         }
       }
@@ -192,11 +206,52 @@ export class ReconciliationService {
       }
     }
 
+    // A5: settlement ledger conservation (advance money only; COD dues are
+    // tracked separately). receipts = all money buckets + paid out + commission.
+    const accountTotals = await this.prisma.ledgerEntry.groupBy({
+      by: ["account"],
+      where: { account: { not: null } },
+      _sum: { amount: true },
+    });
+    const accountValue = (account: string) =>
+      dec(accountTotals.find((row) => row.account === account)?._sum?.amount);
+    const receipts = accountValue("BUYER_RECEIPTS");
+    const bucketTotal = [
+      "PLATFORM_HOLDINGS",
+      "SELLER_PENDING",
+      "SELLER_AVAILABLE",
+      "SELLER_ON_HOLD",
+      "SELLER_WITHDRAWAL_RESERVED",
+      "REFUND_PAYABLE",
+      "PLATFORM_COMMISSION",
+      "SELLER_PAID_OUT",
+      "REFUNDS_PAID",
+    ].reduce((sum, account) => sum.plus(accountValue(account)), new Prisma.Decimal(0));
+    const difference = money(receipts.minus(bucketTotal));
+    if (!difference.isZero()) {
+      checked += 1;
+      violations.push({
+        code: "SETTLEMENT_CONSERVATION_BREACH",
+        entityType: "SettlementLedger",
+        entityId: "all",
+        message: "Buyer receipts do not equal settlement buckets plus payouts",
+        expected: money(receipts).toFixed(2),
+        actual: money(bucketTotal).toFixed(2),
+      });
+    }
+
     return {
       from: from.toISOString(),
       to: to.toISOString(),
       checked,
       violations,
+      settlement: {
+        receipts: money(receipts).toFixed(2),
+        buckets: money(bucketTotal).toFixed(2),
+        difference: difference.toFixed(2),
+        balanced: difference.isZero(),
+        codDues: money(accountValue("COD_DUES").negated()).toFixed(2),
+      },
     };
   }
 }

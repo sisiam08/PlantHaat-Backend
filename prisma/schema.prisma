@@ -197,6 +197,14 @@ enum ComplaintStatus {
   CLOSED
 }
 
+enum DisputeDecision {
+  PENDING
+  REJECTED
+  REFUND_FULL
+  REFUND_PARTIAL
+  RETURN_TO_SELLER
+}
+
 enum ReviewStatus {
   VISIBLE
   HIDDEN
@@ -229,6 +237,36 @@ enum LedgerEntryType {
   DUES_PAYMENT
   REFUND_REVERSAL
   ADJUSTMENT
+  // Part 4 settlement ledger
+  PAYMENT_RECEIVED
+  SELLER_PENDING
+  SELLER_RELEASE
+  COMMISSION
+  DISPUTE_HOLD
+  DISPUTE_RELEASE
+  WITHDRAWAL_RESERVE
+  WITHDRAWAL_PAID
+  WITHDRAWAL_REJECTED
+  COD_DUES_ACCRUAL
+  COD_DUES_PAYMENT
+  REFUND_PAYABLE_CREATED
+  REFUND_PAID
+  ADJUSTMENT_DEBIT
+  ADJUSTMENT_CREDIT
+}
+
+enum LedgerAccount {
+  BUYER_RECEIPTS
+  PLATFORM_HOLDINGS
+  SELLER_PENDING
+  SELLER_AVAILABLE
+  SELLER_ON_HOLD
+  SELLER_WITHDRAWAL_RESERVED
+  SELLER_PAID_OUT
+  REFUND_PAYABLE
+  REFUNDS_PAID
+  PLATFORM_COMMISSION
+  COD_DUES
 }
 
 enum PayoutStatus {
@@ -236,6 +274,7 @@ enum PayoutStatus {
   PROCESSING
   PAID
   FAILED
+  REJECTED
 }
 
 enum CommissionScope {
@@ -474,6 +513,7 @@ model SellerPayoutAccount {
   accountMasked    String
   isDefault        Boolean      @default(false)
   createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   sellerProfile SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
 
@@ -768,6 +808,11 @@ model ShopOrder {
   packedAt              DateTime?
   shippedAt             DateTime?
   deliveredAt           DateTime?
+  /* Part 4 settlement: release snapshot + completion, delivery proof actor. */
+  releaseAt              DateTime?
+  fundsReleasedAt        DateTime?
+  deliveryVerifiedById   String?
+  deliveryProofUrl       String?
   cancelledAt           DateTime?
   cancelledBy           CancelledBy?
   cancelReason          String?
@@ -798,6 +843,7 @@ model ShopOrder {
   @@unique([parentShopOrderId])
   @@index([kind, status])
   @@index([status, estimatedDeliveryTo])
+  @@index([status, releaseAt])
 }
 
 model OrderItem {
@@ -1040,20 +1086,29 @@ model CommissionRule {
 }
 
 model LedgerEntry {
-  id              String          @id @default(uuid())
-  sellerProfileId String
+  id              String           @id @default(uuid())
+  sellerProfileId String?
   shopOrderId     String?
   payoutId        String?
   refundId        String?
+  orderId         String?
+  paymentId       String?
+  disputeId       String?
+  withdrawalId    String?
   type            LedgerEntryType
-  amount          Decimal         @db.Decimal(12, 2)
+  account         LedgerAccount?
+  amount          Decimal          @db.Decimal(12, 2)
   description     String?
   createdById     String?
-  createdAt       DateTime        @default(now())
-  // Positive entries unlock after payout.holdHours past delivery (null = immediate/negative).
+  createdAt       DateTime         @default(now())
+  // Part 4: deterministic release time snapshot and idempotency.
+  releaseAt       DateTime?
+  batchId         String?
+  idempotencyKey  String?          @unique
+  // Positive legacy entries unlock after payout.holdHours past delivery (null = immediate/negative).
   availableAt     DateTime?
 
-  sellerProfile SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Restrict)
+  sellerProfile SellerProfile? @relation(fields: [sellerProfileId], references: [id], onDelete: Restrict)
   shopOrder     ShopOrder?    @relation(fields: [shopOrderId], references: [id], onDelete: SetNull)
   payout        Payout?       @relation(fields: [payoutId], references: [id], onDelete: SetNull)
   refund        Refund?       @relation(fields: [refundId], references: [id], onDelete: SetNull)
@@ -1061,6 +1116,8 @@ model LedgerEntry {
   @@index([sellerProfileId, createdAt])
   @@index([shopOrderId])
   @@index([refundId])
+  @@index([account, releaseAt])
+  @@index([batchId])
 }
 
 model Payout {
@@ -1073,16 +1130,23 @@ model Payout {
   accountMasked   String?
   reference       String?
   note            String?
+  /* Part 4 withdrawal requests (seller-initiated) reuse this table. */
+  requestedById   String?
+  rejectionReason String?
+  balanceSnapshot Decimal?     @db.Decimal(12, 2)
+  idempotencyKey  String?      @unique
   periodFrom      DateTime?
   periodTo        DateTime?
   processedById   String?
   processedAt     DateTime?
   createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   sellerProfile SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Restrict)
   ledgerEntries LedgerEntry[]
 
   @@index([sellerProfileId, status])
+  @@index([status, createdAt])
 }
 
 // ───────────────────────── ENGAGEMENT: WISHLIST, REVIEWS, COMPLAINTS ─────────────────────────
@@ -1223,6 +1287,13 @@ model Complaint {
   resolutionNote String?
   resolvedById   String?
   resolvedAt     DateTime?
+  /* Part 4 dispute/settlement fields (null for pre-Part-4 complaints). */
+  decision               DisputeDecision @default(PENDING)
+  sellerResponseDueAt    DateTime?
+  sellerRespondedAt      DateTime?
+  fundsHeldAt            DateTime?
+  decidedAt              DateTime?
+  refundAmount           Decimal?        @db.Decimal(12, 2)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 

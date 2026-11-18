@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -95,4 +96,31 @@ export class QueryComplaintsDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(ComplaintStatus)
   status?: ComplaintStatus;
+}
+
+export class DecideDisputeDto {
+  @ApiProperty({
+    enum: ["REJECTED", "REFUND_FULL", "REFUND_PARTIAL", "RETURN_TO_SELLER"],
+  })
+  @IsIn(["REJECTED", "REFUND_FULL", "REFUND_PARTIAL", "RETURN_TO_SELLER"])
+  decision!: "REJECTED" | "REFUND_FULL" | "REFUND_PARTIAL" | "RETURN_TO_SELLER";
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(2000)
+  reason!: string;
+
+  @ApiPropertyOptional({ example: 500 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  refundAmount?: number;
+
+  @ApiPropertyOptional({ example: "BKASHREF1234" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  refundTrxId?: string;
 }

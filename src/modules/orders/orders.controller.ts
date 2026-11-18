@@ -57,4 +57,11 @@ export class OrdersController {
   ) {
     return this.ordersService.createCancellationRequest(customerId, id, dto);
   }
+
+  @Post("shop-orders/:id/confirm-receipt")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Confirm delivery to release seller funds early" })
+  confirmReceipt(@CurrentUser("id") customerId: string, @Param("id") id: string) {
+    return this.ordersService.confirmReceipt(customerId, id);
+  }
 }

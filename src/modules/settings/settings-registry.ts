@@ -29,17 +29,19 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "payment.lateGraceHours", type: "number", default: 48, group: "payments", labelEn: "Late payment grace (hours)", labelBn: "দেরি পেমেন্ট গ্রেস (ঘণ্টা)", wired: true },
   { key: "payment.verificationText", type: "string", default: "Verification usually takes a few hours.", group: "payments", labelEn: "Verification time text", labelBn: "যাচাইয়ের সময়" , isPublic: true, wired: true },
   { key: "order.codMaxAmount", type: "number", default: 0, group: "orders", labelEn: "COD maximum amount (0 = no limit)", labelBn: "COD সর্বোচ্চ (০ = সীমা নেই)", isPublic: true, wired: true },
-  { key: "return.windowHours", type: "number", default: 48, group: "orders", labelEn: "Return/objection window (hours)", labelBn: "ফেরতের সময় (ঘণ্টা)", isPublic: true },
-  { key: "return.earlyRelease", type: "boolean", default: true, group: "orders", labelEn: "Allow early release confirmation", labelBn: "আগে রিলিজ নিশ্চিতকরণ" , isPublic: true },
-  { key: "return.photoRequired", type: "boolean", default: true, group: "orders", labelEn: "Photo required for disputes", labelBn: "বিরোধে ছবি আবশ্যক" , isPublic: true },
+  { key: "return.windowHours", type: "number", default: 48, group: "orders", labelEn: "Return/objection window (hours)", labelBn: "ফেরতের সময় (ঘণ্টা)", isPublic: true, wired: true },
+  { key: "return.earlyRelease", type: "boolean", default: true, group: "orders", labelEn: "Allow early release confirmation", labelBn: "আগে রিলিজ নিশ্চিতকরণ" , isPublic: true, wired: true },
+  { key: "return.photoRequired", type: "boolean", default: true, group: "orders", labelEn: "Photo required for disputes", labelBn: "বিরোধে ছবি আবশ্যক" , isPublic: true, wired: true },
+  { key: "return.maxEvidencePhotos", type: "number", default: 5, group: "orders", labelEn: "Maximum dispute photos", labelBn: "বিরোধে সর্বোচ্চ ছবি" , wired: true },
+  { key: "return.disputeSellerHours", type: "number", default: 48, group: "orders", labelEn: "Seller dispute response window (hours)", labelBn: "বিক্রেতার জবাবের সময় (ঘণ্টা)" , wired: true },
   { key: "commission.default", type: "number", default: 10, group: "wallet", labelEn: "Default commission (%)", labelBn: "ডিফল্ট কমিশন (%)" , isSensitive: true },
   { key: "wallet.deliveryChargeRecipient", type: "string", default: "seller", group: "wallet", labelEn: "Delivery charge recipient", labelBn: "ডেলিভারি চার্জ প্রাপক", isSensitive: true },
-  { key: "wallet.codDuesLimit", type: "number", default: 1000, group: "wallet", labelEn: "COD dues limit", labelBn: "COD বকেয়া সীমা", isSensitive: true },
-  { key: "wallet.codCommissionDeduct", type: "boolean", default: true, group: "wallet", labelEn: "Deduct COD commission from available", labelBn: "COD কমিশন কাটা হবে", isSensitive: true },
-  { key: "payout.minimumAmount", type: "number", default: 500, group: "payouts", labelEn: "Minimum withdrawal", labelBn: "সর্বনিম্ন উত্তোলন", isSensitive: true },
-  { key: "payout.methods", type: "json", default: ["BKASH", "NAGAD", "BANK"], group: "payouts", labelEn: "Allowed payout methods", labelBn: "পেআউট পদ্ধতি", isSensitive: true },
-  { key: "payout.cooldownHours", type: "number", default: 24, group: "payouts", labelEn: "Payout profile cooldown (hours)", labelBn: "প্রোফাইল কুলডাউন (ঘণ্টা)", isSensitive: true },
-  { key: "payout.maxPendingRequests", type: "number", default: 3, group: "payouts", labelEn: "Maximum pending withdrawals", labelBn: "সর্বোচ্চ অপেক্ষমাণ উইথড্র", isSensitive: true },
+  { key: "wallet.codDuesLimit", type: "number", default: 1000, group: "wallet", labelEn: "COD dues limit", labelBn: "COD বকেয়া সীমা", isSensitive: true, wired: true },
+  { key: "wallet.codCommissionDeduct", type: "boolean", default: true, group: "wallet", labelEn: "Deduct COD commission from available", labelBn: "COD কমিশন কাটা হবে", isSensitive: true, wired: true },
+  { key: "payout.minimumAmount", type: "number", default: 500, group: "payouts", labelEn: "Minimum withdrawal", labelBn: "সর্বনিম্ন উত্তোলন", isSensitive: true, wired: true },
+  { key: "payout.methods", type: "json", default: ["BKASH", "NAGAD", "BANK"], group: "payouts", labelEn: "Allowed payout methods", labelBn: "পেআউট পদ্ধতি", isSensitive: true, wired: true },
+  { key: "payout.cooldownHours", type: "number", default: 24, group: "payouts", labelEn: "Payout profile cooldown (hours)", labelBn: "প্রোফাইল কুলডাউন (ঘণ্টা)", isSensitive: true, wired: true },
+  { key: "payout.maxPendingRequests", type: "number", default: 3, group: "payouts", labelEn: "Maximum pending withdrawals", labelBn: "সর্বোচ্চ অপেক্ষমাণ উইথড্র", isSensitive: true, wired: true },
   { key: "payout.processingText", type: "string", default: "Payouts are processed within 2 business days.", group: "payouts", labelEn: "Payout processing text", labelBn: "পেআউট প্রসেসিং বার্তা", isPublic: true },
   { key: "checkout.maxQtyPerItem", type: "number", default: 20, group: "orders", labelEn: "Max quantity per item", labelBn: "Max quantity per item", wired: true },
   { key: "order.sellerConfirmTimeoutHours", type: "number", default: 48, group: "orders", labelEn: "Seller confirm timeout (hours)", labelBn: "Seller confirm timeout (hours)", wired: true },
@@ -130,6 +132,15 @@ export function validateSettingValue(key: string, value: unknown): void {
     }
     if (key === "return.windowHours" && (value < 1 || value > 720)) {
       throw new SettingValidationError("Return window must be 1–720 hours");
+    }
+    if (key === "return.maxEvidencePhotos" && (value < 1 || value > 20)) {
+      throw new SettingValidationError("Dispute photos must be 1–20");
+    }
+    if (key === "return.disputeSellerHours" && (value < 1 || value > 720)) {
+      throw new SettingValidationError("Seller response window must be 1–720 hours");
+    }
+    if (key === "payout.maxPendingRequests" && (value < 0 || value > 20)) {
+      throw new SettingValidationError("Pending withdrawal limit must be 0–20");
     }
     if (key === "payout.cooldownHours" && (value < 0 || value > 720)) {
       throw new SettingValidationError("Payout cooldown must be 0–720 hours");

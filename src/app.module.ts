@@ -45,6 +45,7 @@ import { SellersModule } from "./modules/sellers/sellers.module";
 import { SettingsModule } from "./modules/settings/settings.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
 import { UsersModule } from "./modules/users/users.module";
+import { WalletModule } from "./modules/wallet/wallet.module";
 import { WishlistModule } from "./modules/wishlist/wishlist.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
@@ -87,6 +88,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     LedgerModule,
     PayoutsModule,
     RefundsModule,
+    WalletModule,
     WishlistModule,
     ReviewsModule,
     ComplaintsModule,
