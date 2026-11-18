@@ -4,7 +4,7 @@ export interface SettingDefinition {
   key: string;
   type: SettingType;
   default: unknown;
-  group: "payments" | "orders" | "wallet" | "payouts" | "support" | "platform";
+  group: "payments" | "orders" | "wallet" | "payouts" | "support" | "platform" | "security";
   labelEn: string;
   labelBn: string;
   helpEn?: string;
@@ -58,6 +58,14 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "support.whatsapp", type: "string", default: "", group: "support", labelEn: "WhatsApp number", labelBn: "হোয়াটসঅ্যাপ নম্বর", isPublic: true },
   { key: "support.phone", type: "string", default: "", group: "support", labelEn: "Support phone", labelBn: "সাপোর্ট ফোন", isPublic: true },
   { key: "support.email", type: "string", default: "", group: "support", labelEn: "Support email", labelBn: "সাপোর্ট ইমেইল", isPublic: true },
+  { key: "security.access.ttlMinutes", type: "number", default: 15, group: "security", labelEn: "Access token lifetime (minutes)", labelBn: "Access token lifetime (minutes)", wired: true },
+  { key: "security.refresh.customer.days", type: "number", default: 30, group: "security", labelEn: "Customer session lifetime (days, sliding)", labelBn: "Customer session lifetime (days, sliding)", wired: true },
+  { key: "security.refresh.customer.maxDays", type: "number", default: 90, group: "security", labelEn: "Customer maximum session lifetime (days, absolute)", labelBn: "Customer maximum session lifetime (days, absolute)", wired: true },
+  { key: "security.refresh.seller.days", type: "number", default: 14, group: "security", labelEn: "Seller session lifetime (days, sliding)", labelBn: "Seller session lifetime (days, sliding)", wired: true },
+  { key: "security.refresh.seller.maxDays", type: "number", default: 60, group: "security", labelEn: "Seller maximum session lifetime (days, absolute)", labelBn: "Seller maximum session lifetime (days, absolute)", wired: true },
+  { key: "security.refresh.admin.days", type: "number", default: 7, group: "security", labelEn: "Admin session lifetime (days, sliding)", labelBn: "Admin session lifetime (days, sliding)", wired: true },
+  { key: "security.refresh.admin.maxDays", type: "number", default: 30, group: "security", labelEn: "Admin maximum session lifetime (days, absolute)", labelBn: "Admin maximum session lifetime (days, absolute)", wired: true },
+  { key: "security.refresh.graceSeconds", type: "number", default: 30, group: "security", labelEn: "Refresh reuse grace window (seconds)", labelBn: "Refresh reuse grace window (seconds)", wired: true },
 ];
 
 export const SETTING_DEFAULTS = Object.fromEntries(
@@ -135,6 +143,30 @@ export function validateSettingValue(key: string, value: unknown): void {
     if (key === "wallet.codDuesLimit" && value < 0) {
       throw new SettingValidationError("COD dues limit cannot be negative");
     }
+    if (key === "security.access.ttlMinutes" && (value < 1 || value > 1440)) {
+      throw new SettingValidationError("Access token lifetime must be 1-1440 minutes");
+    }
+    if (
+      ["security.refresh.customer.days", "security.refresh.seller.days", "security.refresh.admin.days"].includes(
+        key,
+      ) &&
+      (value < 1 || value > 365)
+    ) {
+      throw new SettingValidationError("Session lifetime must be between 1 and 365 days");
+    }
+    if (
+      [
+        "security.refresh.customer.maxDays",
+        "security.refresh.seller.maxDays",
+        "security.refresh.admin.maxDays",
+      ].includes(key) &&
+      (value < 1 || value > 730)
+    ) {
+      throw new SettingValidationError("Maximum session lifetime must be between 1 and 730 days");
+    }
+    if (key === "security.refresh.graceSeconds" && (value < 0 || value > 300)) {
+      throw new SettingValidationError("Refresh grace window must be 0-300 seconds");
+    }
   }
 
   if (
@@ -189,6 +221,14 @@ export function validateSettingsMap(
     if (!effectiveAdvance) {
       details["payment.cod.enabled"] =
         "COD cannot be disabled until Advance payment is live and a provider number is configured";
+    }
+  }
+  for (const role of ["customer", "seller", "admin"] as const) {
+    const sliding = Number(merged[`security.refresh.${role}.days`]);
+    const absolute = Number(merged[`security.refresh.${role}.maxDays`]);
+    if (Number.isFinite(sliding) && Number.isFinite(absolute) && absolute < sliding) {
+      details[`security.refresh.${role}.maxDays`] =
+        `Maximum lifetime cannot be shorter than the sliding lifetime for ${role}`;
     }
   }
   if (Object.keys(details).length > 0) {

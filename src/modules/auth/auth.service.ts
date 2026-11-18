@@ -16,6 +16,7 @@ import type { AuthTokenType, Role } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { MailService } from "../mail/mail.service";
 import { buildPasswordResetEmail, buildVerificationEmail } from "../mail/mail.templates";
+import { SettingsService } from "../settings/settings.service";
 import { toPublicUser, type PublicUser } from "../users/user.mapper";
 import type { AuthTokenPair } from "./auth.cookies";
 import type { ChangePasswordDto } from "./dto/change-password.dto";
@@ -51,6 +52,8 @@ export interface SessionMeta {
 
 export interface AuthTokens extends AuthTokenPair {
   sessionId: string;
+  accessMaxAgeSeconds: number;
+  refreshMaxAgeSeconds: number;
 }
 
 export interface AuthResult {
@@ -62,7 +65,15 @@ export interface RefreshResult {
   user: PublicUser;
   accessToken: string;
   accessTokenExpiresAt: number;
+  accessMaxAgeSeconds: number;
   refreshToken?: string;
+  refreshMaxAgeSeconds?: number;
+}
+
+interface SessionPolicy {
+  slidingSeconds: number;
+  absoluteSeconds: number;
+  graceSeconds: number;
 }
 
 export interface SessionSummary {
@@ -84,6 +95,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly mail: MailService,
     private readonly events: EventEmitter2,
+    private readonly settings: SettingsService,
   ) {}
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<AuthResult> {
@@ -231,7 +243,12 @@ export class AuthService {
     }
 
     const now = new Date();
-    if (session.revokedAt || session.expiresAt < now) {
+    const policy = await this.sessionPolicy(session.user.role);
+    const absoluteExpiresAt = session.absoluteExpiresAt ?? session.expiresAt;
+    if (session.revokedAt || session.expiresAt < now || absoluteExpiresAt < now) {
+      if (!session.revokedAt && absoluteExpiresAt < now) {
+        await this.revokeFamily(session.familyId, "ABSOLUTE_EXPIRY");
+      }
       throw AppException.unauthorized(ErrorCode.SESSION_EXPIRED, "Session has expired");
     }
 
@@ -255,6 +272,7 @@ export class AuthService {
         role: user.role,
         meta,
         familyId: session.familyId,
+        absoluteExpiresAt,
       });
       await this.prisma.refreshSession.update({
         where: { id: session.id },
@@ -264,7 +282,9 @@ export class AuthService {
         user: toPublicUser(user),
         accessToken: tokens.accessToken,
         accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+        accessMaxAgeSeconds: tokens.accessMaxAgeSeconds,
         refreshToken: tokens.refreshToken,
+        refreshMaxAgeSeconds: tokens.refreshMaxAgeSeconds,
       };
     }
 
@@ -278,14 +298,21 @@ export class AuthService {
     }
 
     const rotatedAt = current?.rotatedAt ?? session.rotatedAt;
-    const graceMs = this.config.values.REFRESH_REUSE_GRACE_SECONDS * 1000;
+    const graceMs = policy.graceSeconds * 1000;
     if (rotatedAt && now.getTime() - rotatedAt.getTime() <= graceMs) {
+      // Benign parallel refresh: the winner already received the successor
+      // refresh token. Return a matching access token without rotating again,
+      // and deliberately do not replace the browser's refresh cookie.
       const sessionId = current?.replacedById ?? session.id;
-      const accessToken = await this.signAccessToken(user.id, user.role, sessionId);
+      const access = await this.signAccessToken(user.id, user.role, sessionId);
       return {
         user: toPublicUser(user),
-        accessToken,
-        accessTokenExpiresAt: this.accessTokenExpiresAt(),
+        accessToken: access.token,
+        accessTokenExpiresAt: access.expiresAt,
+        accessMaxAgeSeconds: Math.max(
+          0,
+          Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000),
+        ),
       };
     }
 
@@ -437,6 +464,7 @@ export class AuthService {
     currentSessionId: string,
     dto: ChangePasswordDto,
   ): Promise<{ changed: true }> {
+    void currentSessionId;
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
       select: { id: true, passwordHash: true },
@@ -451,13 +479,25 @@ export class AuthService {
     const passwordHash = await hashPassword(dto.newPassword);
     await this.prisma.$transaction([
       this.prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      // A password change revokes every session, including the current one.
       this.prisma.refreshSession.updateMany({
-        where: { userId, id: { not: currentSessionId }, revokedAt: null },
+        where: { userId, revokedAt: null },
         data: { revokedAt: new Date(), revokedReason: "PASSWORD_CHANGED" },
       }),
     ]);
     this.events.emit("auth.session_revoked", { userId });
     return { changed: true };
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    // Catch-up cleanup: the daily cron does not run while the API is down.
+    try {
+      await this.cleanupExpired();
+    } catch (error) {
+      this.logger.warn(
+        `Startup refresh-session cleanup failed: ${error instanceof Error ? error.message : "unknown"}`,
+      );
+    }
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
@@ -466,7 +506,13 @@ export class AuthService {
     const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const [sessions, tokens] = await this.prisma.$transaction([
       this.prisma.refreshSession.deleteMany({
-        where: { OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }] },
+        where: {
+          OR: [
+            { expiresAt: { lt: cutoff } },
+            { absoluteExpiresAt: { lt: cutoff } },
+            { revokedAt: { lt: cutoff } },
+          ],
+        },
       }),
       this.prisma.authToken.deleteMany({
         where: { OR: [{ expiresAt: { lt: now } }, { usedAt: { not: null } }] },
@@ -482,7 +528,19 @@ export class AuthService {
     role: Role;
     meta: SessionMeta;
     familyId?: string;
+    absoluteExpiresAt?: Date;
   }): Promise<AuthTokens> {
+    const now = new Date();
+    const policy = await this.sessionPolicy(params.role);
+    const absoluteExpiresAt =
+      params.absoluteExpiresAt ?? new Date(now.getTime() + policy.absoluteSeconds * 1000);
+    const expiresAt = new Date(
+      Math.min(now.getTime() + policy.slidingSeconds * 1000, absoluteExpiresAt.getTime()),
+    );
+    if (expiresAt.getTime() <= now.getTime()) {
+      throw AppException.unauthorized(ErrorCode.SESSION_EXPIRED, "Session has expired");
+    }
+
     const secret = randomToken(48);
     const session = await this.prisma.refreshSession.create({
       data: {
@@ -491,24 +549,99 @@ export class AuthService {
         tokenHash: sha256Hex(secret),
         userAgent: params.meta.userAgent ?? null,
         ipAddress: params.meta.ipAddress ?? null,
-        expiresAt: addDays(new Date(), this.config.values.REFRESH_TTL_DAYS),
+        expiresAt,
+        absoluteExpiresAt,
       },
     });
-    const accessToken = await this.signAccessToken(params.userId, params.role, session.id);
+    const access = await this.signAccessToken(params.userId, params.role, session.id);
+    const maxAgeSeconds = Math.max(
+      0,
+      Math.floor((expiresAt.getTime() - now.getTime()) / 1000),
+    );
     return {
-      accessToken,
+      accessToken: access.token,
       refreshToken: `${session.id}.${secret}`,
       sessionId: session.id,
-      accessTokenExpiresAt: this.accessTokenExpiresAt(),
+      accessTokenExpiresAt: access.expiresAt,
+      accessMaxAgeSeconds: maxAgeSeconds,
+      refreshMaxAgeSeconds: maxAgeSeconds,
     };
   }
 
-  private signAccessToken(userId: string, role: Role, sessionId: string): Promise<string> {
-    return this.jwt.signAsync({ sub: userId, role, sid: sessionId });
+  private async signAccessToken(
+    userId: string,
+    role: Role,
+    sessionId: string,
+  ): Promise<{ token: string; expiresAt: number }> {
+    const ttlSeconds = await this.accessTtlSeconds();
+    const token = await this.jwt.signAsync(
+      { sub: userId, role, sid: sessionId },
+      { expiresIn: ttlSeconds },
+    );
+    return { token, expiresAt: Date.now() + ttlSeconds * 1000 };
   }
 
-  private accessTokenExpiresAt(): number {
-    return Date.now() + this.config.values.JWT_ACCESS_TTL * 1000;
+  private async accessTtlSeconds(): Promise<number> {
+    const testOverride = this.testSeconds("AUTH_TEST_ACCESS_TTL_SECONDS");
+    if (testOverride !== undefined) {
+      return testOverride;
+    }
+    const minutes = await this.settings.getNumber("security.access.ttlMinutes");
+    if (Number.isFinite(minutes) && minutes > 0) {
+      return Math.floor(minutes * 60);
+    }
+    return this.config.values.JWT_ACCESS_TTL;
+  }
+
+  private async sessionPolicy(role: Role): Promise<SessionPolicy> {
+    const roleKey = role === "ADMIN" ? "admin" : role === "SELLER" ? "seller" : "customer";
+    const slidingOverride = this.testSeconds("AUTH_TEST_REFRESH_TTL_SECONDS");
+    const absoluteOverride = this.testSeconds("AUTH_TEST_REFRESH_ABSOLUTE_SECONDS");
+    const graceOverride = this.testSeconds("AUTH_TEST_REFRESH_GRACE_SECONDS");
+
+    const slidingDays = Number(
+      await this.settings.getNumber(`security.refresh.${roleKey}.days`),
+    );
+    const absoluteDays = Number(
+      await this.settings.getNumber(`security.refresh.${roleKey}.maxDays`),
+    );
+    const graceSecondsValue = Number(
+      await this.settings.getNumber("security.refresh.graceSeconds"),
+    );
+
+    return {
+      slidingSeconds:
+        slidingOverride ??
+        Math.floor(
+          (Number.isFinite(slidingDays) && slidingDays > 0
+            ? slidingDays
+            : this.config.values.REFRESH_TTL_DAYS) * 24 * 60 * 60,
+        ),
+      absoluteSeconds:
+        absoluteOverride ??
+        Math.floor(
+          (Number.isFinite(absoluteDays) && absoluteDays > 0
+            ? absoluteDays
+            : this.config.values.REFRESH_TTL_DAYS) * 24 * 60 * 60,
+        ),
+      graceSeconds:
+        graceOverride ??
+        (Number.isFinite(graceSecondsValue) && graceSecondsValue >= 0
+          ? graceSecondsValue
+          : this.config.values.REFRESH_REUSE_GRACE_SECONDS),
+    };
+  }
+
+  private testSeconds(name: string): number | undefined {
+    if (!this.config.isTest) {
+      return undefined;
+    }
+    const raw = process.env[name];
+    if (!raw) {
+      return undefined;
+    }
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : undefined;
   }
 
   private async enforceSessionLimit(userId: string): Promise<void> {
@@ -638,10 +771,6 @@ function parseRefreshToken(
 
 function addSeconds(date: Date, seconds: number): Date {
   return new Date(date.getTime() + seconds * 1000);
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
 function addMinutes(date: Date, minutes: number): Date {

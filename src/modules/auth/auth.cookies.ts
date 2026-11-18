@@ -10,6 +10,10 @@ export interface AuthTokenPair {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresAt: number;
+  /** Keep the access cookie alive for the whole refresh session (the JWT
+   * inside still expires after the short access TTL). */
+  accessMaxAgeSeconds?: number;
+  refreshMaxAgeSeconds?: number;
 }
 
 function baseCookieOptions(config: AppConfigService): CookieOptions {
@@ -25,11 +29,12 @@ export function setAccessCookie(
   res: Response,
   config: AppConfigService,
   accessToken: string,
+  maxAgeSeconds = config.values.JWT_ACCESS_TTL,
 ): void {
   res.cookie(ACCESS_COOKIE, accessToken, {
     ...baseCookieOptions(config),
     path: "/",
-    maxAge: config.values.JWT_ACCESS_TTL * 1000,
+    maxAge: Math.max(0, maxAgeSeconds) * 1000,
   });
 }
 
@@ -37,11 +42,12 @@ export function setRefreshCookie(
   res: Response,
   config: AppConfigService,
   refreshToken: string,
+  maxAgeSeconds = config.values.REFRESH_TTL_DAYS * 24 * 60 * 60,
 ): void {
   res.cookie(REFRESH_COOKIE, refreshToken, {
     ...baseCookieOptions(config),
     path: REFRESH_COOKIE_PATH,
-    maxAge: config.values.REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000,
+    maxAge: Math.max(0, maxAgeSeconds) * 1000,
   });
 }
 
@@ -50,8 +56,8 @@ export function setAuthCookies(
   config: AppConfigService,
   tokens: AuthTokenPair,
 ): void {
-  setAccessCookie(res, config, tokens.accessToken);
-  setRefreshCookie(res, config, tokens.refreshToken);
+  setAccessCookie(res, config, tokens.accessToken, tokens.accessMaxAgeSeconds);
+  setRefreshCookie(res, config, tokens.refreshToken, tokens.refreshMaxAgeSeconds);
 }
 
 export function clearAuthCookies(res: Response, config: AppConfigService): void {

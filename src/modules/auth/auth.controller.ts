@@ -135,9 +135,14 @@ export class AuthController {
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     try {
       const result = await this.auth.refresh(readRefreshCookie(request), toSessionMeta(request));
-      setAccessCookie(response, this.config, result.accessToken);
+      setAccessCookie(response, this.config, result.accessToken, result.accessMaxAgeSeconds);
       if (result.refreshToken) {
-        setRefreshCookie(response, this.config, result.refreshToken);
+        setRefreshCookie(
+          response,
+          this.config,
+          result.refreshToken,
+          result.refreshMaxAgeSeconds,
+        );
       }
       return { user: result.user, accessTokenExpiresAt: result.accessTokenExpiresAt };
     } catch (error) {

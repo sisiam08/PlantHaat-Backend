@@ -8,6 +8,7 @@ import { hashPassword } from "../../common/utils/password";
 import type { AppConfigService } from "../../config/app-config.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { MailService } from "../mail/mail.service";
+import type { SettingsService } from "../settings/settings.service";
 import { AuthService } from "./auth.service";
 
 const config = {
@@ -39,6 +40,15 @@ const activeUser = {
 type PrismaMockFn = jest.Mock<(...args: unknown[]) => Promise<unknown>>;
 
 const mockFn = (): PrismaMockFn => jest.fn<(...args: unknown[]) => Promise<unknown>>();
+
+const settingsMock = {
+  getNumber: jest.fn<() => Promise<number>>().mockResolvedValue(Number.NaN),
+  get: jest.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
+} as unknown as SettingsService;
+
+const accessTokenMock = {
+  signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed-access-token"),
+} as unknown as JwtService;
 
 function createPrismaMock() {
   return {
@@ -74,12 +84,17 @@ function createService(prisma: ReturnType<typeof createPrismaMock>): AuthService
     if (typeof op === "function") return (op as (tx: unknown) => unknown)(prisma);
     return Promise.all(op as Promise<unknown>[]);
   });
-  const jwt = {
-    signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed-access-token"),
-  } as unknown as JwtService;
+  const jwt = accessTokenMock;
   const mail = { queue: jest.fn() } as unknown as MailService;
   const events = { emit: jest.fn() } as unknown as EventEmitter2;
-  return new AuthService(prisma as unknown as PrismaService, config, jwt, mail, events);
+  return new AuthService(
+    prisma as unknown as PrismaService,
+    config,
+    jwt,
+    mail,
+    events,
+    settingsMock,
+  );
 }
 
 describe("AuthService", () => {
@@ -102,14 +117,10 @@ describe("AuthService", () => {
       const service = new AuthService(
         prisma as unknown as PrismaService,
         config,
-        (() => {
-          const jwt = {
-            signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed"),
-          } as unknown as JwtService;
-          return jwt;
-        })(),
+        accessTokenMock,
         mail,
         { emit: jest.fn() } as unknown as EventEmitter2,
+        settingsMock,
       );
 
       const result = await service.register(
@@ -117,7 +128,7 @@ describe("AuthService", () => {
         {},
       );
 
-      expect(result.tokens.accessToken).toBe("signed");
+      expect(result.tokens.accessToken).toBe("signed-access-token");
       const created = prisma.user.create.mock.calls[0][0] as {
         data: { email: string; name: string; role: string };
       };
@@ -462,6 +473,7 @@ describe("AuthService", () => {
         jwt,
         { queue: jest.fn() } as unknown as MailService,
         events,
+        settingsMock,
       );
 
       await service.logout("s1.secret");
@@ -597,6 +609,7 @@ describe("AuthService", () => {
         jwt,
         mail,
         { emit: jest.fn() } as unknown as EventEmitter2,
+        settingsMock,
       );
 
       await expect(service.resendVerification("u1")).resolves.toEqual({
@@ -620,14 +633,10 @@ describe("AuthService", () => {
       const service = new AuthService(
         prisma as unknown as PrismaService,
         config,
-        (() => {
-          const jwt = {
-            signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed"),
-          } as unknown as JwtService;
-          return jwt;
-        })(),
+        accessTokenMock,
         mail,
         { emit: jest.fn() } as unknown as EventEmitter2,
+        settingsMock,
       );
 
       await expect(service.resendVerification("u1")).resolves.toEqual({
@@ -665,14 +674,10 @@ describe("AuthService", () => {
       const service = new AuthService(
         prisma as unknown as PrismaService,
         config,
-        (() => {
-          const jwt = {
-            signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed"),
-          } as unknown as JwtService;
-          return jwt;
-        })(),
+        accessTokenMock,
         mail,
         { emit: jest.fn() } as unknown as EventEmitter2,
+        settingsMock,
       );
 
       await expect(service.forgotPassword("A@B.Com")).resolves.toEqual({ sent: true });
@@ -693,14 +698,10 @@ describe("AuthService", () => {
       const service = new AuthService(
         prisma as unknown as PrismaService,
         config,
-        (() => {
-          const jwt = {
-            signAsync: jest.fn<() => Promise<string>>().mockResolvedValue("signed"),
-          } as unknown as JwtService;
-          return jwt;
-        })(),
+        accessTokenMock,
         mail,
         { emit: jest.fn() } as unknown as EventEmitter2,
+        settingsMock,
       );
 
       await expect(service.forgotPassword("a@b.com")).resolves.toEqual({ sent: true });
@@ -746,9 +747,11 @@ describe("AuthService", () => {
         } as never),
       ).resolves.toEqual({ changed: true });
       const sessionArg = prisma.refreshSession.updateMany.mock.calls[0][0] as {
-        where: { id: { not: string } };
+        where: { userId: string; revokedAt: null };
+        data: { revokedReason: string };
       };
-      expect(sessionArg.where.id.not).toBe("s-current");
+      expect(sessionArg.where).toEqual({ userId: "u1", revokedAt: null });
+      expect(sessionArg.data.revokedReason).toBe("PASSWORD_CHANGED");
     });
 
     it("rejects a wrong current password", async () => {

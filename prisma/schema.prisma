@@ -338,6 +338,7 @@ model RefreshSession {
   createdAt     DateTime  @default(now())
   lastUsedAt    DateTime  @default(now())
   expiresAt     DateTime
+  absoluteExpiresAt DateTime?
   rotatedAt     DateTime?
   revokedAt     DateTime?
   revokedReason String?

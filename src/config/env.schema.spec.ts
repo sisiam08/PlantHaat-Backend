@@ -13,6 +13,19 @@ function parsed(overrides: Record<string, string>) {
 }
 
 describe("storage env validation", () => {
+  it("requires a strong JWT access secret with no random fallback", () => {
+    const result = envSchema.safeParse({
+      ...base,
+      JWT_ACCESS_SECRET: undefined,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.includes("JWT_ACCESS_SECRET"))).toBe(
+        true,
+      );
+    }
+  });
+
   it("defaults to the auto driver", () => {
     const result = parsed({});
     expect(result.success).toBe(true);
