@@ -277,6 +277,29 @@ export class ComplaintsService {
         attachments: true,
         refunds: true,
         comments: { orderBy: { createdAt: "asc" } },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            sellerProfile: { select: { id: true, businessName: true } },
+          },
+        },
+        shopOrder: {
+          select: {
+            id: true,
+            shopOrderNumber: true,
+            status: true,
+            subtotal: true,
+            deliveryCharge: true,
+            total: true,
+            commissionAmount: true,
+            sellerNetAmount: true,
+            releaseAt: true,
+            fundsReleasedAt: true,
+            order: { select: { orderNumber: true, paymentMethod: true } },
+          },
+        },
       },
     });
     if (!complaint) {
