@@ -64,3 +64,31 @@ new sessions/tokens.
 
 Validation rejects an absolute cap shorter than the sliding lifetime, non-positive lifetimes and a
 grace outside 0â€“300 s. Details and test steps: `auth/sessions.md`.
+
+## Part 4 settlement, wallet and disputes — 2026-11-18
+
+All keys below are in the registry, admin-editable, `wired: true`, and covered by
+`src/modules/settings/settings-wiring.spec.ts`. Money values are read at the moment of the
+delivery/dispute/withdrawal and snapshotted onto the affected rows; changing them never
+retro-applies.
+
+| Key | Default | Sensitive | Used by |
+|---|---:|:---:|---|
+| `return.windowHours` | 48 | no | Single money-hold source: buyer dispute window **and** seller release time. Snapshotted to `ShopOrder.releaseAt` at delivery. |
+| `return.earlyRelease` | true | no | `POST /orders/shop-orders/:id/confirm-receipt` (buyer early release). |
+| `return.photoRequired` | true | no | Delivered-order disputes require at least one photo. |
+| `return.maxEvidencePhotos` | 5 | no | Max attachments per dispute (1–20). |
+| `return.disputeSellerHours` | 48 | no | Seller response deadline (`Complaint.sellerResponseDueAt`), snapshotted per dispute. |
+| `wallet.codDuesLimit` | 1000 | yes | Withdrawal is blocked while `codDues >` limit. |
+| `wallet.codCommissionDeduct` | true | yes | Auto-deduct COD commission from `SELLER_AVAILABLE`. |
+| `wallet.deliveryChargeRecipient` | seller | yes | Documented owner decision; the current split keeps the delivery charge in `sellerNetAmount`. |
+| `payout.minimumAmount` | 500 | yes | Minimum seller withdrawal. |
+| `payout.methods` | `["BKASH","NAGAD","BANK"]` | yes | Allowed withdrawal methods; `ROCKET` is not exposed in Part 4. |
+| `payout.cooldownHours` | 24 | yes | Payout-profile change cooldown + notification. |
+| `payout.maxPendingRequests` | 3 | yes | Max simultaneous `PENDING`/`PROCESSING` seller withdrawals. |
+| `payout.processingText` | public text | no | Copy shown in the seller wallet. |
+| `payout.holdHours` | 48 | no | **Deprecated alias** for `return.windowHours` (read and write delegate). Kept so old admin clients do not break. |
+
+Guards: `src/modules/settings/settings-wiring.spec.ts` fails if the ledger stops reading
+`return.windowHours`, if the hold becomes a hard-coded constant, or if wallet/dispute limits stop
+reading their keys. The dev settings values were not changed by this work.

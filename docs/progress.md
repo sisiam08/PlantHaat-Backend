@@ -323,3 +323,36 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Shared PasswordInput and keyboard-only card focus rings landed with Playwright guards.
 - Settings harness: production isolated stack; settings 4/4, payments-advance 12/12, session-refresh 8/8. Fixed public-settings staleness (60 s -> 1 s).
 - Warning: the dev settings still have Advance enabled with the owner's real bKash number; with these settings a real customer on the dev app could send real money to that number, so the dev app must not be exposed publicly while Advance is enabled. Do not change these settings from tests.
+
+## 2026-11-18 Part 4 settlement ledger (backend only)
+
+- Branch `feature/payments`; code commit `2361c08` (docs commit follows).
+- Migration `20261118120000_p4_settlement_ledger` applied to **both** dev `neondb` and
+  `planthaat_test` with `npm run db:migrate:all` (16 applied before, 17 after). Additive only;
+  rollback SQL is in the migration.
+- Ledger: `LedgerEntry` gained nullable `account`, `releaseAt`, `batchId`, unique
+  `idempotencyKey`, business refs; `sellerProfileId` is nullable for platform entries. New account
+  buckets (BUYER_RECEIPTS, PLATFORM_HOLDINGS, SELLER_PENDING/AVAILABLE/ON_HOLD/
+  WITHDRAWAL_RESERVED/PAID_OUT, REFUND_PAYABLE/PAID, PLATFORM_COMMISSION, COD_DUES). Legacy rows
+  stay `account = NULL` and keep the old projection; no existing balance changed.
+- Hold: one setting (`return.windowHours`); `payout.holdHours` is a deprecated read/write alias.
+  Delivery snapshots `ShopOrder.releaseAt`; release job runs on bootstrap + every 5 minutes, locks
+  each ShopOrder row, skips open disputes and is replay-safe.
+- Disputes: existing complaints extended with decision/deadlines/hold fields; buyer-only delivered
+  disputes inside the window, one open per ShopOrder, photo limit from settings; admin decision
+  endpoint posts refund payable/paid or returns held funds. Audit + notifications.
+- Wallet/withdrawals: seller wallet (pending/available/on hold/reserved/withdrawn/COD dues),
+  transactions, payout profile with encryption + cooldown, withdrawal request with row lock and
+  immediate reserve, admin pay/reject queue. `Payout` is reused.
+- COD: commission is a receivable (`COD_DUES`), no buyer receipt; optional auto-deduction from
+  available; manual dues payment records the TrxID; withdrawals blocked above the dues limit.
+- Reconciliation: A5 conservation check added to `GET /admin/reconciliation` with
+  `SETTLEMENT_CONSERVATION_BREACH`; settlement summary in the response.
+- Baseline failure fixed: `test/earnings.e2e-spec.ts` dues-payment test was un-skipped, the wrong
+  payout expectation replaced by the real `PAYOUT_EXCEEDS_AVAILABLE` guard and COD dues assertions.
+- Tests actually run: backend unit **228/228** (29 suites); settlement e2e **8/8** (advance hold +
+  boundary 47h59/48h01, early release, multi-shop rounding, dispute-vs-release race x3, parallel
+  withdrawals, COD dues/block/manual clear, dispute refund/reject, permissions); earnings **2/2**;
+  advance+cod-settings **18/18**; full backend e2e **21 suites, 153 passed, 3 skipped** (the three
+  known pre-existing upload/seller-onboarding failures).
+- Dev settings were not written. Advance and COD suites still pass.

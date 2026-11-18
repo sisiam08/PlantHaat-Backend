@@ -36,3 +36,32 @@
 - 2026-11-18 - Card focus (owner follow-up): the inset wrapper ring was removed. Chrome on Windows can match :focus-visible after a mouse click/Back (bfcache focus restoration / Windows focus-ring settings), and an inset box-shadow paints under the image, producing a green frame on the text area only. Cards now use a shared `::after` overlay (inset 0, 2px, border-radius inherit, pointer-events none, z-index 15) painted above the artwork, shown only when `html[data-input-modality="keyboard"]` (set by InputModality: keydown=keyboard, pointerdown=pointer) AND the card contains a :focus-visible anchor (or is the anchor). Tests run on both bundled Chromium and real Chrome; pointer clicks, hover, active, tap and Back stay clean. No money/business logic touched.
 
 - 2026-11-18 - Wishlist hydration fix: the delegated CardActionsLayer sets data-saved/aria-pressed on server-rendered hearts, and it could run before a streamed rail hydrated, which React reported as an attribute mismatch. The button now omits those props (with suppressHydrationWarning for the intentionally mutated attributes), renders two server-side sr-only labels switched by CSS on data-saved, and the layer only sets data-saved/aria-pressed. Added e2e/wishlist-hydration.spec.ts (saved heart shows true + "Remove from wishlist" with no hydration console error). WishlistClient also skips malformed infinite-query pages defensively. The reported WishlistClient TypeError did not reproduce on a warm server; it matched a transient stale dev chunk after the HMR churn, and the defensive guard prevents it from crashing if a page payload is malformed.
+
+## 2026-11-18 Part 4 settlement decisions
+
+- **One hold setting:** `return.windowHours` drives both the buyer dispute window and the seller
+  money release. `payout.holdHours` stays in the registry as a deprecated alias (reads and writes
+  delegate) so old admin clients do not break; no data migration was needed.
+- **Ledger extension, not a second ledger:** Part 4 adds accounts/idempotency/business refs to
+  `LedgerEntry`. Pre-Part-4 rows keep `account = NULL` and the old projection, so existing delivered
+  or paid orders do not suddenly change balance. New events use balanced account batches with
+  deterministic idempotency keys.
+- **Legacy-settled:** orders delivered before the migration have no `releaseAt`, so the release job
+  ignores them; no opening entries or guessed dates are written.
+- **Reuse:** seller withdrawals reuse `Payout` (`requestedById`, `balanceSnapshot`, unique
+  `idempotencyKey`, `REJECTED` status); disputes reuse `Complaint` (`decision`, response deadline,
+  hold fields). Existing endpoints stay valid; new endpoints are additive.
+- **Refund recording:** an admin decision with a refund TrxID posts `REFUNDS_PAID` immediately;
+  without one it creates a `REQUESTED` refund and keeps `REFUND_PAYABLE`, leaving the existing
+  refund-processing endpoint to complete it.
+- **Reject/return timing:** held funds go back to `SELLER_PENDING` if the original release time is
+  still in the future, otherwise straight to `SELLER_AVAILABLE`.
+- **COD:** the platform never receives COD cash, so `COD_DUES` is outside the advance conservation
+  equation. Auto-deduction from available books the retained amount as platform commission; manual
+  dues payments only clear the receivable.
+- **Withdrawal concurrency:** use a `SellerProfile` row lock (`SELECT ... FOR UPDATE`) before reading
+  balances, plus reservation ledger rows and a unique idempotency key; parallel tests prove available
+  is never overdrawn.
+- **Defaults used (unchanged):** return window 48h, early release on, photo required, max 5 photos,
+  seller response 48h, minimum withdrawal 500, max 3 pending, cooldown 24h, COD dues limit 1000,
+  methods BKASH/NAGAD/BANK, commission 10% fallback.

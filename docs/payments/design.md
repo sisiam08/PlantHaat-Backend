@@ -122,3 +122,119 @@ Part 4 must use **one source of truth for the money hold**. Recommended:
 - `PayoutsService.createPayout` reserves the available balance by writing a negative `PAYOUT` ledger row inside one transaction; `recordDuesPayment` writes a positive `DUES_PAYMENT`; `recordAdjustment` writes `ADJUSTMENT`. Part 4 should add the missing buckets (ON_HOLD, REFUND_PAYABLE/PAID, PLATFORM_COMMISSION, COD_DUES) around these rows, not replace them.
 - `Refund` + `RefundObligation` already exist; Part 4 should link `Refund` to ledger reversal entries with unique idempotency keys (today the advance refund queue records the obligation + TrxID, but does not yet post ledger entries - this is the stated Part 4 gap).
 - **Baseline failure to resolve first:** `test/earnings.e2e-spec.ts` has a skipped scenario ("dues payment 422") that uses `GET /seller/earnings` with a body and expects `201`; before extending payouts, re-diagnose that test: the request helper/expectation is wrong independently of the dues write, and the 422 path must be reproduced against the current `recordDuesPayment`/`createPayout` guards. Fix the test semantics (do not weaken the assertion) and add a real dues-limit characterization case.
+
+---
+
+## Part 4 implementation (2026-11-18) — final ledger design
+
+### Source of truth and compatibility
+
+`LedgerEntry` remains the single ledger. Part 4 added nullable `account`, `releaseAt`, `batchId`,
+`idempotencyKey` (unique), `orderId/paymentId/disputeId/withdrawalId`, and made
+`sellerProfileId` nullable for platform-only entries. Existing rows keep `account = NULL` and are
+still projected by the legacy pending/available calculation, so old delivered/paid orders do not
+change balance. New settlement events always write account entries.
+
+`payout.holdHours` is a deprecated alias: `SettingsService.get/getAll` read
+`return.windowHours`, and `SettingsService.update` rewrites `payout.holdHours` to
+`return.windowHours`. The ledger reads only `return.windowHours`.
+
+Existing endpoints kept working: `GET /seller/earnings`, `GET/POST/PATCH /admin/payouts`,
+`/admin/sellers/:id/{ledger,balance,dues-payments,adjustments}`, refunds and complaints. New Part 4
+endpoints are additive (see `api.md`). `Payout` is reused for seller withdrawal requests
+(`requestedById`, `balanceSnapshot`, `idempotencyKey`, `rejectionReason`), so the admin payout queue
+and the withdrawal queue share one auditable record.
+
+### Accounts and sign convention
+
+Amounts are deltas to one account bucket (Decimal 12,2, no floats). A business event is one
+`postBatch()` call with a deterministic `eventKey`; every row gets `idempotencyKey =
+"<eventKey>:<index>"`, so replaying an event posts nothing (`createMany skipDuplicates`).
+
+| Account | Meaning |
+|---|---|
+| `BUYER_RECEIPTS` | cumulative cash actually received from buyers (advance only) |
+| `PLATFORM_HOLDINGS` | advance cash still held by the platform |
+| `SELLER_PENDING` | seller net waiting for the return window |
+| `SELLER_AVAILABLE` | withdrawable seller balance |
+| `SELLER_ON_HOLD` | seller funds locked by an open dispute |
+| `SELLER_WITHDRAWAL_RESERVED` | amount reserved by a pending withdrawal |
+| `SELLER_PAID_OUT` | cumulative seller payouts |
+| `REFUND_PAYABLE` | refund obligation not paid yet |
+| `REFUNDS_PAID` | cumulative refunds paid |
+| `PLATFORM_COMMISSION` | commission recognised / retained |
+| `COD_DUES` | COD commission receivable (negative = seller owes) |
+
+### Posting table
+
+| Event | Entries (signed deltas) | Idempotency key |
+|---|---|---|
+| Advance payment verified PAID | `BUYER_RECEIPTS +received`, `PLATFORM_HOLDINGS +received` | `payment_receipt:<intentId>` |
+| Advance delivered | `PLATFORM_HOLDINGS -total`, `SELLER_PENDING +net`, `PLATFORM_COMMISSION +commission` | `delivery:<shopOrderId>` |
+| Release (window closed / early) | `SELLER_PENDING -net`, `SELLER_AVAILABLE +net` | `release:<shopOrderId>` |
+| Dispute opened | source (`PENDING` or `AVAILABLE`) `-amount`, `SELLER_ON_HOLD +amount` | `dispute_hold:<complaintId>` |
+| Dispute rejected / return to seller | `SELLER_ON_HOLD -amount`, `SELLER_PENDING` or `SELLER_AVAILABLE +amount` | `dispute_release:<complaintId>:<to>` |
+| Refund accepted | `REFUND_PAYABLE +amount`, seller source `-sellerShare`, `PLATFORM_COMMISSION -commissionShare` | `refund_payable:<refundId>` |
+| Refund paid | `REFUND_PAYABLE -amount`, `REFUNDS_PAID +amount` | `refund_paid:<refundId>` |
+| Withdrawal requested | `SELLER_AVAILABLE -amount`, `SELLER_WITHDRAWAL_RESERVED +amount` | `withdrawal_reserve:<payoutId>` |
+| Withdrawal paid | reserved `-amount`, `SELLER_PAID_OUT +amount` | `withdrawal_paid:<payoutId>` |
+| Withdrawal rejected | reserved `-amount`, `SELLER_AVAILABLE +amount` | `withdrawal_rejected:<payoutId>` |
+| COD delivered | `COD_DUES -commission` (receivable) | `cod_dues:<shopOrderId>` |
+| COD auto-deduction | `SELLER_AVAILABLE -amount`, `PLATFORM_COMMISSION +amount`, `COD_DUES +amount` | `cod_deduct:<seller>:<order>:<dues>:<available>` |
+| Manual COD dues payment | `COD_DUES +amount` (outside advance conservation) | `cod_dues_payment:<seller>:<reference>` |
+| Admin adjustment | `PLATFORM_HOLDINGS -amount`, `SELLER_AVAILABLE +amount` (signed) | `adjustment:<seller>:<uuid>` |
+
+Advance conservation (A5):
+`BUYER_RECEIPTS = PLATFORM_HOLDINGS + SELLER_PENDING + SELLER_AVAILABLE + SELLER_ON_HOLD +
+SELLER_WITHDRAWAL_RESERVED + REFUND_PAYABLE + PLATFORM_COMMISSION + SELLER_PAID_OUT + REFUNDS_PAID`.
+COD is excluded from buyer receipts; `COD_DUES` is tracked separately because the seller/courier
+already holds the cash.
+
+### State machines
+
+- Shop order settlement: `NOT_DELIVERED -> DELIVERED` creates `releaseAt = deliveredAt + window`
+  and `SELLER_PENDING`; `PENDING -> AVAILABLE` on release; `PENDING/AVAILABLE -> ON_HOLD` on an
+  accepted dispute; `ON_HOLD -> PENDING|AVAILABLE` on reject/return; `ON_HOLD -> REFUND_PAYABLE ->
+  REFUNDS_PAID` on refund. `ShopOrder.fundsReleasedAt` is the release marker.
+- Withdrawal (`Payout`): `PENDING -> PAID` or `PENDING -> REJECTED`; replays of the same transition
+  return the stored payout. `SELLER_WITHDRAWAL_RESERVED` prevents double spending.
+- Dispute (`Complaint`): `OPEN -> SELLER_RESPONDED -> (admin) REJECTED|RESOLVED_REFUND|CLOSED`.
+  `decision` (`DisputeDecision`) is the money decision; a decided dispute cannot be decided again.
+
+### Locking and jobs
+
+- `SettlementScheduler` runs on bootstrap and every 5 minutes. It selects delivered advance orders
+  with `releaseAt <= now`, `fundsReleasedAt = null`, no open dispute, then locks
+  `SELECT ... FROM "ShopOrder" WHERE id = ? FOR UPDATE` inside one transaction, re-checks, posts the
+  release and stamps `fundsReleasedAt`. A process-level flag prevents overlapping runs.
+- Dispute creation and dispute decisions lock the same `ShopOrder` row before moving funds (A9).
+  The race test opens a dispute at the window while the release job runs; funds always end in exactly
+  one bucket.
+- Withdrawal requests lock the seller's `SellerProfile` row before reading balances, so parallel
+  requests cannot both pass the available check.
+
+### Rounding (A6)
+
+Commission is rounded per line (ROUND_HALF_UP, 2 dp) and summed; the per-ShopOrder allocation equals
+the ShopOrder total, and the intent `amountDue` equals the sum of allocations. Multi-shop allocations
+with `.33/.34` prices are covered by `test/settlement.e2e-spec.ts`.
+
+### Legacy and migration
+
+Migration `20261118120000_p4_settlement_ledger` is additive. Existing rows keep `account = NULL`;
+no opening entries or balance rewrites are written. If an ADVANCE order was verified before this
+release and delivered after it, delivery posts the missing receipt idempotently
+(`payment_receipt:<intentId>`) before the delivery batch. Orders delivered before Part 4 are not
+picked up by the release job because they have no `releaseAt`; their history stays as-is
+(legacy-settled). Rollback SQL is included in the migration file.
+
+### Decisions taken autonomously
+
+1. Reused `Payout` for seller withdrawals and `Complaint` for disputes instead of new tables.
+2. A refund decision requires the admin to record the refund TrxID to post `REFUNDS_PAID`; without
+   one, a `REQUESTED` refund and `REFUND_PAYABLE` are created and the seller funds stay on hold.
+3. A rejected/returned dispute goes back to `PENDING` when the original release time is still in the
+   future, otherwise straight to `AVAILABLE`.
+4. COD dues payments are not mixed into advance conservation (no platform cash); automatic deduction
+   from available books the retained cash as platform commission.
+5. The release job skips legacy delivered orders without `releaseAt` rather than guessing a date.

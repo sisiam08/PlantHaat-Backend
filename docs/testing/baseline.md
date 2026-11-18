@@ -70,3 +70,21 @@ Suites were re-run with the API restarted between groups; every rerun passed.
 - `payments-advance.spec.ts`: **12/12 passed** on the same stack (strict-mode locator fixed to `.first()`).
 - `session-refresh.spec.ts` with the documented short-TTL overrides: **8/8 passed**. The revoked-session case now accepts `auth-required` (logout-all clears both cookies) as well as `session-expired`.
 - The stack is stopped after the run; dev settings and the dev database were never used for these writes.
+
+## 2026-11-18 Part 4 settlement baseline
+
+- Full backend e2e on `planthaat_test` (global setup verifies migrations): **21 suites, 153 passed,
+  3 skipped**, ~18 min serial.
+- Skipped (unchanged pre-existing): catalog avatar/upload key expectations (2) and seller-onboarding
+  document key prefix (1). The former earnings dues-payment failure is fixed and the test is now
+  enabled as COD dues behavior.
+- New `test/settlement.e2e-spec.ts`: **8/8** passed (advance hold -> 47h59/48h01 release -> withdrawal
+  and admin pay; early release; multi-shop allocation rounding; dispute-vs-release race repeated 3x;
+  parallel withdrawal reservation; COD dues accrual/limit/manual payment; dispute full refund and
+  reject-return; role permission matrix).
+- Backend unit: **228/228** (29 suites). `npm run typecheck` and `npm run lint` clean.
+- Run order note: the settlement suite takes ~2.5 min and uses real timestamps; keep
+  `--runInBand`. The 48h boundary is exercised by calling `LedgerService.releaseDue(futureDate)` and
+  not by sleeping.
+- Migrations: `20261118120000_p4_settlement_ledger` applied to dev and test; `db:migrate:all` prints
+  host/database and refuses anything else.

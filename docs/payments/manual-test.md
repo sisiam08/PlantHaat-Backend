@@ -46,3 +46,60 @@ Do not enable Advance in dev until you are ready for real buyers to see the opti
 - `-Action stop` stops both; `-Action seed` reseeds.
 - Playwright: `PAYMENTS_TEST_BASE_URL=http://localhost:3002 PAYMENTS_TEST_API_URL=http://127.0.0.1:5001 npx playwright test e2e/payments-advance.spec.ts --project=desktop-chromium`.
 - Expiry tests force `expiresAt` into the past and run the real expiry job via `backend/scripts/test-expire-intent.ts` (test database only).
+
+---
+
+# Part 4 manual test script (run after the UI session)
+
+Use the isolated stack or dev app. Do not change the owner's dev settings except through the
+Settings UI for the steps marked optional, and restore them afterwards.
+
+## Advance -> hold -> release -> withdrawal
+
+1. As a seller, open Wallet. Confirm Available, Pending, On hold, Total withdrawn and COD dues show.
+2. As a customer, place an ADVANCE order with one shop. Pay by bKash/Nagad and submit the TrxID.
+3. As admin, verify the payment with the exact amount. Seller wallet still shows no Available.
+4. As the seller, confirm -> pack -> ship -> deliver the order. The wallet Pending grows by the
+   seller net; the order shows a "report a problem until <time>" deadline and the wallet shows the
+   same release date.
+5. Optional: before the deadline, as the buyer press "Everything is fine". The seller funds move to
+   Available immediately and a "Funds released" notification appears.
+6. Otherwise wait until the window passes (or use a short `return.windowHours` in Settings for the
+   test, then restore 48). The release job runs on startup/every 5 minutes; Pending moves to
+   Available.
+7. As the seller, open Request withdrawal. Enter less than Available and more than the minimum.
+   Confirm Available drops and Reserved/Withdrawal pending appears.
+8. As admin, open the payout queue and mark it paid with a TrxID. Total withdrawn increases; the
+   seller gets a notification. Reject another request and confirm the amount returns to Available.
+
+## Dispute
+
+1. Deliver another ADVANCE order. Before the window closes, as the buyer open a dispute with a photo.
+2. Confirm the seller wallet shows On hold (not Available) and the seller gets a notification.
+3. As the seller, respond within the response window; the complaint shows the response.
+4. As admin, try a partial refund above the order total (must fail), then a valid partial/full refund
+   with a refund TrxID. Confirm the order shows the refund and the seller's held funds are gone.
+5. Open one more dispute and reject it. Confirm the funds return to Pending (if the window is still
+   open) or Available (if it already passed).
+
+## COD dues
+
+1. Deliver a COD order. Seller wallet shows COD dues equal to the commission; Available does not
+   change and the platform has no buyer receipt for it.
+2. Set `wallet.codDuesLimit` below the dues. A withdrawal request is blocked with
+   `PAYOUT_COD_DUES_BLOCKED`; restore the setting.
+3. As admin, record a dues payment with a TrxID. COD dues return to 0 and the wallet history shows it.
+4. With `wallet.codCommissionDeduct` on and some Available balance, deliver a COD order and confirm
+   the dues are deducted automatically from Available.
+
+## Reconciliation
+
+1. As admin, open the ledger/reconciliation view. `balanced` must be true and `difference` `0.00`.
+2. If it is not, do not pay out; capture the response (receipts/buckets/COD dues) for the backend
+   owner. A `SETTLEMENT_CONSERVATION_BREACH` violation must be treated as a P1.
+
+## Permission checks
+
+1. A customer cannot open the seller wallet or admin withdrawal/dispute endpoints (403).
+2. A seller cannot open the admin queues or decide a dispute (403).
+3. Another seller cannot see this seller's wallet, transactions or withdrawal rows.
