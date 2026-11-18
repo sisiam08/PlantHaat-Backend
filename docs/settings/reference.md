@@ -92,3 +92,13 @@ retro-applies.
 Guards: `src/modules/settings/settings-wiring.spec.ts` fails if the ledger stops reading
 `return.windowHours`, if the hold becomes a hard-coded constant, or if wallet/dispute limits stop
 reading their keys. The dev settings values were not changed by this work.
+
+## Part 4 UI wiring (2026-11-19)
+
+The seller wallet reads `return.windowHours` (via the public setting on the server page), the payout
+profile/withdrawal limits read `payout.minimumAmount`, `payout.methods`, `payout.cooldownHours`,
+`payout.maxPendingRequests`, `payout.processingText`, `wallet.codDuesLimit` and
+`wallet.codCommissionDeduct`; the dispute panel reads `return.earlyRelease`; complaint creation uses
+`return.photoRequired`, `return.maxEvidencePhotos` and `return.disputeSellerHours`; admin queues read
+the same contracts. Settings UI needs no custom fields: the registry drives the new keys with their
+bilingual help text and existing re-auth rules.

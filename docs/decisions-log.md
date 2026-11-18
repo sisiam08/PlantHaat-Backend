@@ -65,3 +65,16 @@
 - **Defaults used (unchanged):** return window 48h, early release on, photo required, max 5 photos,
   seller response 48h, minimum withdrawal 500, max 3 pending, cooldown 24h, COD dues limit 1000,
   methods BKASH/NAGAD/BANK, commission 10% fallback.
+
+## 2026-11-19 Part 4 UI decisions
+
+- Reused the existing earnings route as the wallet (`/seller/earnings`) and reused `Payout`-backed
+  `/admin/withdrawals` rather than adding a parallel payouts model.
+- The payout destination stays masked in admin because the API never returns the full account
+  number; no fake “reveal” was added.
+- Early release is shown only when the public `return.earlyRelease` setting is on and the window is
+  still open; the confirm dialog names the loss of the remaining dispute window.
+- Legacy delivered orders (no `releaseAt`) show “legacy-settled” and keep the existing report link;
+  no release date is invented.
+- Shared header mobile spacing/logo sizing was tightened instead of hiding navigation controls, to
+  fix the 360 px overflow without breaking the 44 px target on the remaining controls.

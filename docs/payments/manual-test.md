@@ -103,3 +103,22 @@ Settings UI for the steps marked optional, and restore them afterwards.
 1. A customer cannot open the seller wallet or admin withdrawal/dispute endpoints (403).
 2. A seller cannot open the admin queues or decide a dispute (403).
 3. Another seller cannot see this seller's wallet, transactions or withdrawal rows.
+
+## Part 4 owner UI check (use NEW orders only)
+
+Orders delivered before Part 4 are legacy-settled and have no return window; create new test orders.
+
+1. Seller ? Wallet: check Available, Pending (with release date), On hold, Total withdrawn and COD
+   dues. Open Transactions and Payout profile.
+2. Place and pay a new Advance order; deliver it as the seller. Buyer ? Orders ? the order shows
+   “Problem window is open” with a deadline and two actions.
+3. Press “Everything is fine” ? confirm. Seller Wallet moves the amount from Pending to Available.
+   Otherwise wait for the window; the release job runs every 5 minutes.
+4. Request a withdrawal (at least the minimum). Admin ? Withdrawals ? Mark paid with a TrxID. Seller
+   Wallet shows Total withdrawn; reject another request and confirm the amount returns to Available.
+5. Buyer reports a problem with a photo. Seller ? Complaints responds. Admin ? Disputes opens the
+   order/evidence and chooses reject, full refund, partial refund or return. A refund needs the
+   refund TrxID before it is finished.
+6. COD: deliver a COD order; Wallet shows COD dues. If dues exceed the limit, withdrawal is blocked;
+   Admin ? seller ? dues payment with TrxID clears it.
+7. Admin ? Reconciliation: run the check; `Balanced` must be green. Do not pay out on a breach.

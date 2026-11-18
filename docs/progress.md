@@ -359,3 +359,20 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Follow-up `dfd3a02`: Part 3 refund obligations (overpay, cancellation, late no-stock) now post
   `PLATFORM_HOLDINGS -> REFUNDS_PAID` when the admin records the refund TrxID, keeping A5 conserved.
   Advance payments e2e re-run: 11/11.
+
+## 2026-11-19 Part 4 UI (frontend) + live verification
+
+- Frontend branch `redesign/phase2`, commit `9f15c3f` (pushed below): seller wallet, buyer return
+  window/early release, admin withdrawals queue, dispute decision panel + evidence lightbox,
+  reconciliation settlement block, dashboard counters and nav badges.
+- Shared header mobile padding/gap reduced to remove the 5 px 360 px overflow; wallet tab contrast
+  fixed for axe; Bengali nav labels for Wallet/Withdrawals repaired after a test-stack render showed
+  corrupt glyphs. No new dependencies.
+- Backend tiny UI-support fix on `feature/payments` `4c678a1`: admin complaint detail now includes
+  shop + shop order summary (no money logic). Backend typecheck/lint and complaints unit 6/6 pass.
+- Tests on isolated production stack (`:5001` + `:3002`): `e2e/part4-settlement.spec.ts` **1/1**
+  (axe + 360 overflow included), `payments-advance.spec.ts` **12/12**, Vitest **68 passed / 1
+  skipped**, frontend typecheck/lint clean (5 pre-existing warnings), production build green.
+- Live report: `frontend/docs/testing/part4-live-report.md`. Screenshots were kept only in a
+  gitignored `.artifacts/` folder and deleted after the report.
+- Dev database/settings untouched; test only. Test stack stopped at the end.
