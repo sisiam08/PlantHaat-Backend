@@ -69,4 +69,4 @@ key returns the original order.
 
 ## Realtime
 
-See `docs/REALTIME.md`. WebSocket events carry plain payloads (not enveloped).
+See `api/realtime.md`. WebSocket events carry plain payloads (not enveloped).

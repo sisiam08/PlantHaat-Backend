@@ -1,7 +1,7 @@
 # PlantHaat Backend
 
 NestJS + Prisma API for PlantHaat, a multi-vendor online plant marketplace for
-Bangladesh. See `../BACKEND_DESIGN.md` for the full design and `../BACKEND_CONTEXT.md`
+Bangladesh. See `docs/BACKEND_DESIGN.md` for the full design and `docs/BACKEND_CONTEXT.md`
 for the working rules, progress log and decisions.
 
 ## Stack
@@ -136,7 +136,7 @@ Demo accounts:
 
 Notifications are pushed over a Socket.IO namespace `/realtime` (ticket auth,
 no cookies). `POST /api/v1/realtime/ticket` returns a short-lived one-time
-ticket; the browser connects with `auth: { ticket }`. See `docs/REALTIME.md` for
+ticket; the browser connects with `auth: { ticket }`. See `docs/api/realtime.md` for
 the full contract (handshake rules, events, revocation, limits, env). The
 transport is designed to be reused by the future messaging module.
 

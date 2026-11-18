@@ -238,7 +238,7 @@ describe("Search suggestions (e2e)", () => {
 
   it("is configured to throttle to 60 requests per minute per IP", async () => {
     // The global guard skips execution when NODE_ENV=test (documented in
-    // BACKEND_CONTEXT §9); in production the same guard returns 429.
+    // docs/BACKEND_CONTEXT.md §9); in production the same guard returns 429.
     const { SearchController } = await import("../src/modules/search/search.controller");
     const limit = Reflect.getMetadata("THROTTLER:LIMITdefault", SearchController.prototype.suggest);
     const ttl = Reflect.getMetadata("THROTTLER:TTLdefault", SearchController.prototype.suggest);

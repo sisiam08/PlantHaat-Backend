@@ -36,3 +36,28 @@ Checkout, products and engagement suites passed at baseline in this run.
 - Added registry defaults for keys previously read but missing: checkout.maxQtyPerItem=20, order.sellerConfirmTimeoutHours=48, review.windowDays=14, product.autoApprove=true, payout.holdHours=48, codRisk.watchAfter=2/blockAfter=4/windowDays=90/restrictCap=2000, stuck.*=48/48/2/24/3.
 - This fixed the products and engagement failures that appeared after the settings work (they passed at baseline but failed without these defaults).
 - Current full backend e2e: 19 suites passed, 134 tests passed, 4 skipped (the baseline upload/dues failures above).
+
+## 2026-11-16 full frontend regression (rating + digit/proxy changes)
+Production build served on `:3000`, Playwright `--workers=1`.
+
+| Suite | Result |
+|---|---|
+| Vitest (`npm test`) | 52/52 passed (16 files), including the new `src/server/proxy-manifest.test.ts` |
+| `e2e/access-control.spec.ts` | 8 passed, 1 admin test skipped without `ADMIN_PASSWORD`; the admin test passed (1/1) when the value from `backend/.env` was exported |
+| `e2e/product-card.spec.ts` | 4/4 passed on the production build (home rail + catalog/search, en/bn, 360/1280, row alignment) |
+| `e2e/cart-layout.spec.ts` | desktop 8/8; mobile 8/8 |
+| `e2e/checkout-layout.spec.ts` | desktop 30/30; mobile 30 skipped by design (viewport set explicitly) |
+| `e2e/cart-quantity.spec.ts` + `cart-persistence.spec.ts` + `digits.spec.ts` | 8/8 passed together |
+| `e2e/overflow.spec.ts`, `typography.spec.ts`, `scroll-restore.spec.ts`, `messages.spec.ts`, `auth-redirect.spec.ts`, `cart-layout` (first pass) | all passed in the combined run |
+| `e2e/settings.spec.ts`, `settings-persist.spec.ts` | skipped: `ADMIN_PASSWORD` not exported and `SETTINGS_PERSIST_BASE_URL` unset; isolation procedure below unchanged |
+
+Known environment constraint: a single continuous run can hit the backend login throttle
+(10/min). Failures observed were `429` responses from `POST /auth/login` (and one stale
+Bangla-digit expectation in `checkout-layout.spec.ts`, now fixed to `সব 6টি দোকান`).
+Suites were re-run with the API restarted between groups; every rerun passed.
+
+## 2026-11-17 advance payment UI (isolated :5001/:3002)
+- Backend: unit 223/223, advance e2e 11/11, typecheck/lint/build green.
+- Frontend Vitest 52/52. Payment Playwright 12 scenarios all passed (serial runs): COD, advance UI journey, reject/resubmit, duplicate, under/overpay, expiry vs pending, late payment, partial refund, permissions, settings snapshot, screenshots.
+- Existing suites on dev :3000 (desktop project): checkout 32/32 after raising its timeout for the extra payment card, messages 8/8, typography 8/8, overflow 9 pass/1 admin skip, scroll-restore 6/6 after stabilising the mobile filter-sheet wait, cart-quantity 2/2, digits 1/1.
+- Known environment note: long dev runs still hit navigation timeouts under load; the failing cases passed on warm reruns. The isolated stack is stopped after the run.

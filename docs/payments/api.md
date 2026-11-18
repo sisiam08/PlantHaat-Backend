@@ -57,7 +57,15 @@ Only `UNPAID` expires. `PENDING_VERIFICATION` never expires; it raises an SLA al
 { "provider": "BKASH", "trxId": "9F7K2M1Q", "senderNumber": "01712345678", "proofUrl": "/uploads/payments/x.webp" }
 ```
 
-`201` on first submit, `200`-shape idempotent response for the same pending TrxID, `409 PAYMENT_SUBMISSION_DUPLICATE` for a rejected/other-intent TrxID, `400` for invalid TrxID/mobile or closed window, `429` after too many submissions.
+**Proof upload (buyer):** `POST /uploads/images` (multipart `file`, `purpose=payment`) returns `{ key, url }` (envelope). Max 5 MB; JPEG/PNG/WebP/HEIC/HEIF only; the server re-encodes to WebP and strips EXIF. The returned key looks like `payments/<buyerId>/<uuid>.webp`.
+
+`proofUrl` may be:
+- that storage key, or
+- a URL whose path ends with that exact key (e.g. the `url` returned by the upload).
+
+The server checks the key prefix against the authenticated buyer, then requires an `UploadedAsset` row with the same `publicId`, `ownerId` and `purpose="payment"`, and stores the canonical stored URL. External hosts, `data:`/`javascript:`/other schemes, path traversal and another buyer's upload are rejected with `400 PAYMENT_PROOF_INVALID`.
+
+`201` on first submit, `200`-shape idempotent response for the same pending TrxID, `409 PAYMENT_SUBMISSION_DUPLICATE` for a rejected/other-intent TrxID, `400` for invalid TrxID/mobile/proof or closed window, `429` after too many submissions.
 
 ## Admin (`ADMIN` role)
 
@@ -77,7 +85,7 @@ Only `UNPAID` expires. `PENDING_VERIFICATION` never expires; it raises an SLA al
 
 ## Error codes
 
-`PAYMENT_NOT_FOUND`, `PAYMENT_REQUIRED`, `PAYMENT_EXPIRED`, `PAYMENT_ALREADY_PAID`, `PAYMENT_INVALID_STATE`, `PAYMENT_SUBMISSION_DUPLICATE`, `PAYMENT_AMOUNT_MISMATCH`, `PAYMENT_METHOD_NOT_AVAILABLE`, `TOO_MANY_REQUESTS`, `FORBIDDEN`/`NOT_FOUND` for permissions.
+`PAYMENT_NOT_FOUND`, `PAYMENT_REQUIRED`, `PAYMENT_EXPIRED`, `PAYMENT_ALREADY_PAID`, `PAYMENT_INVALID_STATE`, `PAYMENT_SUBMISSION_DUPLICATE`, `PAYMENT_AMOUNT_MISMATCH`, `PAYMENT_PROOF_INVALID`, `PAYMENT_METHOD_NOT_AVAILABLE`, `TOO_MANY_REQUESTS`, `FORBIDDEN`/`NOT_FOUND` for permissions.
 
 ## Jobs
 
