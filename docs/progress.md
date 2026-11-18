@@ -356,3 +356,6 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
   advance+cod-settings **18/18**; full backend e2e **21 suites, 153 passed, 3 skipped** (the three
   known pre-existing upload/seller-onboarding failures).
 - Dev settings were not written. Advance and COD suites still pass.
+- Follow-up `dfd3a02`: Part 3 refund obligations (overpay, cancellation, late no-stock) now post
+  `PLATFORM_HOLDINGS -> REFUNDS_PAID` when the admin records the refund TrxID, keeping A5 conserved.
+  Advance payments e2e re-run: 11/11.
