@@ -8,11 +8,13 @@ Canonical docs for the backend repo (`feature/payments`). Documentation lives on
 | `BACKEND_DESIGN.md` | Backend final-state design: architecture, domain rules, API, DB, security | backend | 2026-10-20 |
 | `BACKEND_CHANGE_REQUESTS.md` | Additive backend changes requested by the frontend | backend (for frontend) | 2026-11-18 |
 | `UPLOAD_SYSTEM.md` | Upload/Cloudinary architecture, producer inventory, orphan safety, environment separation, production checklist | backend | 2026-11-19 |
+| `home-highlights-guide.md` | Admin-facing guide for Home Highlights: image sizes, overlay/button/schedule tips, limits | backend | 2026-11-19 |
 | `security/secret-rotation.md` | Secret findings and rotation order/effects | backend | 2026-11-19 |
 | `decisions-log.md` | Single chronological decision log (both tracks) | cross-cutting | 2026-11-18 |
 | `progress.md` | Single chronological implementation/resume log (payments + frontend consistency track) | cross-cutting | 2026-11-18 |
 | `api/conventions.md` | Envelope, pagination, auth, idempotency, money/date conventions | backend | 2026-11-18 |
 | `api/realtime.md` | Socket.IO `/realtime` ticket auth, events, limits, revocation | backend | 2026-11-18 |
+| `api/home-highlights.md` | Home Highlights data model, public/admin API, validation, scripts, frontend behavior | backend | 2026-11-19 |
 | `auth/sessions.md` | Access/refresh session model, cookies, refresh flows, security settings, short-TTL testing | backend | 2026-11-18 |
 | `payments/PAYMENTS_MASTER_PROMPT.md` | Canonical payments/settings/settlement master spec | backend | 2026-11-18 |
 | `payments/design.md` | Payments design note + amendments A1–A9 + owner decisions | backend | 2026-11-18 |

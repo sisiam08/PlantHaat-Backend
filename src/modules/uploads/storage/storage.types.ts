@@ -19,6 +19,9 @@ export interface StoredObject {
   key: string;
   url: string;
   resourceType?: StorageResourceType;
+  /** Pixel dimensions when the storage driver can determine them. */
+  width?: number;
+  height?: number;
 }
 
 export interface StorageService {

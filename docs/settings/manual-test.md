@@ -100,6 +100,33 @@ Open http://localhost:3000 with an admin account, then **Admin → Settings**. S
 3. Reload five times; the number and both toggles must stay.
 4. Clear the number and press Save; the form must show an inline number error and must not report success. Restore the values afterwards.
 
+## 8. Home hero settings
+
+1. Open **Admin → Settings → Home**. Change the English headline and add/reorder a chip; Save.
+2. Open the home page in a new tab. The new headline and chip order appear without a deploy. Click a
+   chip; it must open `/products` with the matching filter (for example `isIndoor=true`).
+3. Upload an optional hero image (1200×900), set alt text and focal point, Save. The hero shows the
+   image with the chosen crop; remove it and Save to return to the real product cards.
+4. Clear the headline and Save; the server should reject the empty bilingual value. Restore it.
+
+## 9. Home Highlights
+
+1. Open **Admin → Home → Highlights**. The master switch is on; the list shows slides (or the empty
+   state). Turn it off, open the home page in a new tab: no Highlights heading, no box and no gap.
+   Turn it back on.
+2. Add a slide: upload a desktop image (1920×640 works best) and an optional mobile image
+   (960×640), add Bangla/English alt text, overlay headline and a button with an external
+   `https://` link. Save; the page says customers will see it within seconds.
+3. Open the home page at 1440 and 390. The desktop and mobile crops differ, the overlay/button are
+   readable, and the button opens the external link in a new tab.
+4. Schedule the slide to start tomorrow. It disappears from the public list today (status
+   Scheduled); remove the schedule and it returns. Use the up/down buttons or drag to reorder.
+5. Duplicate the slide (creates a hidden copy), then delete it. Delete the test slide at the end.
+6. Try a `javascript:` link and a custom button with white text on yellow; both must be rejected with
+   an inline/server message. Try a square image; it should save with an aspect-ratio warning.
+7. Turn the master switch off again if the owner does not want the section live. The dev settings
+   should be left exactly as the owner wants them.
+
 **বাংলা**
 1. bKash receiving number দিন, bKash enabled ও Advance payment enabled টিক দিন।
 2. একবার Save চেপে একবার অ্যাডমিন পাসওয়ার্ড দিন; "Saved. Customers will see this on new page loads" দেখা পর্যন্ত অপেক্ষা করুন।

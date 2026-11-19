@@ -120,3 +120,31 @@
 - The standalone trust band was removed rather than duplicated under the hero, so the promise is
   made once per screen.
 - The hero search is a native GET form, but the Next 16 Cache Components/streaming shell reveals streamed sections with inline JS. A browser with JavaScript fully disabled never un-hides those segments; this is app-wide, not hero-specific. The form therefore works when client JS fails after HTML is present, and the e2e asserts its native GET semantics rather than claiming full no-JS rendering.
+
+## 2026-11-19 Home Highlights (Part B)
+
+- Extended the existing `Banner` table/placement model instead of adding a parallel slider table;
+  all new columns are additive and nullable/defaulted (`20261119120000_home_highlights_banner_fields`).
+- Desktop/tablet uses a 3:1 aspect box (source 1920x640) and mobile 3:2 (source 960x640), with a
+  480 px desktop cap. The heights intentionally differ: a 3:1 crop on a phone would be a thin strip,
+  while a 3:2 crop on desktop would be too tall and hurt the below-the-fold rhythm.
+- Autoplay is off by default and, when enabled, runs only at >= 768 px. Baymard/WCAG evidence says
+  touch users cannot hover to pause and auto-rotating content is often ignored; reduced motion
+  always wins, and touch pauses permanently for that visit.
+- A single slide (or the whole feature off) renders no carousel JavaScript. With 2+ slides the Embla
+  engine is dynamically imported only when the section is near the viewport; non-selected slide
+  images are not rendered until selected, so off-screen slides are not downloaded.
+- The backend owns a 15 s in-process cache of active rows and reads settings on every call. The
+  frontend deliberately does not add a second `"use cache"` layer: admin saves and schedule
+  boundaries then show on the next home request (the earlier double cache left the static home shell
+  stale after a direct data change).
+- Create/update returns validation warnings for off-aspect/small images instead of blocking; unsafe
+  links, malformed colors/HTML text, end-before-start schedules and unreadable custom button colors
+  are still rejected server-side. Overlay contrast blocks only at maximum scrim; button text blocks
+  below 3:1.
+- Highlights images must be owned uploads. The validator accepts Cloudinary https, same-site
+  `/uploads/...` and the local test API origin (`http://localhost:<port>/uploads/...`) so the
+  isolated test stack exercises the same attach/cleanup path.
+- The import script uploads the owner's existing static banner files through the normal pipeline
+  and tags rows with `[seed:home-highlights]`; a documented guarded removal script deletes only
+  those rows/assets. It was run once on dev (3 slides), not on the test DB or production.

@@ -10,7 +10,8 @@ be marked `ATTACHED` in the same transaction as the entity write.
 Browser -> uploadsApi -> POST /api/v1/uploads/images (multipart)
         -> multer memory storage (5 MB cap)
         -> magic-byte + MIME validation
-        -> sharp re-encode to WebP (EXIF stripped, 2000 px products / 1600 px others)
+        -> sharp re-encode to WebP (EXIF stripped, 2000 px products / 1920 px banners / 1600 px others)
+        -> pixel dimensions stored on UploadedAsset (when sharp can decode it)
         -> StorageService.put()
         -> Cloudinary secure_url + public_id
         -> UploadedAsset(PENDING)
@@ -31,7 +32,8 @@ never auto-deleted by the orphan cron.
 | Admin category create/update | `Category.imageUrl` | Yes | Yes on replace; delete on category delete |
 | Seller shop create/update | `Shop.logoUrl`, `Shop.bannerUrl` | Yes | Yes on replace |
 | User avatar update | `User.avatarUrl` | Yes | Yes on replace |
-| Admin banner create/update/delete | `Banner.imageUrl` | Yes | Yes on replace/delete |
+| Admin banner create/update/delete | `Banner.imageUrl`, `Banner.mobileImageUrl` | Yes | Yes on replace/delete unless another slide still references the URL |
+| Home Highlights slide create/update/delete/duplicate | same Banner columns (placement `HOME_HIGHLIGHTS`) | Yes | Yes via reference check; duplicate shares URLs |
 | Review create/update/delete | `ReviewImage.url` | Yes | Yes for removed/replaced review images |
 | Complaint/dispute evidence | `ComplaintAttachment.url` | Yes | No complaint deletion flow exists |
 | Advance payment proof (Part 3) | `PaymentSubmission.proofUrl` | Yes | Historical proof; never auto-deleted |

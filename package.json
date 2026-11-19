@@ -25,6 +25,8 @@
     "db:seed:demo:reviews": "node scripts/db-guard.mjs && tsx ./prisma/seed-demo-reviews.ts",
     "db:seed:demo:reviews:cleanup": "node scripts/db-guard.mjs && tsx ./prisma/seed-demo-reviews-cleanup.ts",
     "db:seed:test-stack": "tsx ./prisma/seed-test-stack.ts",
+    "home:highlights:import": "node scripts/db-guard.mjs && tsx scripts/import-home-highlights.ts",
+    "home:highlights:import:remove": "node scripts/db-guard.mjs && tsx scripts/remove-home-highlights-import.ts",
     "docs:export": "npm run build && node --import tsx dist/openapi.export.js",
     "uploads:smoke": "tsx scripts/uploads-smoke.ts",
     "uploads:migrate": "tsx scripts/migrate-uploads-to-cloudinary.ts",

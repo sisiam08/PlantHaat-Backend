@@ -415,3 +415,32 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Perf (prod, 390x844, Slow 4G + 4x CPU, 5 runs): LCP 6740 -> **3288 ms** en and 5584 -> **3584 ms** bn; CLS 0; JS 363 KB unchanged. Details in `frontend/docs/design/performance.md`.
 - E2E `e2e/home-hero.spec.ts`: 7 passed, 2 skipped (admin credentials not set in this environment; native no-JS semantics asserted because the streamed shell requires JS, logged in decisions).
 - Dev settings were not modified beyond the new registry defaults. No destructive migration.
+
+## 2026-11-19 Home Highlights Part B (admin-managed slider)
+
+- Migration `20261119120000_home_highlights_banner_fields` applied to dev **and** `planthaat_test` via
+  `npm run db:migrate:all`; `db:status:all` clean (18 migrations). Additive `Banner` columns,
+  `UploadedAsset.width/height`, `Banner.mobileImageUrl` registered in the upload reference registry.
+- Backend: public `GET /home/highlights` (active/schedule/maxSlides, ETag, 30 s Cache-Control,
+  15 s in-process row cache, settings read live); admin list/create/update/delete/duplicate/
+  transactional reorder with role guard + audit. Server validation covers safe links, colors,
+  lengths, schedule order, owned uploads, aspect warnings, visible-count cap and the contrast guard.
+  Uploads attach in the entity transaction; replaced/deleted assets are cleaned only when
+  unreferenced. `highlights.validation.spec.ts` 8/8; `content-highlights.e2e-spec.ts` 8/8.
+- Frontend: shared `HighlightSlideView`, server `HomeHighlightsSlot`, lazy `HighlightsCarousel`
+  (Embla loaded on visibility; non-selected images not rendered until selected). 3:2 mobile / 3:1
+  desktop art direction; single-slide/off = no carousel JS. Admin **Home ? Highlights** page with
+  master switch, autoplay/interval, drag + up/down reorder, status chips, duplicate/delete, editor,
+  focal picker, contrast warnings and desktop/mobile bn/en live preview. Settings ? Home carries the
+  hero + highlights settings.
+- Import: `home:highlights:import` (dev-guarded, idempotent marker `[seed:home-highlights]`) uploaded
+  the owner's three static banner files (1920x640 desktop + mobile) and created three dev slides;
+  `home:highlights:import:remove` documented and available. Test/prod DB untouched by the import.
+- Perf (prod, 5 runs, medians): 390 LCP 2832/3044 ms en/bn, CLS 0, JS 356 KB, images 217/191 KB;
+  1440 LCP 2968/3140 ms, CLS 0/0.0001. Mobile-only `w_640` (~22 KB) and desktop-only `w_1920`
+  (~77 KB) variants verified; off-screen slides not requested until selected.
+- E2E: `home-highlights.spec.ts` 8/8 guest tests on dev (geometry bn/en, art direction, axe); the
+  admin page test passes on the isolated stack. `admin-highlights.spec.ts` 1/1 on the isolated stack
+  (create + uploads + overlay/button/external link, public render, admin list, schedule hidden,
+  duplicate, reorder, feature off/on with no section/gap, cleanup).
+- Dev settings were left at registry defaults (feature on); imported slides are real owner artwork.

@@ -28,6 +28,8 @@ export const HEIC_BRANDS = new Set([
 export const DEFAULT_IMAGE_MAX_EDGE = 1600;
 /** Product images keep more resolution so the product page can zoom. */
 export const PRODUCT_IMAGE_MAX_EDGE = 2000;
+/** Home highlight banners need the full desktop 1920x640 source. */
+export const BANNER_IMAGE_MAX_EDGE = 1920;
 export const DEFAULT_IMAGE_QUALITY = 82;
 export const PRODUCT_IMAGE_QUALITY = 80;
 

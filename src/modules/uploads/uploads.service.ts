@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import sharp from "sharp";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
@@ -14,6 +15,7 @@ import {
 } from "./document.util";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
+  BANNER_IMAGE_MAX_EDGE,
   DEFAULT_IMAGE_MAX_EDGE,
   detectImageMime,
   HEIC_MIME_TYPES,
@@ -88,7 +90,9 @@ export class UploadsService {
           file.buffer,
           purpose === UploadPurpose.PRODUCT
             ? { maxEdge: PRODUCT_IMAGE_MAX_EDGE, quality: PRODUCT_IMAGE_QUALITY }
-            : undefined,
+            : purpose === UploadPurpose.BANNER
+              ? { maxEdge: BANNER_IMAGE_MAX_EDGE }
+              : undefined,
         );
         extension = "webp";
         contentType = "image/webp";
@@ -109,8 +113,18 @@ export class UploadsService {
       resourceType: "image",
       ...(isHeic ? { format: "jpg" } : {}),
     });
-    await this.trackAsset(stored, purpose, ownerId);
-    return stored;
+    let width: number | undefined;
+    let height: number | undefined;
+    try {
+      const metadata = await sharp(buffer).metadata();
+      width = metadata.width;
+      height = metadata.height;
+    } catch {
+      // HEIC/HEIF and unexpected encodings may not be decodable here.
+    }
+    const result: StoredObject = { ...stored, width, height };
+    await this.trackAsset(result, purpose, ownerId);
+    return result;
   }
 
   async uploadDocument(
@@ -243,6 +257,8 @@ export class UploadsService {
           purpose,
           ownerId,
           status: "PENDING",
+          width: stored.width ?? null,
+          height: stored.height ?? null,
         },
       });
     } catch (error) {

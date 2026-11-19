@@ -26,6 +26,7 @@ export const UPLOAD_SCALAR_REFERENCES: readonly UploadReference[] = [
   { model: "complaintAttachment", table: "ComplaintAttachment", column: "url" },
   { model: "message", table: "Message", column: "attachmentUrl" },
   { model: "banner", table: "Banner", column: "imageUrl" },
+  { model: "banner", table: "Banner", column: "mobileImageUrl" },
 ] as const;
 
 /** JSON columns: any string value containing the URL counts as a reference. */
@@ -58,6 +59,7 @@ export const URL_LIKE_COLUMNS = new Set([
   "logourl",
   "bannerurl",
   "imageurl",
+  "mobileimageurl",
   "url",
   "deliveryproofurl",
   "proofurl",

@@ -1419,16 +1419,52 @@ model Announcement {
 }
 
 model Banner {
-  id        String    @id @default(uuid())
-  title     String?
-  imageUrl  String
-  linkUrl   String?
-  placement String    @default("HOME_HERO")
-  sortOrder Int       @default(0)
-  isActive  Boolean   @default(true)
-  startsAt  DateTime?
-  endsAt    DateTime?
-  createdAt DateTime  @default(now())
+  id                  String    @id @default(uuid())
+  title               String?
+  imageUrl            String
+  linkUrl             String?
+  placement           String    @default("HOME_HERO")
+  sortOrder           Int       @default(0)
+  isActive            Boolean   @default(true)
+  startsAt            DateTime?
+  endsAt              DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  imagePublicId       String?
+  imageWidth          Int?
+  imageHeight         Int?
+  mobileImageUrl      String?
+  mobileImagePublicId String?
+  mobileImageWidth    Int?
+  mobileImageHeight   Int?
+  imageAltBn          String?
+  imageAltEn          String?
+  focalX              Int       @default(50)
+  focalY              Int       @default(50)
+  mobileFocalX        Int       @default(50)
+  mobileFocalY        Int       @default(50)
+  overlayEnabled      Boolean   @default(false)
+  headlineBn          String?
+  headlineEn          String?
+  subtextBn           String?
+  subtextEn           String?
+  textColor           String?
+  scrimColor          String?   @default("#0B2116")
+  scrimOpacity        Int       @default(35)
+  desktopPosition     String?   @default("BOTTOM_LEFT")
+  mobilePosition      String?   @default("BOTTOM_LEFT")
+  desktopAlign        String?   @default("left")
+  mobileAlign         String?   @default("left")
+  buttonEnabled       Boolean   @default(false)
+  buttonLabelBn       String?
+  buttonLabelEn       String?
+  buttonHref          String?
+  buttonStyle         String?   @default("primary")
+  buttonBgColor       String?
+  buttonTextColor     String?
+  openInNewTab        Boolean   @default(false)
+  createdById         String?
+  updatedById         String?
 
   @@index([placement, isActive, sortOrder])
 }
@@ -1471,6 +1507,8 @@ model UploadedAsset {
   status       UploadAssetStatus @default(PENDING)
   createdAt    DateTime          @default(now())
   attachedAt   DateTime?
+  width        Int?
+  height       Int?
 
   @@index([status, createdAt])
   @@index([ownerId])
