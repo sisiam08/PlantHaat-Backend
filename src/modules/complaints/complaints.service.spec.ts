@@ -9,6 +9,7 @@ import type { LedgerService } from "../ledger/ledger.service";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { OrdersService } from "../orders/orders.service";
 import type { SettingsService } from "../settings/settings.service";
+import type { UploadsService } from "../uploads/uploads.service";
 import { ComplaintsService } from "./complaints.service";
 
 type MockFn = jest.Mock<(...args: unknown[]) => Promise<unknown>>;
@@ -61,8 +62,19 @@ function createService(overrides: Record<string, unknown> = {}) {
       shopOrderId: "replacement-shop-order",
     }),
   } as unknown as OrdersService;
-  const service = new ComplaintsService(prisma as unknown as PrismaService, settings, notifications, audit, ledger, orders);
-  return { service, prisma, settings, notifications, audit, ledger, orders };
+  const uploads = {
+    attachAssetsInTransaction: mockFn().mockResolvedValue(undefined),
+  } as unknown as UploadsService;
+  const service = new ComplaintsService(
+    prisma as unknown as PrismaService,
+    settings,
+    notifications,
+    audit,
+    ledger,
+    orders,
+    uploads,
+  );
+  return { service, prisma, settings, notifications, audit, ledger, orders, uploads };
 }
 
 const deliveredShopOrder = {

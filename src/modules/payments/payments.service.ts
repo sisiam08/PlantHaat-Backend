@@ -10,6 +10,7 @@ import { AuditService } from "../audit/audit.service";
 import { LedgerService } from "../ledger/ledger.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { SettingsService } from "../settings/settings.service";
+import { UploadsService } from "../uploads/uploads.service";
 import type {
   AdvanceProvider,
   CreatePaymentSubmissionDto,
@@ -48,6 +49,7 @@ export class PaymentsService {
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async snapshot(): Promise<ProviderSnapshot> {
@@ -273,6 +275,7 @@ export class PaymentsService {
           where: { id: intent.id },
           data: { status: "PENDING_VERIFICATION" },
         });
+        await this.uploads.attachAssetsInTransaction(tx, [proofUrl]);
         return created;
       });
     } catch (error) {

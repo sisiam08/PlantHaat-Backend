@@ -4,6 +4,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
+import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   documentContentType,
@@ -144,13 +145,75 @@ export class UploadsService {
     return { key: stored.key };
   }
 
-  /** Marks the PENDING asset whose URL was attached to an entity. */
-  async attachAsset(url: string | null | undefined): Promise<void> {
-    if (!url) return;
-    await this.prisma.uploadedAsset.updateMany({
-      where: { url, status: "PENDING" },
+  /**
+   * Marks PENDING assets ATTACHED inside the caller's transaction so the
+   * entity write and the lifecycle change commit or roll back together.
+   */
+  async attachAssetsInTransaction(
+    tx: Prisma.TransactionClient,
+    urls: Iterable<string | null | undefined>,
+  ): Promise<void> {
+    const values = [...new Set([...urls].filter((url): url is string => Boolean(url)))];
+    if (values.length === 0) return;
+    await tx.uploadedAsset.updateMany({
+      where: { url: { in: values }, status: "PENDING" },
       data: { status: "ATTACHED", attachedAt: new Date() },
     });
+  }
+
+  /** Marks the PENDING assets whose URLs were attached to an entity. */
+  async attachAssets(urls: Iterable<string | null | undefined>): Promise<void> {
+    const values = [...new Set([...urls].filter((url): url is string => Boolean(url)))];
+    if (values.length === 0) return;
+    try {
+      await this.prisma.$transaction((tx) => this.attachAssetsInTransaction(tx, values));
+    } catch (error) {
+      // Tracking must never fail a caller that is not already in a transaction.
+      this.logger.debug(
+        `Could not mark uploads attached: ${error instanceof Error ? error.message : "unknown"}`,
+      );
+    }
+  }
+
+  /** Marks the PENDING asset whose URL was attached to an entity. */
+  async attachAsset(url: string | null | undefined): Promise<void> {
+    await this.attachAssets([url]);
+  }
+
+  /** Best-effort deletion of replaced/removed assets (never throws). */
+  async deleteAssets(urls: Iterable<string | null | undefined>): Promise<void> {
+    const values = [...new Set([...urls].filter((url): url is string => Boolean(url)))];
+    for (const url of values) {
+      await this.deleteByUrl(url);
+    }
+  }
+
+  /** Tiny upload + HEAD + delete used by the admin storage health check. */
+  async storageHealthCheck(): Promise<{ ok: boolean; latencyMs: number }> {
+    const started = Date.now();
+    const key = `smoke/${randomUUID()}.png`;
+    const stored = await this.storage.put({
+      key,
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEElEQVQImWMQCdCAIwbiOADidAjBP8yuuwAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+      contentType: "image/png",
+      visibility: "public",
+      resourceType: "image",
+    });
+    try {
+      if (!stored.url) throw new Error("Storage returned no public URL");
+      const response = await fetch(stored.url, { method: "HEAD" });
+      if (!response.ok) throw new Error(`Storage delivery returned ${response.status}`);
+      return { ok: true, latencyMs: Date.now() - started };
+    } finally {
+      await this.storage.delete(stored.key, "public").catch((error: unknown) => {
+        this.logger.warn(
+          `Storage health cleanup failed: ${error instanceof Error ? error.message : "unknown"}`,
+        );
+      });
+    }
   }
 
   /** Best-effort deletion of a replaced/removed asset (never throws). */

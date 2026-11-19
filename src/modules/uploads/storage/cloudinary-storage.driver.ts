@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import { v2 as cloudinary } from "cloudinary";
 
 import { AppConfigService } from "../../../config/app-config.service";
+import { currentFolderPrefix } from "../upload-references";
 import type {
   PutObjectInput,
   StorageResourceType,
@@ -72,9 +73,7 @@ export class CloudinaryStorageDriver implements StorageService {
       );
     }
     this.cloudName = CLOUDINARY_CLOUD_NAME;
-    this.folderPrefix = (
-      config.values.CLOUDINARY_FOLDER_PREFIX ?? `planthaat/${config.values.NODE_ENV}`
-    ).replace(/^\/+|\/+$/g, "");
+    this.folderPrefix = currentFolderPrefix(config.values);
     this.now = deps.now ?? (() => Date.now());
 
     if (deps.client) {

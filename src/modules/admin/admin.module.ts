@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { OrdersModule } from "../orders/orders.module";
+import { UploadsModule } from "../uploads/uploads.module";
 import { AdminAuditController } from "./admin-audit.controller";
 import { AdminCategoriesController } from "./admin-categories.controller";
 import { AdminCategoriesService } from "./admin-categories.service";
@@ -13,11 +14,12 @@ import { AdminSellersService } from "./admin-sellers.service";
 import { AdminSuspendedSellersController } from "./admin-suspended-sellers.controller";
 import { AdminShopsController } from "./admin-shops.controller";
 import { AdminShopsService } from "./admin-shops.service";
+import { AdminUploadsController } from "./admin-uploads.controller";
 import { AdminUsersController } from "./admin-users.controller";
 import { AdminUsersService } from "./admin-users.service";
 
 @Module({
-  imports: [OrdersModule],
+  imports: [OrdersModule, UploadsModule],
   controllers: [
     AdminUsersController,
     AdminSellersController,
@@ -27,6 +29,7 @@ import { AdminUsersService } from "./admin-users.service";
     AdminCategoriesController,
     AdminPaymentsController,
     AdminAuditController,
+    AdminUploadsController,
   ],
   providers: [
     AdminUsersService,

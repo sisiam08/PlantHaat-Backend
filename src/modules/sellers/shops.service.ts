@@ -5,6 +5,7 @@ import { ErrorCode } from "../../common/errors/error-codes";
 import { toUniqueSlug } from "../../common/utils/slug";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { UploadsService } from "../uploads/uploads.service";
 import type { SetVacationDto } from "./dto/set-vacation.dto";
 import type { UpdateShopDto } from "./dto/update-shop.dto";
 import { SellerContextService } from "./seller-context.service";
@@ -14,6 +15,7 @@ export class ShopsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sellerContext: SellerContextService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async getForSeller(userId: string) {
@@ -33,21 +35,26 @@ export class ShopsService {
       if (!dto.name) {
         throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Shop name is required");
       }
-      const shop = await this.prisma.shop.create({
-        data: {
-          sellerProfileId: profile.id,
-          name: dto.name.trim(),
-          slug: await this.generateUniqueSlug(dto.name),
-          description: dto.description ?? null,
-          logoUrl: dto.logoUrl ?? null,
-          bannerUrl: dto.bannerUrl ?? null,
-          phone: dto.phone ?? null,
-          district: dto.district ?? null,
-          address: dto.address ?? null,
-          latitude: dto.latitude ?? null,
-          longitude: dto.longitude ?? null,
-          status: "PENDING",
-        },
+      const slug = await this.generateUniqueSlug(dto.name);
+      const shop = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.shop.create({
+          data: {
+            sellerProfileId: profile.id,
+            name: dto.name!.trim(),
+            slug,
+            description: dto.description ?? null,
+            logoUrl: dto.logoUrl ?? null,
+            bannerUrl: dto.bannerUrl ?? null,
+            phone: dto.phone ?? null,
+            district: dto.district ?? null,
+            address: dto.address ?? null,
+            latitude: dto.latitude ?? null,
+            longitude: dto.longitude ?? null,
+            status: "PENDING",
+          },
+        });
+        await this.uploads.attachAssetsInTransaction(tx, [created.logoUrl, created.bannerUrl]);
+        return created;
       });
       return this.toView(shop);
     }
@@ -63,7 +70,17 @@ export class ShopsService {
     if (dto.latitude !== undefined) data.latitude = dto.latitude;
     if (dto.longitude !== undefined) data.longitude = dto.longitude;
 
-    const shop = await this.prisma.shop.update({ where: { id: existing.id }, data });
+    const shop = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.shop.update({ where: { id: existing.id }, data });
+      await this.uploads.attachAssetsInTransaction(tx, [updated.logoUrl, updated.bannerUrl]);
+      return updated;
+    });
+    if (existing.logoUrl && existing.logoUrl !== shop.logoUrl) {
+      await this.uploads.deleteByUrl(existing.logoUrl);
+    }
+    if (existing.bannerUrl && existing.bannerUrl !== shop.bannerUrl) {
+      await this.uploads.deleteByUrl(existing.bannerUrl);
+    }
     return this.toView(shop);
   }
 

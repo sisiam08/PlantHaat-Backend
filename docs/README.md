@@ -7,7 +7,8 @@ Canonical docs for the backend repo (`feature/payments`). Documentation lives on
 | `BACKEND_CONTEXT.md` | Backend working rules, phase history, decisions/deviations, endpoint inventory | backend | 2026-11-18 (docs index added; historical log kept) |
 | `BACKEND_DESIGN.md` | Backend final-state design: architecture, domain rules, API, DB, security | backend | 2026-10-20 |
 | `BACKEND_CHANGE_REQUESTS.md` | Additive backend changes requested by the frontend | backend (for frontend) | 2026-11-18 |
-| `UPLOAD_SYSTEM.md` | Image/PDF upload architecture (Cloudinary/S3/local), security and triggers | backend | 2026-10-12 |
+| `UPLOAD_SYSTEM.md` | Upload/Cloudinary architecture, producer inventory, orphan safety, environment separation, production checklist | backend | 2026-11-19 |
+| `security/secret-rotation.md` | Secret findings and rotation order/effects | backend | 2026-11-19 |
 | `decisions-log.md` | Single chronological decision log (both tracks) | cross-cutting | 2026-11-18 |
 | `progress.md` | Single chronological implementation/resume log (payments + frontend consistency track) | cross-cutting | 2026-11-18 |
 | `api/conventions.md` | Envelope, pagination, auth, idempotency, money/date conventions | backend | 2026-11-18 |

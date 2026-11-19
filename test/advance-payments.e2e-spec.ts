@@ -340,6 +340,10 @@ describe("Advance payments (real DB)", () => {
     expect(stored.proofUrl).toBeTruthy();
     expect(stored.proofUrl).not.toContain("evil.example");
     expect(stored.proofUrl).toContain("/payments/");
+    const tracked = await prisma.uploadedAsset.findFirstOrThrow({
+      where: { url: stored.proofUrl! },
+    });
+    expect(tracked.status).toBe("ATTACHED");
   });
 
   it("snapshots provider details and enforces permissions", async () => {

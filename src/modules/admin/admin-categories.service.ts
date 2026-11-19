@@ -5,12 +5,14 @@ import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import { toSlug, toUniqueSlug } from "../../common/utils/slug";
 import { PrismaService } from "../../prisma/prisma.service";
+import { UploadsService } from "../uploads/uploads.service";
 import type { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
 
 @Injectable()
 export class AdminCategoriesService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly uploads: UploadsService,
     private readonly events: EventEmitter2,
   ) {}
 
@@ -28,23 +30,27 @@ export class AdminCategoriesService {
     const slug = dto.slug
       ? await this.ensureUniqueSlug(toSlug(dto.slug))
       : await this.ensureUniqueSlug(toUniqueSlug(dto.name));
-    const created = await this.prisma.category.create({
-      data: {
-        name: dto.name.trim(),
-        nameBn: dto.nameBn ?? null,
-        slug,
-        parentId: dto.parentId ?? null,
-        imageUrl: dto.imageUrl ?? null,
-        sortOrder: dto.sortOrder ?? 0,
-        isActive: dto.isActive ?? true,
-      },
+    const created = await this.prisma.$transaction(async (tx) => {
+      const category = await tx.category.create({
+        data: {
+          name: dto.name.trim(),
+          nameBn: dto.nameBn ?? null,
+          slug,
+          parentId: dto.parentId ?? null,
+          imageUrl: dto.imageUrl ?? null,
+          sortOrder: dto.sortOrder ?? 0,
+          isActive: dto.isActive ?? true,
+        },
+      });
+      await this.uploads.attachAssetsInTransaction(tx, [category.imageUrl]);
+      return category;
     });
     this.events.emit("category.changed");
     return created;
   }
 
   async update(id: string, dto: UpdateCategoryDto) {
-    await this.getOrThrow(id);
+    const existing = await this.getOrThrow(id);
     if (dto.parentId) {
       if (dto.parentId === id) {
         throw AppException.badRequest(
@@ -54,24 +60,31 @@ export class AdminCategoriesService {
       }
       await this.assertParent(dto.parentId);
     }
-    const updated = await this.prisma.category.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-        ...(dto.nameBn !== undefined ? { nameBn: dto.nameBn } : {}),
-        ...(dto.slug !== undefined ? { slug: toSlug(dto.slug) } : {}),
-        ...(dto.parentId !== undefined ? { parentId: dto.parentId } : {}),
-        ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl } : {}),
-        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const category = await tx.category.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.nameBn !== undefined ? { nameBn: dto.nameBn } : {}),
+          ...(dto.slug !== undefined ? { slug: toSlug(dto.slug) } : {}),
+          ...(dto.parentId !== undefined ? { parentId: dto.parentId } : {}),
+          ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl } : {}),
+          ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+      await this.uploads.attachAssetsInTransaction(tx, [category.imageUrl]);
+      return category;
     });
+    if (existing.imageUrl && existing.imageUrl !== updated.imageUrl) {
+      await this.uploads.deleteByUrl(existing.imageUrl);
+    }
     this.events.emit("category.changed");
     return updated;
   }
 
   async remove(id: string): Promise<void> {
-    await this.getOrThrow(id);
+    const existing = await this.getOrThrow(id);
     const products = await this.prisma.product.count({ where: { categoryId: id } });
     if (products > 0) {
       throw AppException.conflict(
@@ -87,6 +100,7 @@ export class AdminCategoriesService {
       );
     }
     await this.prisma.category.delete({ where: { id } });
+    await this.uploads.deleteByUrl(existing.imageUrl);
     this.events.emit("category.changed");
   }
 
@@ -117,7 +131,7 @@ export class AdminCategoriesService {
   private async getOrThrow(id: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, imageUrl: true },
     });
     if (!category) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Category not found");

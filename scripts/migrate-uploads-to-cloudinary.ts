@@ -39,6 +39,7 @@ const driver = new CloudinaryStorageDriver({
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+    CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER,
     CLOUDINARY_FOLDER_PREFIX:
       process.env.CLOUDINARY_FOLDER_PREFIX ?? `planthaat/${process.env.NODE_ENV ?? "development"}`,
   },
@@ -71,6 +72,54 @@ async function collect(): Promise<Row[]> {
   rows.push(...attachments.map((r) => ({ table: "ComplaintAttachment", id: r.id, field: "url", url: r.url })));
   const banners = await prisma.banner.findMany({ select: { id: true, imageUrl: true } });
   rows.push(...banners.map((r) => ({ table: "Banner", id: r.id, field: "imageUrl", url: r.imageUrl })));
+  const orderItems = await prisma.orderItem.findMany({
+    where: { imageUrl: { not: null } },
+    select: { id: true, imageUrl: true },
+  });
+  rows.push(
+    ...orderItems.map((r) => ({
+      table: "OrderItem",
+      id: r.id,
+      field: "imageUrl",
+      url: r.imageUrl ?? "",
+    })),
+  );
+  const shopOrders = await prisma.shopOrder.findMany({
+    where: { deliveryProofUrl: { not: null } },
+    select: { id: true, deliveryProofUrl: true },
+  });
+  rows.push(
+    ...shopOrders.map((r) => ({
+      table: "ShopOrder",
+      id: r.id,
+      field: "deliveryProofUrl",
+      url: r.deliveryProofUrl ?? "",
+    })),
+  );
+  const messages = await prisma.message.findMany({
+    where: { attachmentUrl: { not: null } },
+    select: { id: true, attachmentUrl: true },
+  });
+  rows.push(
+    ...messages.map((r) => ({
+      table: "Message",
+      id: r.id,
+      field: "attachmentUrl",
+      url: r.attachmentUrl ?? "",
+    })),
+  );
+  const proofs = await prisma.paymentSubmission.findMany({
+    where: { proofUrl: { not: null } },
+    select: { id: true, proofUrl: true },
+  });
+  rows.push(
+    ...proofs.map((r) => ({
+      table: "PaymentSubmission",
+      id: r.id,
+      field: "proofUrl",
+      url: r.proofUrl ?? "",
+    })),
+  );
   return rows.filter((row) => row.url && localKey(row.url));
 }
 
@@ -100,6 +149,18 @@ async function update(row: Row, newUrl: string): Promise<void> {
     case "Banner":
       await prisma.banner.update({ where: { id: row.id }, data: { imageUrl: newUrl } });
       break;
+    case "OrderItem":
+      await prisma.orderItem.update({ where: { id: row.id }, data: { imageUrl: newUrl } });
+      break;
+    case "ShopOrder":
+      await prisma.shopOrder.update({ where: { id: row.id }, data: { deliveryProofUrl: newUrl } });
+      break;
+    case "Message":
+      await prisma.message.update({ where: { id: row.id }, data: { attachmentUrl: newUrl } });
+      break;
+    case "PaymentSubmission":
+      await prisma.paymentSubmission.update({ where: { id: row.id }, data: { proofUrl: newUrl } });
+      break;
   }
 }
 
@@ -112,6 +173,7 @@ async function main(): Promise<void> {
   }
   const rows = await collect();
   console.log(`${APPLY ? "APPLY" : "DRY-RUN"}: ${rows.length} local upload URL(s) found`);
+  const uploaded = new Map<string, string>();
   let migrated = 0;
   for (const row of rows) {
     const key = localKey(row.url);
@@ -119,6 +181,12 @@ async function main(): Promise<void> {
     console.log(`${row.table}.${row.field} ${row.id}  ${key}`);
     if (!APPLY) continue;
     try {
+      const existing = uploaded.get(row.url);
+      if (existing) {
+        await update(row, existing);
+        migrated += 1;
+        continue;
+      }
       const file = await readFile(join(resolve(process.cwd(), UPLOAD_DIR), "public", key));
       const ext = extname(key).toLowerCase();
       const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
@@ -129,6 +197,7 @@ async function main(): Promise<void> {
         visibility: "public",
         resourceType: contentType.startsWith("image/") ? "image" : "raw",
       });
+      uploaded.set(row.url, stored.url);
       await update(row, stored.url);
       migrated += 1;
     } catch (error) {

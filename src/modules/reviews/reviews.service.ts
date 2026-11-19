@@ -10,6 +10,7 @@ import type { ReportStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { SettingsService } from "../settings/settings.service";
+import { UploadsService } from "../uploads/uploads.service";
 import type {
   CreateReviewDto,
   QueryProductReviewsDto,
@@ -68,6 +69,7 @@ export class ReviewsService {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async create(customerId: string, orderItemId: string, dto: CreateReviewDto) {
@@ -114,6 +116,7 @@ export class ReviewsService {
           images: dto.images?.length ? { create: dto.images.map((url) => ({ url })) } : undefined,
         },
       });
+      await this.uploads.attachAssetsInTransaction(tx, dto.images ?? []);
       await recomputeReviewRatings(tx, orderItem.productId!, shopOrder.shopId);
       return created;
     });
@@ -123,11 +126,14 @@ export class ReviewsService {
   async update(customerId: string, reviewId: string, dto: UpdateReviewDto) {
     const review = await this.getOwned(customerId, reviewId);
     if (Date.now() > review.createdAt.getTime() + REVIEW_EDIT_WINDOW_DAYS * 86_400_000) {
-      throw AppException.badRequest(
-        ErrorCode.REVIEW_WINDOW_CLOSED,
-        "A review can only be edited within 7 days",
-      );
+      throw AppException.badRequest(ErrorCode.REVIEW_WINDOW_CLOSED, "A review can only be edited within 7 days");
     }
+    const previousImages =
+      dto.images !== undefined
+        ? (await this.prisma.reviewImage.findMany({ where: { reviewId }, select: { url: true } })).map(
+            (image) => image.url,
+          )
+        : [];
     await this.prisma.$transaction(async (tx) => {
       await tx.review.update({
         where: { id: reviewId },
@@ -144,18 +150,28 @@ export class ReviewsService {
             data: dto.images.map((url) => ({ reviewId, url })),
           });
         }
+        await this.uploads.attachAssetsInTransaction(tx, dto.images);
       }
       await recomputeReviewRatings(tx, review.productId, review.shopId);
     });
+    if (dto.images !== undefined) {
+      const next = new Set(dto.images);
+      await this.uploads.deleteAssets(previousImages.filter((url) => !next.has(url)));
+    }
     return this.prisma.review.findUniqueOrThrow({ where: { id: reviewId } });
   }
 
   async remove(customerId: string, reviewId: string): Promise<void> {
     const review = await this.getOwned(customerId, reviewId);
+    const images = await this.prisma.reviewImage.findMany({
+      where: { reviewId },
+      select: { url: true },
+    });
     await this.prisma.$transaction(async (tx) => {
       await tx.review.delete({ where: { id: reviewId } });
       await recomputeReviewRatings(tx, review.productId, review.shopId);
     });
+    await this.uploads.deleteAssets(images.map((image) => image.url));
   }
 
   async listForProduct(slug: string, query: QueryProductReviewsDto) {

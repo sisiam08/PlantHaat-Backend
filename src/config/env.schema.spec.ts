@@ -69,4 +69,26 @@ describe("storage env validation", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("requires an explicit production Cloudinary folder", () => {
+    const baseProduction = {
+      NODE_ENV: "production",
+      STORAGE_DRIVER: "cloudinary",
+      CLOUDINARY_CLOUD_NAME: "demo",
+      CLOUDINARY_API_KEY: "key",
+      CLOUDINARY_API_SECRET: "secret",
+      BFF_SHARED_SECRET: "b".repeat(32),
+    };
+    const missing = parsed(baseProduction);
+    expect(missing.success).toBe(false);
+    if (!missing.success) {
+      expect(missing.error.issues.some((issue) => issue.path.includes("CLOUDINARY_FOLDER"))).toBe(
+        true,
+      );
+    }
+    const wrong = parsed({ ...baseProduction, CLOUDINARY_FOLDER: "planthaat/dev" });
+    expect(wrong.success).toBe(false);
+    const good = parsed({ ...baseProduction, CLOUDINARY_FOLDER: "planthaat/prod" });
+    expect(good.success).toBe(true);
+  });
 });

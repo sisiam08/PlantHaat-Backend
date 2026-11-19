@@ -22,14 +22,19 @@ async function main(): Promise<void> {
     return;
   }
 
+  const env = process.env.NODE_ENV ?? "development";
+  const prefix = (
+    process.env.CLOUDINARY_FOLDER ??
+    process.env.CLOUDINARY_FOLDER_PREFIX ??
+    `planthaat/${env}`
+  ).replace(/^\/+|\/+$/g, "");
   const driver = new CloudinaryStorageDriver({
     values: {
-      NODE_ENV: process.env.NODE_ENV ?? "development",
+      NODE_ENV: env,
       CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
       CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
       CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
-      CLOUDINARY_FOLDER_PREFIX:
-        process.env.CLOUDINARY_FOLDER_PREFIX ?? `planthaat/${process.env.NODE_ENV ?? "development"}`,
+      CLOUDINARY_FOLDER: prefix,
     },
   } as unknown as AppConfigService);
 
@@ -39,6 +44,7 @@ async function main(): Promise<void> {
   };
 
   const stamp = Date.now();
+  const smokeFolder = `${prefix}/smoke/${stamp}`;
   const png = await sharp({
     create: { width: 4, height: 4, channels: 3, background: { r: 30, g: 120, b: 60 } },
   })
@@ -50,6 +56,7 @@ async function main(): Promise<void> {
     contentType: "image/png",
     visibility: "public",
     resourceType: "image",
+    folder: smokeFolder,
   });
   const publicStatus = (await fetch(publicAsset.url)).status;
   record("public image", "200", String(publicStatus));
@@ -60,6 +67,7 @@ async function main(): Promise<void> {
     contentType: "application/pdf",
     visibility: "private",
     resourceType: "raw",
+    folder: smokeFolder,
   });
   const cloud = process.env.CLOUDINARY_CLOUD_NAME;
   const unsignedUrl = `https://res.cloudinary.com/${cloud}/raw/upload/${privateAsset.key}`;
@@ -72,7 +80,12 @@ async function main(): Promise<void> {
 
   await driver.delete(publicAsset.key, "public");
   await driver.delete(privateAsset.key, "private");
-  const afterDelete = (await fetch(publicAsset.url)).status;
+  let afterDelete = 200;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    afterDelete = (await fetch(`${publicAsset.url}?smoke=${Date.now()}`)).status;
+    if (afterDelete !== 200) break;
+  }
   record("public after delete", "not 200", String(afterDelete));
 
   const width = Math.max(...rows.map(([a, b, c]) => Math.max(a.length, b.length, c.length)));

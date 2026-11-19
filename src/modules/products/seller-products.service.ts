@@ -11,6 +11,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { SellerContextService } from "../sellers/seller-context.service";
 import { SettingsService } from "../settings/settings.service";
+import { UploadsService } from "../uploads/uploads.service";
 import type { AdjustStockDto } from "./dto/adjust-stock.dto";
 import type { CreateProductDto } from "./dto/create-product.dto";
 import type { CreateVariantDto } from "./dto/create-variant.dto";
@@ -34,6 +35,7 @@ export class SellerProductsService {
     private readonly sellerContext: SellerContextService,
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
+    private readonly uploads: UploadsService,
     private readonly events: EventEmitter2,
   ) {}
 
@@ -387,6 +389,7 @@ export class SellerProductsService {
           isPrimary: makePrimary,
         },
       });
+      await this.uploads.attachAssetsInTransaction(tx, [dto.url]);
     });
     return this.get(userId, productId);
   }
@@ -421,8 +424,21 @@ export class SellerProductsService {
 
   async deleteImage(userId: string, productId: string, imageId: string) {
     await this.getOwned(userId, productId);
-    await this.getImage(productId, imageId);
+    const image = await this.prisma.productImage.findFirstOrThrow({
+      where: { id: imageId, productId },
+      select: { url: true },
+    });
     await this.prisma.productImage.delete({ where: { id: imageId } });
+
+    // Order history keeps an image snapshot; never delete an asset that a
+    // historical order or another product image still points at.
+    const [orderRefs, imageRefs] = await Promise.all([
+      this.prisma.orderItem.count({ where: { imageUrl: image.url } }),
+      this.prisma.productImage.count({ where: { url: image.url } }),
+    ]);
+    if (orderRefs === 0 && imageRefs === 0) {
+      await this.uploads.deleteByUrl(image.url);
+    }
     return this.get(userId, productId);
   }
 

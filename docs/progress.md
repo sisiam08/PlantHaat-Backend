@@ -9,6 +9,7 @@
 - Dev DB settings are owner-managed: Advance ON, bKash ON with the owner's real number, Nagad OFF, COD ON (last changed 2026-11-16 11:11 UTC). Never print, delete or overwrite the number.
 - Isolated verification stack: `:5001` (planthaat_test) + `:3002`; dev servers `:5000`/`:3000`; `:3100` stays off.
 - Docs consolidated into the two repos on 2026-11-18; old-root path map is in `README.md`.
+- 2026-11-19 image storage: dev now uses Cloudinary (`STORAGE_DRIVER=cloudinary`); 109 legacy local URLs migrated (98 product images, 11 categories; one avatar file was already missing); every upload flow now marks `UploadedAsset` ATTACHED and replacement/removal cleans Cloudinary safely. See `BACKEND_CONTEXT.md` and `decisions-log.md`.
 
 ## Backend/payments log
 
@@ -395,3 +396,12 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
   then restored; balanced path passes in UI.
 - Legacy-settled labels added to seller transactions and admin order detail; reconciliation help text
   added bn/en. Dev database/settings untouched; test stack stopped.
+
+## Upload/Cloudinary follow-up (2026-11-19)
+
+- Producer inventory written to `docs/UPLOAD_SYSTEM.md`; every existing persistence flow attaches in the entity transaction. Seller dispute response photos and delivery-proof writers do not exist yet; messaging is schema-only. Private KYC files are never auto-deleted.
+- Orphan cron now uses the central reference registry, relinks live PENDING assets, skips private/foreign-prefix assets, supports `upload.orphanGraceDays` (default 7, min 1), dry-run and summary logs. `uploads:orphans` and `uploads:reconcile` added.
+- Live damage check: Category.imageUrl 11/11 OK, ProductImage.url 98 OK + 2 external picsum errors, User.avatarUrl 1 pre-existing missing (record left intact).
+- Env separation: `CLOUDINARY_FOLDER=planthaat/dev` locally; production requires `/prod`. Smoke uses its own temporary folder and passed live after the delete-propagation retry.
+- Secrets: Cloudinary credentials in history at `35675ba`; working tree sanitized; `npm run lint` includes `scripts/check-secrets.mjs`; rotation runbook added.
+- Frontend: home banners point at existing `.webp` files with a Vitest guard; admin Settings has a storage health card; production build requires `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`.

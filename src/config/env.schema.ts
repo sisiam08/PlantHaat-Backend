@@ -63,6 +63,9 @@ export const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: optionalString,
   CLOUDINARY_API_KEY: optionalString,
   CLOUDINARY_API_SECRET: optionalString,
+  /** Environment-scoped Cloudinary folder, e.g. planthaat/dev. */
+  CLOUDINARY_FOLDER: optionalString,
+  /** Deprecated alias kept for existing local env files. */
   CLOUDINARY_FOLDER_PREFIX: optionalString,
   S3_ENDPOINT: optionalString,
   S3_REGION: optionalString,
@@ -123,6 +126,21 @@ export const envSchema = z.object({
       path: ["STORAGE_DRIVER"],
       message: "STORAGE_DRIVER must be cloudinary or s3 in production (local is refused)",
     });
+  }
+  if (value.NODE_ENV === "production" && value.STORAGE_DRIVER === "cloudinary") {
+    if (!value.CLOUDINARY_FOLDER) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["CLOUDINARY_FOLDER"],
+        message: "CLOUDINARY_FOLDER is required in production (for example planthaat/prod)",
+      });
+    } else if (!/(^|\/)prod(\/|$)/.test(value.CLOUDINARY_FOLDER)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["CLOUDINARY_FOLDER"],
+        message: "CLOUDINARY_FOLDER must be a production folder (include a /prod segment)",
+      });
+    }
   }
   if (value.STORAGE_DRIVER === "s3") {
     const required = ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const;

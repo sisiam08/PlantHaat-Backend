@@ -57,6 +57,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "stuck.shippedGraceDays", type: "number", default: 2, group: "orders", labelEn: "Stuck SHIPPED grace days", labelBn: "Stuck SHIPPED grace days", wired: true },
   { key: "stuck.reminderHours", type: "number", default: 24, group: "orders", labelEn: "Stuck reminder hours", labelBn: "Stuck reminder hours", wired: true },
   { key: "stuck.maxReminders", type: "number", default: 3, group: "orders", labelEn: "Stuck max reminders", labelBn: "Stuck max reminders", wired: true },
+  { key: "upload.orphanGraceDays", type: "number", default: 7, group: "platform", labelEn: "Orphan upload grace (days)", labelBn: "অনাথ আপলোড গ্রেস (দিন)", helpEn: "Pending uploads older than this are checked for references before deletion. Minimum 1 day.", helpBn: "এই সময়ের বেশি পুরোনো pending upload মুছে ফেলার আগে reference যাচাই করা হয়। সর্বনিম্ন ১ দিন।", wired: true },
   { key: "support.whatsapp", type: "string", default: "", group: "support", labelEn: "WhatsApp number", labelBn: "হোয়াটসঅ্যাপ নম্বর", isPublic: true },
   { key: "support.phone", type: "string", default: "", group: "support", labelEn: "Support phone", labelBn: "সাপোর্ট ফোন", isPublic: true },
   { key: "support.email", type: "string", default: "", group: "support", labelEn: "Support email", labelBn: "সাপোর্ট ইমেইল", isPublic: true },
@@ -177,6 +178,9 @@ export function validateSettingValue(key: string, value: unknown): void {
     }
     if (key === "security.refresh.graceSeconds" && (value < 0 || value > 300)) {
       throw new SettingValidationError("Refresh grace window must be 0-300 seconds");
+    }
+    if (key === "upload.orphanGraceDays" && (value < 1 || value > 30)) {
+      throw new SettingValidationError("Orphan upload grace must be 1–30 days");
     }
   }
 

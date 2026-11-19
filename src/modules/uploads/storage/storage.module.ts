@@ -1,4 +1,4 @@
-import { Global, Module } from "@nestjs/common";
+import { Global, Logger, Module } from "@nestjs/common";
 
 import { AppConfigService } from "../../../config/app-config.service";
 import { CloudinaryStorageDriver } from "./cloudinary-storage.driver";
@@ -27,6 +27,11 @@ export function resolveStorageDriver(config: AppConfigService): StorageService {
   if (values.STORAGE_DRIVER === "s3") {
     return new S3StorageDriver(config);
   }
+  Logger.warn(
+    "Local disk storage is active; uploaded images will be served from /uploads. " +
+      "Set STORAGE_DRIVER=cloudinary (or s3) for persistent storage.",
+    "StorageModule",
+  );
   return new LocalStorageDriver(config);
 }
 

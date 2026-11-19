@@ -347,6 +347,38 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
     expect(allocations).toHaveLength(2);
   });
 
+  it("attaches dispute evidence in the same transaction", async () => {
+    const seller = await createShop(1000, 60);
+    const { customer, order } = await advanceOrder([seller]);
+    const shopOrderId = order.shopOrders[0].id as string;
+    await deliver(seller, shopOrderId);
+    const url =
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/disputes/evidence.webp";
+    await prisma.uploadedAsset.create({
+      data: {
+        publicId: "planthaat/test/disputes/evidence",
+        resourceType: "image",
+        url,
+        purpose: "complaint",
+        ownerId: customer.userId,
+        status: "PENDING",
+      },
+    });
+    const opened = await customer.agent
+      .post(`${API}/complaints`)
+      .set("Origin", ORIGIN)
+      .send({
+        shopOrderId,
+        type: "DAMAGED_PLANT",
+        description: "The plant arrived damaged in the box",
+        attachments: [url],
+      })
+      .expect(201);
+    expect(opened.body.data.id).toBeTruthy();
+    const asset = await prisma.uploadedAsset.findFirstOrThrow({ where: { url } });
+    expect(asset.status).toBe("ATTACHED");
+  });
+
   it("keeps funds on hold when a dispute wins the race and never double-posts", async () => {    const seller = await createShop(1000, 60);
     for (let run = 0; run < 3; run += 1) {
       const { customer, order } = await advanceOrder([seller]);

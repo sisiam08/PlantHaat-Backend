@@ -87,11 +87,21 @@ export class UsersService {
   }
 
   async updateAvatar(userId: string, file: Express.Multer.File | undefined): Promise<PublicUser> {
-    const stored = await this.uploads.uploadImage(file, UploadPurpose.AVATAR, userId);
-    await this.prisma.user.update({
+    const current = await this.prisma.user.findUnique({
       where: { id: userId },
-      data: { avatarUrl: stored.url },
+      select: { avatarUrl: true },
     });
+    const stored = await this.uploads.uploadImage(file, UploadPurpose.AVATAR, userId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { avatarUrl: stored.url },
+      });
+      await this.uploads.attachAssetsInTransaction(tx, [stored.url]);
+    });
+    if (current?.avatarUrl && current.avatarUrl !== stored.url) {
+      await this.uploads.deleteByUrl(current.avatarUrl);
+    }
     return this.getProfile(userId);
   }
 }

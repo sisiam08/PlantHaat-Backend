@@ -14,6 +14,7 @@ import { LedgerService } from "../ledger/ledger.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
 import { SettingsService } from "../settings/settings.service";
+import { UploadsService } from "../uploads/uploads.service";
 import type {
   ComplaintCommentDto,
   CreateComplaintDto,
@@ -36,6 +37,7 @@ export class ComplaintsService {
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
     private readonly orders: OrdersService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async create(customerId: string, dto: CreateComplaintDto) {
@@ -179,6 +181,7 @@ export class ComplaintsService {
         });
         flags = updated.falseDeliveryFlags;
       }
+      await this.uploads.attachAssetsInTransaction(tx, dto.attachments ?? []);
       return { complaint: created, falseDeliveryFlags: flags };
     });
 

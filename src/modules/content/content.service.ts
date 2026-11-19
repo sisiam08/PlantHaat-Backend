@@ -4,6 +4,7 @@ import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { UploadsService } from "../uploads/uploads.service";
 import type {
   CreateBannerDto,
   CreateHomepageSectionDto,
@@ -13,49 +14,66 @@ import type {
 
 @Injectable()
 export class ContentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploads: UploadsService,
+  ) {}
 
   listBanners() {
     return this.prisma.banner.findMany({ orderBy: [{ placement: "asc" }, { sortOrder: "asc" }] });
   }
 
-  createBanner(dto: CreateBannerDto) {
-    return this.prisma.banner.create({
-      data: {
-        title: dto.title ?? null,
-        imageUrl: dto.imageUrl,
-        linkUrl: dto.linkUrl ?? null,
-        placement: dto.placement ?? "HOME_HERO",
-        sortOrder: dto.sortOrder ?? 0,
-        isActive: dto.isActive ?? true,
-        startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
-      },
+  async createBanner(dto: CreateBannerDto) {
+    const banner = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.banner.create({
+        data: {
+          title: dto.title ?? null,
+          imageUrl: dto.imageUrl,
+          linkUrl: dto.linkUrl ?? null,
+          placement: dto.placement ?? "HOME_HERO",
+          sortOrder: dto.sortOrder ?? 0,
+          isActive: dto.isActive ?? true,
+          startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
+          endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        },
+      });
+      await this.uploads.attachAssetsInTransaction(tx, [created.imageUrl]);
+      return created;
     });
+    return banner;
   }
 
   async updateBanner(id: string, dto: UpdateBannerDto) {
-    await this.ensureBanner(id);
-    return this.prisma.banner.update({
-      where: { id },
-      data: {
-        ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl } : {}),
-        ...(dto.linkUrl !== undefined ? { linkUrl: dto.linkUrl } : {}),
-        ...(dto.placement !== undefined ? { placement: dto.placement } : {}),
-        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-        ...(dto.startsAt !== undefined
-          ? { startsAt: dto.startsAt ? new Date(dto.startsAt) : null }
-          : {}),
-        ...(dto.endsAt !== undefined ? { endsAt: dto.endsAt ? new Date(dto.endsAt) : null } : {}),
-      },
+    const existing = await this.ensureBanner(id);
+    const banner = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.banner.update({
+        where: { id },
+        data: {
+          ...(dto.title !== undefined ? { title: dto.title } : {}),
+          ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl } : {}),
+          ...(dto.linkUrl !== undefined ? { linkUrl: dto.linkUrl } : {}),
+          ...(dto.placement !== undefined ? { placement: dto.placement } : {}),
+          ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.startsAt !== undefined
+            ? { startsAt: dto.startsAt ? new Date(dto.startsAt) : null }
+            : {}),
+          ...(dto.endsAt !== undefined ? { endsAt: dto.endsAt ? new Date(dto.endsAt) : null } : {}),
+        },
+      });
+      await this.uploads.attachAssetsInTransaction(tx, [updated.imageUrl]);
+      return updated;
     });
+    if (existing.imageUrl && existing.imageUrl !== banner.imageUrl) {
+      await this.uploads.deleteByUrl(existing.imageUrl);
+    }
+    return banner;
   }
 
   async deleteBanner(id: string): Promise<void> {
-    await this.ensureBanner(id);
+    const existing = await this.ensureBanner(id);
     await this.prisma.banner.delete({ where: { id } });
+    await this.uploads.deleteByUrl(existing.imageUrl);
   }
 
   listSections() {
@@ -106,11 +124,15 @@ export class ContentService {
     await this.prisma.homepageSection.delete({ where: { id } });
   }
 
-  private async ensureBanner(id: string): Promise<void> {
-    const banner = await this.prisma.banner.findUnique({ where: { id }, select: { id: true } });
+  private async ensureBanner(id: string) {
+    const banner = await this.prisma.banner.findUnique({
+      where: { id },
+      select: { id: true, imageUrl: true },
+    });
     if (!banner) {
       throw AppException.notFound(ErrorCode.NOT_FOUND, "Banner not found");
     }
+    return banner;
   }
 
   private async ensureSection(id: string): Promise<void> {
