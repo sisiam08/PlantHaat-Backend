@@ -376,3 +376,22 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Live report: `frontend/docs/testing/part4-live-report.md`. Screenshots were kept only in a
   gitignored `.artifacts/` folder and deleted after the report.
 - Dev database/settings untouched; test only. Test stack stopped at the end.
+
+## 2026-11-19 Part 4 closing pass
+
+- Payout destination reveal: admin-only, re-auth-scoped, single-use, `Cache-Control: no-store`,
+  5/min throttle, audit without the value, UI password reveal + copy + 60s auto-hide. Tests cover
+  role denial, missing/single-use token, audit row, absence from lists, copy and auto-hide (en/bn).
+- Dispute filters: `seller`, `minAgeHours`, `maxAgeHours`, `minAmount`, `maxAmount` added to the
+  admin complaint query with unit + UI coverage; admin list filter bar wired.
+- Double decision now returns `409 DISPUTE_INVALID_STATE` (stale tabs get a clear conflict instead of
+  a replay); COD-dues block copy explains how to resolve it.
+- UI live scenarios split into independent specs under `e2e/part4-*.spec.ts` (the monolithic spec was
+  removed). Results: **9/9** scenario spec tests passed (filters, reject dispute + stale tab,
+  multi-shop refund, destination reveal, permissions, reconciliation, window, withdrawal reject,
+  withdrawal validation); `payments-advance` **12/12**. Backend settlement e2e **8/8**, complaints
+  unit **7/7**, typecheck/lint clean.
+- Breach path exercised in the visible browser with `scripts/part4-breach-test.ts` (test DB only),
+  then restored; balanced path passes in UI.
+- Legacy-settled labels added to seller transactions and admin order detail; reconciliation help text
+  added bn/en. Dev database/settings untouched; test stack stopped.

@@ -96,6 +96,40 @@ export class QueryComplaintsDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(ComplaintStatus)
   status?: ComplaintStatus;
+
+  @ApiPropertyOptional({ description: "Shop or seller business name contains" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  seller?: string;
+
+  @ApiPropertyOptional({ description: "Minimum age in hours" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  minAgeHours?: number;
+
+  @ApiPropertyOptional({ description: "Maximum age in hours" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  maxAgeHours?: number;
+
+  @ApiPropertyOptional({ description: "Minimum order total" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  minAmount?: number;
+
+  @ApiPropertyOptional({ description: "Maximum order total" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  maxAmount?: number;
 }
 
 export class DecideDisputeDto {

@@ -400,6 +400,60 @@ export class WalletService {
     };
   }
 
+  async revealDestination(
+    id: string,
+    actor: AuthenticatedUser,
+    meta: RequestMeta,
+  ): Promise<{
+    method: PayoutMethod;
+    accountName: string;
+    accountNumber: string;
+    accountMasked: string;
+  }> {
+    const payout = await this.prisma.payout.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        sellerProfileId: true,
+        requestedById: true,
+        method: true,
+      },
+    });
+    if (!payout || !payout.requestedById) {
+      throw AppException.notFound(ErrorCode.NOT_FOUND, "Withdrawal not found");
+    }
+    const account = await this.prisma.sellerPayoutAccount.findFirst({
+      where: {
+        sellerProfileId: payout.sellerProfileId,
+        ...(payout.method ? { method: payout.method } : {}),
+      },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+    });
+    if (!account) {
+      throw AppException.unprocessable(
+        ErrorCode.WITHDRAWAL_DESTINATION_UNAVAILABLE,
+        "No payout account is available for this withdrawal",
+      );
+    }
+    const accountNumber = decryptAesGcm(account.accountNumberEnc, this.encryptionKey());
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      action: "withdrawal.destination_revealed",
+      entityType: "Payout",
+      entityId: id,
+      // Never store the destination value; only the masked identity and method.
+      after: { method: account.method, accountMasked: account.accountMasked },
+      ...meta,
+    });
+    return {
+      method: account.method,
+      accountName: account.accountName,
+      accountNumber,
+      accountMasked: account.accountMasked,
+    };
+  }
+
   async markPaid(
     id: string,
     dto: PayWithdrawalDto,

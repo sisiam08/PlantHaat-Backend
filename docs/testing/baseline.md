@@ -88,3 +88,14 @@ Suites were re-run with the API restarted between groups; every rerun passed.
   not by sleeping.
 - Migrations: `20261118120000_p4_settlement_ledger` applied to dev and test; `db:migrate:all` prints
   host/database and refuses anything else.
+
+## 2026-11-19 Part 4 closing fixtures
+
+- Payout destination reveal tested in `test/settlement.e2e-spec.ts`: role denial (seller 403), missing
+  re-auth (400), valid reveal `200`, full value absent from list JSON and audit JSON, re-auth token
+  single-use (second call 400).
+- Dispute filters unit + e2e: seller/business name contains, age hours, order-total range; stale
+  second decision returns `409 DISPUTE_INVALID_STATE`.
+- Reconciliation breach fixture: `node --import tsx scripts/part4-breach-test.ts insert` then
+  `restore <id>`. The script refuses unless the DB is `planthaat_test` at the approved Neon host.
+  Never run it on dev; restore immediately.

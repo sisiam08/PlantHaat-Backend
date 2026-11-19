@@ -78,3 +78,18 @@
   no release date is invented.
 - Shared header mobile spacing/logo sizing was tightened instead of hiding navigation controls, to
   fix the 360 px overflow without breaking the 44 px target on the remaining controls.
+
+## 2026-11-19 Part 4 closing decisions
+
+- Payout destination reveal reuses the existing settings re-auth service with a per-withdrawal scope
+  (`withdrawal.destination:<id>`) instead of creating a second password system. The endpoint is
+  admin-only, 5/min, no-store, single-use and audited without the value.
+- The admin UI cannot reveal a destination from a list; it must open one request, re-authenticate and
+  the value auto-hides after 60 seconds. The value is never put in React Query or local storage.
+- A second dispute decision is a conflict, not an idempotent success: stale tabs must refresh and see
+  the current decision rather than silently posting twice.
+- Dispute seller/age/amount filtering is server-side (shop/seller name contains, age hours, order
+  total range) so pagination stays correct.
+- Legacy rows are labeled rather than backfilled: “Settled before the new wallet system”.
+- The breach fixture is a guarded, documented test-only script (planthaat_test + approved host), and
+  must be restored immediately.

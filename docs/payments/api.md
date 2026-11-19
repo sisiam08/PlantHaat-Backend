@@ -339,3 +339,27 @@ token system.
    snapshot, pay dialog (reference) and reject dialog (reason).
 7. **Admin ledger/reconciliation**: settlement summary (receipts, buckets, difference, COD dues),
    violation list with alert; per-seller balance/ledger drill-down.
+
+### `POST /admin/withdrawals/:id/destination`
+
+Returns the full payout destination for **one** withdrawal request. Admin-only; never included in
+list responses.
+
+1. `POST /admin/settings/reauth` with `{ "keys": ["withdrawal.destination:<id>"], "password": "..." }`.
+2. `POST /admin/withdrawals/:id/destination` with header `x-settings-reauth: <token>`.
+
+```json
+{
+  "method": "BKASH",
+  "accountName": "Rahim Uddin",
+  "accountNumber": "01712345678",
+  "accountMasked": "017*****78"
+}
+```
+
+The token is short-lived and single-use (a second reveal returns `400 VALIDATION_FAILED`). The route
+is limited to 5 requests/minute, returns `Cache-Control: no-store`, and writes the audit entry
+`withdrawal.destination_revealed` with admin/withdrawal/time/IP but **never** the account number.
+`404 NOT_FOUND` for a non-seller/manual payout, `422 WITHDRAWAL_DESTINATION_UNAVAILABLE` when the
+seller has no matching payout account. UI: masked list value + “Show payout details” ? password
+re-auth ? copy ? auto-hide after 60 seconds or navigation; the value is not put in a query cache.

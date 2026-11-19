@@ -265,6 +265,43 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
     balances = await ledger.balances(seller.profile.id);
     expect(balances.available.toFixed(2)).toBe("360.00");
     expect(balances.withdrawalReserved.toFixed(2)).toBe("600.00");
+    const revealId = withdrawal.body.data.id as string;
+    await seller.agent
+      .post(`${API}/admin/withdrawals/${revealId}/destination`)
+      .set("Origin", ORIGIN)
+      .expect(403);
+    await admin
+      .post(`${API}/admin/withdrawals/${revealId}/destination`)
+      .set("Origin", ORIGIN)
+      .expect(400);
+    const reauth = await admin
+      .post(`${API}/admin/settings/reauth`)
+      .set("Origin", ORIGIN)
+      .send({
+        keys: [`withdrawal.destination:${revealId}`],
+        password: "AdminStr0ng1",
+      })
+      .expect(200);
+    const revealed = await admin
+      .post(`${API}/admin/withdrawals/${revealId}/destination`)
+      .set("Origin", ORIGIN)
+      .set("x-settings-reauth", reauth.body.data.token as string)
+      .expect(200);
+    expect(revealed.body.data.accountNumber).toBe("01712345678");
+    const list = await admin.get(`${API}/admin/withdrawals`).expect(200);
+    expect(JSON.stringify(list.body.data)).not.toContain("01712345678");
+    const audit = await prisma.auditLog.findFirst({
+      where: { action: "withdrawal.destination_revealed", entityId: revealId },
+    });
+    expect(audit).not.toBeNull();
+    expect(JSON.stringify(audit)).not.toContain("01712345678");
+    // Re-auth token is single-use: the second reveal must fail.
+    await admin
+      .post(`${API}/admin/withdrawals/${revealId}/destination`)
+      .set("Origin", ORIGIN)
+      .set("x-settings-reauth", reauth.body.data.token as string)
+      .expect(400);
+
 
     await admin
       .post(`${API}/admin/withdrawals/${withdrawal.body.data.id}/pay`)
@@ -450,6 +487,27 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
         refundTrxId: "BKASHREF1234",
       })
       .expect(200);
+    const duplicateDecision = await refundCase.admin
+      .post(`${API}/admin/complaints/${opened.body.data.id}/decision`)
+      .set("Origin", ORIGIN)
+      .send({ decision: "REJECTED", reason: "Stale tab replay" });
+    expect(duplicateDecision.status).toBe(409);
+    expect(duplicateDecision.body.error.code).toBe("DISPUTE_INVALID_STATE");
+    const filtered = await refundCase.admin
+      .get(`${API}/admin/complaints`)
+      .query({
+        seller: seller.profile.businessName,
+        status: "RESOLVED_REFUND",
+        minAgeHours: 0,
+        maxAgeHours: 24,
+        minAmount: 1,
+        maxAmount: 100000,
+      })
+      .expect(200);
+    expect(filtered.body.data.some((row: { id: string }) => row.id === opened.body.data.id)).toBe(
+      true,
+    );
+
     let balances = await ledger.balances(seller.profile.id);
     expect(balances.onHold.toFixed(2)).toBe("0.00");
     expect(balances.pending.toFixed(2)).toBe("0.00");

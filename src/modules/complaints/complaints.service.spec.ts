@@ -26,6 +26,8 @@ function createService(overrides: Record<string, unknown> = {}) {
       update: mockFn(),
       findUnique: mockFn(),
       findFirst: mockFn(),
+      findMany: mockFn(),
+      count: mockFn(),
     },
     sellerProfile: { update: mockFn() },
     refund: { create: mockFn() },
@@ -217,5 +219,34 @@ describe("ComplaintsService", () => {
     await expect(
       service.updateStatus("cmp-1", { status: "RESOLVED_REFUND" } as never, actor, meta),
     ).rejects.toMatchObject({ code: ErrorCode.COMPLAINT_NOT_ALLOWED });
+  });
+  it("builds admin dispute filters for seller, age and amount", async () => {
+    const { service, prisma } = createService();
+    prisma.complaint.findMany.mockResolvedValue([]);
+    prisma.complaint.count.mockResolvedValue(0);
+
+    await service.listAll({
+      page: 1,
+      limit: 20,
+      status: "OPEN",
+      seller: "Green",
+      minAgeHours: 2,
+      maxAgeHours: 48,
+      minAmount: 100,
+      maxAmount: 2000,
+    } as never);
+
+    const arg = prisma.complaint.findMany.mock.calls[0][0] as {
+      where: {
+        status: string;
+        shop: { is: { OR: unknown[] } };
+        createdAt: { lte: Date; gte: Date };
+        shopOrder: { is: { total: { gte: number; lte: number } } };
+      };
+    };
+    expect(arg.where.status).toBe("OPEN");
+    expect(arg.where.shop.is.OR).toHaveLength(2);
+    expect(arg.where.createdAt.lte.getTime()).toBeGreaterThan(arg.where.createdAt.gte.getTime());
+    expect(arg.where.shopOrder.is.total).toEqual({ gte: 100, lte: 2000 });
   });
 });

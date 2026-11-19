@@ -122,3 +122,25 @@ Orders delivered before Part 4 are legacy-settled and have no return window; cre
 6. COD: deliver a COD order; Wallet shows COD dues. If dues exceed the limit, withdrawal is blocked;
    Admin ? seller ? dues payment with TrxID clears it.
 7. Admin ? Reconciliation: run the check; `Balanced` must be green. Do not pay out on a breach.
+
+## Part 4 closing checks (UI)
+
+1. **Reject a dispute:** deliver an ADVANCE order, buyer reports a problem with a photo, seller
+   responds, admin opens the dispute and chooses Reject with a reason. Seller Wallet moves the amount
+   back to Pending (or Available if the window passed); buyer and seller timelines show the decision.
+2. **Reject a withdrawal:** seller requests a withdrawal; admin opens Withdrawals, rejects with a
+   reason. Seller Wallet shows the amount back in Available and the rejected request with the reason.
+3. **Payout details:** admin opens Withdrawals, presses “Show payout details”, enters the admin
+   password, copies the full destination, then closes it. It disappears automatically after about
+   60 seconds. It is never shown in the list or audit log.
+4. **Validation:** try a below-minimum amount, more than Available, a fourth pending request (limit),
+   a payout-account change inside the cooldown, an invalid mobile number, and a withdrawal while COD
+   dues exceed the limit. Each must show a specific message; the COD message must say how to fix it.
+5. **Double submit:** click Request withdrawal twice quickly; only one request is created.
+6. **Multi-shop refund:** cancel one shop of a paid ADVANCE order, complete the refund in Admin ?
+   Advance refunds with a TrxID, and confirm the buyer sees the partially-refunded payment state.
+7. **Reconciliation:** Balanced state is green. In the TEST database only, run
+   `node --import tsx scripts/part4-breach-test.ts insert`, open Admin ? Reconciliation, confirm the
+   breach banner/table, then restore with the printed id. Never run this on the dev database.
+8. **Permissions:** a buyer/seller typing an admin URL directly is blocked; another seller cannot see
+   this seller’s wallet.

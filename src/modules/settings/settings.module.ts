@@ -9,6 +9,6 @@ import { SettingsService } from "./settings.service";
 @Module({
   controllers: [AdminSettingsController, PublicSettingsController],
   providers: [SettingsService, SettingsReauthService],
-  exports: [SettingsService],
+  exports: [SettingsService, SettingsReauthService],
 })
 export class SettingsModule {}

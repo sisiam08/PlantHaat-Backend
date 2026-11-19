@@ -238,7 +238,51 @@ export class ComplaintsService {
   }
 
   async listAll(query: QueryComplaintsDto): Promise<PaginatedResult<unknown>> {
-    return this.paginate(query.status ? { status: query.status } : {}, query);
+    const now = Date.now();
+    const where: Prisma.ComplaintWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.seller?.trim()
+        ? {
+            shop: {
+              is: {
+                OR: [
+                  { name: { contains: query.seller.trim(), mode: "insensitive" } },
+                  {
+                    sellerProfile: {
+                      businessName: { contains: query.seller.trim(), mode: "insensitive" },
+                    },
+                  },
+                ],
+              },
+            },
+          }
+        : {}),
+      ...(query.minAgeHours !== undefined || query.maxAgeHours !== undefined
+        ? {
+            createdAt: {
+              ...(query.minAgeHours !== undefined
+                ? { lte: new Date(now - query.minAgeHours * 3_600_000) }
+                : {}),
+              ...(query.maxAgeHours !== undefined
+                ? { gte: new Date(now - query.maxAgeHours * 3_600_000) }
+                : {}),
+            },
+          }
+        : {}),
+      ...(query.minAmount !== undefined || query.maxAmount !== undefined
+        ? {
+            shopOrder: {
+              is: {
+                total: {
+                  ...(query.minAmount !== undefined ? { gte: query.minAmount } : {}),
+                  ...(query.maxAmount !== undefined ? { lte: query.maxAmount } : {}),
+                },
+              },
+            },
+          }
+        : {}),
+    };
+    return this.paginate(where, query);
   }
 
   async getForCustomer(customerId: string, id: string) {
@@ -419,7 +463,10 @@ export class ComplaintsService {
         throw AppException.notFound(ErrorCode.NOT_FOUND, "Dispute not found");
       }
       if (complaint.decision !== "PENDING") {
-        return { complaint, replay: true };
+        throw AppException.conflict(
+          ErrorCode.DISPUTE_INVALID_STATE,
+          "This dispute has already been decided",
+        );
       }
       await tx.$queryRaw`SELECT "id" FROM "ShopOrder" WHERE "id" = ${complaint.shopOrderId} FOR UPDATE`;
 
