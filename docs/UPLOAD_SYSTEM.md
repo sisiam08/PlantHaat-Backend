@@ -119,10 +119,12 @@ backup. Do not run a bulk move without a rollback plan.
 
 The storefront already uses the custom Cloudinary loader (`PlantImage` +
 `src/lib/images/cloudinary-loader.ts`) with `f_auto,q_auto,c_limit,w_<width>` for product/category
-imagery. The Next optimizer therefore does not fetch Cloudinary originals on the LCP path. Admin
-thumbnails may use the default optimizer but are not part of the storefront LCP. No loader change was
-made in this pass; if a future page starts using default `next/image` with Cloudinary originals,
-re-run the CDP Slow 4G + 4x CPU comparison before changing it.
+imagery. A browser check of the home page found 36 direct Cloudinary URLs, 0 `_next/image` requests
+for Cloudinary originals, 0 local `/uploads` URLs, and `sizes` on every Cloudinary image. The Next
+optimizer therefore does not fetch Cloudinary originals on the LCP path, so no loader change was made.
+Admin thumbnails may use the default optimizer but are not part of the storefront LCP. If a future
+page starts using default `next/image` with Cloudinary originals, re-run the CDP Slow 4G + 4x CPU
+comparison before changing it.
 
 ## 8. Secret handling
 
