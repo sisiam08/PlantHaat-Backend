@@ -102,3 +102,21 @@ profile/withdrawal limits read `payout.minimumAmount`, `payout.methods`, `payout
 `return.photoRequired`, `return.maxEvidencePhotos` and `return.disputeSellerHours`; admin queues read
 the same contracts. Settings UI needs no custom fields: the registry drives the new keys with their
 bilingual help text and existing re-auth rules.
+
+## Home hero and Highlights keys (2026-11-19)
+
+Group `home`, registry-driven, bilingual labels/help and `wired: true` (public where the storefront reads them).
+
+| Key | Type | Default | Public | Used by |
+|---|---|---:|---:|---|
+| `home.hero.headline` | json {bn,en} | "????? ?? ????? ??? ?????" / "Fill your home with green" | yes | Home hero H1; admin Settings ? Home |
+| `home.hero.subheadline` | json {bn,en} | current one-line promise | yes | Home hero subheadline |
+| `home.hero.chips` | json[] (max 8) | Indoor, Low light, Pet-safe, Under ?500, Seeds, Pots, Tools | yes | Hero chips; links must be same-site `/...` or `https://` |
+| `home.hero.image` | json | empty | yes | Optional hero image (desktop/mobile, alt, focal point); uploaded assets attached in the settings transaction |
+| `home.highlights.enabled` | boolean | true | yes | Whole Highlights section on/off; off = no section, heading, gap or skeleton |
+| `home.highlights.autoplay` | boolean | false | yes | Autoplay (tablet/desktop only; paused on hover/focus/touch; reduced motion wins) |
+| `home.highlights.intervalSeconds` | number | 6 | yes | Autoplay interval, 4–12 s |
+| `home.highlights.maxSlides` | number | 6 | no | Maximum active slides sent to the home page, 1–10 |
+| `home.highlights.title` | json {bn,en} | ??????? / Highlights | yes | Section heading; empty in both locales hides it |
+
+Validation: text lengths (60/140/40), chip count and safe links, hero image URL scheme and focal 0–100, interval 4–12, maxSlides 1–10. Dev settings were not changed except these registry defaults.

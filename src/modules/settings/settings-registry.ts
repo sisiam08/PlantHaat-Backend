@@ -4,7 +4,15 @@ export interface SettingDefinition {
   key: string;
   type: SettingType;
   default: unknown;
-  group: "payments" | "orders" | "wallet" | "payouts" | "support" | "platform" | "security";
+  group:
+    | "payments"
+    | "orders"
+    | "wallet"
+    | "payouts"
+    | "support"
+    | "platform"
+    | "security"
+    | "home";
   labelEn: string;
   labelBn: string;
   helpEn?: string;
@@ -69,6 +77,23 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "security.refresh.admin.days", type: "number", default: 7, group: "security", labelEn: "Admin session lifetime (days, sliding)", labelBn: "Admin session lifetime (days, sliding)", wired: true },
   { key: "security.refresh.admin.maxDays", type: "number", default: 30, group: "security", labelEn: "Admin maximum session lifetime (days, absolute)", labelBn: "Admin maximum session lifetime (days, absolute)", wired: true },
   { key: "security.refresh.graceSeconds", type: "number", default: 30, group: "security", labelEn: "Refresh reuse grace window (seconds)", labelBn: "Refresh reuse grace window (seconds)", wired: true },
+  { key: "home.hero.headline", type: "json", default: { bn: "আপনার ঘর সবুজে ভরে তুলুন", en: "Fill your home with green" }, group: "home", labelEn: "Hero headline", labelBn: "হিরো শিরোনাম", helpEn: "Shown in the home hero. Keep it short; customers scan it in about five seconds.", helpBn: "হোম হিরোতে দেখানো হয়। সংক্ষিপ্ত রাখুন; ক্রেতারা প্রায় পাঁচ সেকেন্ডে এটি দেখে নেন।", isPublic: true, wired: true },
+  { key: "home.hero.subheadline", type: "json", default: { bn: "সারা বাংলাদেশে যাচাইকৃত নার্সারির গাছ - ক্যাশ অন ডেলিভারি, নিরাপদ প্যাকেজিং।", en: "Plants from verified nurseries across Bangladesh - cash on delivery, plant-safe packaging." }, group: "home", labelEn: "Hero subheadline", labelBn: "হিরো উপ-শিরোনাম", helpEn: "One line of context under the headline.", helpBn: "শিরোনামের নিচে এক লাইনের পরিচিতি।", isPublic: true, wired: true },
+  { key: "home.hero.chips", type: "json", default: [
+    { labelBn: "ইন্ডোর", labelEn: "Indoor", href: "/products?isIndoor=true" },
+    { labelBn: "কম আলো", labelEn: "Low light", href: "/products?light=LOW_LIGHT" },
+    { labelBn: "পোষা প্রাণীর জন্য নিরাপদ", labelEn: "Pet-safe", href: "/products?isPetSafe=true" },
+    { labelBn: "৳500-এর নিচে", labelEn: "Under ৳500", href: "/products?maxPrice=500" },
+    { labelBn: "বীজ", labelEn: "Seeds", href: "/products?category=seeds" },
+    { labelBn: "টব ও প্ল্যান্টার", labelEn: "Pots", href: "/products?category=pots-planters" },
+    { labelBn: "গার্ডেনিং টুলস", labelEn: "Tools", href: "/products?category=gardening-tools" },
+  ], group: "home", labelEn: "Popular search chips", labelBn: "জনপ্রিয় সার্চ চিপ", helpEn: "Up to 8 chips under the hero search. Every chip must link to a real filtered listing.", helpBn: "হিরো সার্চের নিচে সর্বোচ্চ ৮টি চিপ। প্রতিটি চিপ অবশ্যই সত্যিকারের ফিল্টার করা তালিকায় যাবে।", isPublic: true, wired: true },
+  { key: "home.hero.image", type: "json", default: { url: "", mobileUrl: "", altBn: "", altEn: "", focalX: 50, focalY: 50 }, group: "home", labelEn: "Hero image", labelBn: "হিরো ছবি", helpEn: "Optional. Leave the URL empty to use the default composition with real product cards.", helpBn: "ঐচ্ছিক। URL খালি রাখলে সত্যিকারের পণ্য কার্ডসহ ডিফল্ট রচনা দেখানো হবে।", isPublic: true, wired: true },
+  { key: "home.highlights.enabled", type: "boolean", default: true, group: "home", labelEn: "Highlights section on home", labelBn: "হোমে হাইলাইট সেকশন", helpEn: "When off, the Highlights section, its heading and its spacing do not appear on the home page.", helpBn: "বন্ধ থাকলে হোম পেজে হাইলাইট সেকশন, শিরোনাম ও ফাঁকা জায়গা কিছুই দেখাবে না।", isPublic: true, wired: true },
+  { key: "home.highlights.autoplay", type: "boolean", default: false, group: "home", labelEn: "Highlights autoplay", labelBn: "হাইলাইট অটোপ্লে", helpEn: "Off by default. When on, it runs only on tablet/desktop, pauses on hover, focus and touch, and never ignores reduced motion.", helpBn: "ডিফল্ট বন্ধ। চালু থাকলে শুধু ট্যাবলেট/ডেস্কটপে চলবে, হোভার/ফোকাস/টাচে থামবে এবং reduced motion উপেক্ষা করবে না।", isPublic: true, wired: true },
+  { key: "home.highlights.intervalSeconds", type: "number", default: 6, group: "home", labelEn: "Highlights interval (seconds)", labelBn: "হাইলাইট বিরতি (সেকেন্ড)", helpEn: "4-12 seconds. Autoplay is ignored when the customer prefers reduced motion.", helpBn: "৪-১২ সেকেন্ড। ক্রেতা reduced motion পছন্দ করলে অটোপ্লে চলবে না।", isPublic: true, wired: true },
+  { key: "home.highlights.maxSlides", type: "number", default: 6, group: "home", labelEn: "Maximum active highlights", labelBn: "সর্বোচ্চ সক্রিয় হাইলাইট", helpEn: "1-10. Extra active slides stay in the admin list but are not sent to the home page.", helpBn: "১-১০। অতিরিক্ত সক্রিয় স্লাইড অ্যাডমিন তালিকায় থাকবে কিন্তু হোম পেজে যাবে না।", wired: true },
+  { key: "home.highlights.title", type: "json", default: { bn: "হাইলাইট", en: "Highlights" }, group: "home", labelEn: "Highlights section title", labelBn: "হাইলাইট সেকশনের শিরোনাম", helpEn: "Leave both languages empty to hide the section heading.", helpBn: "শিরোনাম লুকাতে দুই ভাষাই খালি রাখুন।", isPublic: true, wired: true },
 ];
 
 export const SETTING_DEFAULTS = Object.fromEntries(
@@ -88,6 +113,44 @@ const BD_MOBILE = /^01[3-9]\d{8}$/;
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Same-site relative path or an absolute https URL. Blocks javascript:, data:, //host and other schemes. */
+export function isSafePublicLink(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const href = value.trim();
+  if (href === "") return false;
+  if (href.startsWith("//")) return false;
+  if (href.startsWith("/")) return true;
+  return /^https:\/\/[^\s]+$/i.test(href);
+}
+
+function localizedText(value: unknown, field: string, maxLength: number, allowEmpty = false): void {
+  if (!isRecord(value)) {
+    throw new SettingValidationError(`${field} must have bn and en text`);
+  }
+  for (const locale of ["bn", "en"] as const) {
+    const text = value[locale];
+    if (typeof text !== "string") {
+      throw new SettingValidationError(`${field}.${locale} must be text`);
+    }
+    if (!allowEmpty && text.trim().length === 0) {
+      throw new SettingValidationError(`${field}.${locale} cannot be empty`);
+    }
+    if (text.length > maxLength) {
+      throw new SettingValidationError(`${field}.${locale} must be ${maxLength} characters or fewer`);
+    }
+  }
+}
+
+export interface HeroChipValue {
+  labelBn: string;
+  labelEn: string;
+  href: string;
 }
 
 function advanceIsLive(): boolean {
@@ -182,8 +245,66 @@ export function validateSettingValue(key: string, value: unknown): void {
     if (key === "upload.orphanGraceDays" && (value < 1 || value > 30)) {
       throw new SettingValidationError("Orphan upload grace must be 1–30 days");
     }
+    if (key === "home.highlights.intervalSeconds" && (value < 4 || value > 12)) {
+      throw new SettingValidationError("Highlights interval must be 4–12 seconds");
+    }
+    if (key === "home.highlights.maxSlides" && (value < 1 || value > 10)) {
+      throw new SettingValidationError("Highlights maximum must be 1–10 slides");
+    }
   }
 
+  if (key === "home.hero.headline") {
+    localizedText(value, "home.hero.headline", 60);
+  }
+  if (key === "home.hero.subheadline") {
+    localizedText(value, "home.hero.subheadline", 140);
+  }
+  if (key === "home.highlights.title") {
+    localizedText(value, "home.highlights.title", 40, true);
+  }
+  if (key === "home.hero.chips") {
+    if (!Array.isArray(value)) {
+      throw new SettingValidationError("home.hero.chips must be a list");
+    }
+    if (value.length > 8) {
+      throw new SettingValidationError("Use at most 8 hero chips");
+    }
+    value.forEach((chip, index) => {
+      if (!isRecord(chip)) {
+        throw new SettingValidationError(`Chip ${index + 1} is invalid`);
+      }
+      localizedText(
+        { bn: chip.labelBn, en: chip.labelEn },
+        `Chip ${index + 1} label`,
+        40,
+      );
+      if (!isSafePublicLink(chip.href)) {
+        throw new SettingValidationError(
+          `Chip ${index + 1} must link to a same-site path or an https URL`,
+        );
+      }
+    });
+  }
+  if (key === "home.hero.image") {
+    if (!isRecord(value)) {
+      throw new SettingValidationError("home.hero.image must be an object");
+    }
+    const url = stringValue(value.url);
+    const mobileUrl = stringValue(value.mobileUrl);
+    if (url !== "" && !isSafePublicLink(url)) {
+      throw new SettingValidationError("Hero image URL must be https or a same-site path");
+    }
+    if (mobileUrl !== "" && !isSafePublicLink(mobileUrl)) {
+      throw new SettingValidationError("Hero mobile image URL must be https or a same-site path");
+    }
+    localizedText({ bn: value.altBn ?? "", en: value.altEn ?? "" }, "Hero image alt", 120, true);
+    for (const field of ["focalX", "focalY"] as const) {
+      const focal = value[field];
+      if (focal !== undefined && (typeof focal !== "number" || focal < 0 || focal > 100)) {
+        throw new SettingValidationError(`${field} must be between 0 and 100`);
+      }
+    }
+  }
   if (
     ["payment.bkash.number", "payment.nagad.number", "support.whatsapp", "support.phone"].includes(
       key,

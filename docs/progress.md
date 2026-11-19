@@ -405,3 +405,13 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Env separation: `CLOUDINARY_FOLDER=planthaat/dev` locally; production requires `/prod`. Smoke uses its own temporary folder and passed live after the delete-propagation retry.
 - Secrets: Cloudinary credentials in history at `35675ba`; working tree sanitized; `npm run lint` includes `scripts/check-secrets.mjs`; rotation runbook added.
 - Frontend: home banners point at existing `.webp` files with a Vitest guard; admin Settings has a storage health card; production build requires `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`.
+
+## 2026-11-19 Home hero Part A (marketplace-first)
+
+- Branch: backend `feature/payments`, frontend `redesign/phase2`. No migrations in Part A.
+- Backend: added `home.hero.headline`, `home.hero.subheadline`, `home.hero.chips`, `home.hero.image` to the Settings registry (group `home`, public), with safe-link/JSON validation, upload attach lifecycle and cleanup on replace. `settings-registry.spec.ts` covers the validators (12/12 settings tests).
+- Frontend: hero rebuilt as a compact search-first marketplace hero; real popular in-stock product cards replace the decorative composition; the standalone trust band and `HeroComposition` were removed. Search remains a native GET form; chips link to existing filters (`isIndoor`, `light`, `isPetSafe`, `maxPrice`, `category`).
+- Admin: Settings ? Home has bilingual headline/subheadline, reorderable chips (max 8), optional hero image with mobile variant/alt/focal and the Highlights on/off/autoplay/interval/max controls.
+- Perf (prod, 390x844, Slow 4G + 4x CPU, 5 runs): LCP 6740 -> **3288 ms** en and 5584 -> **3584 ms** bn; CLS 0; JS 363 KB unchanged. Details in `frontend/docs/design/performance.md`.
+- E2E `e2e/home-hero.spec.ts`: 7 passed, 2 skipped (admin credentials not set in this environment; native no-JS semantics asserted because the streamed shell requires JS, logged in decisions).
+- Dev settings were not modified beyond the new registry defaults. No destructive migration.

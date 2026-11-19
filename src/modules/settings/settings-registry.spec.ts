@@ -111,6 +111,60 @@ describe("settings registry", () => {
     }
   });
 
+  it("validates home hero and highlights keys", () => {
+    const byKey = new Map(SETTINGS_REGISTRY.map((setting) => [setting.key, setting]));
+    expect(byKey.get("home.highlights.enabled")).toMatchObject({
+      default: true,
+      group: "home",
+      isPublic: true,
+      wired: true,
+    });
+    expect(byKey.get("home.highlights.autoplay")).toMatchObject({ default: false });
+    expect(byKey.get("home.highlights.intervalSeconds")).toMatchObject({ default: 6 });
+    expect(byKey.get("home.highlights.maxSlides")).toMatchObject({ default: 6 });
+
+    expect(() =>
+      validateSettingValue("home.hero.chips", [
+        { labelBn: "ইন্ডোর", labelEn: "Indoor", href: "/products?isIndoor=true" },
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      validateSettingValue("home.hero.chips", [
+        { labelBn: "খারাপ", labelEn: "Bad", href: "javascript:alert(1)" },
+      ]),
+    ).toThrow(/same-site/);
+    expect(() =>
+      validateSettingValue("home.hero.chips", [
+        { labelBn: "খারাপ", labelEn: "Bad", href: "//evil.example" },
+      ]),
+    ).toThrow(/same-site/);
+    expect(() =>
+      validateSettingValue(
+        "home.hero.chips",
+        Array.from({ length: 9 }, (_, index) => ({
+          labelBn: `চিপ ${index}`,
+          labelEn: `Chip ${index}`,
+          href: "/products",
+        })),
+      ),
+    ).toThrow(/at most 8/);
+    expect(() => validateSettingValue("home.highlights.intervalSeconds", 3)).toThrow(/4–12/);
+    expect(() => validateSettingValue("home.highlights.maxSlides", 11)).toThrow(/1–10/);
+    expect(() =>
+      validateSettingValue("home.hero.image", {
+        url: "https://res.cloudinary.com/demo/image/upload/a.webp",
+        mobileUrl: "",
+        altBn: "হিরো",
+        altEn: "Hero",
+        focalX: 50,
+        focalY: 40,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateSettingValue("home.hero.image", { url: "data:text/html,x" }),
+    ).toThrow(/same-site|https/);
+  });
+
   it("masks sensitive values only", () => {
     const masked = maskSensitive({
       "payment.bkash.number": "01712345678",

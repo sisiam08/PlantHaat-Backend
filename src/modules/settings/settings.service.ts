@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import { PrismaService } from "../../prisma/prisma.service";
+import { UploadsService } from "../uploads/uploads.service";
 import { applySettingChange } from "./settings-history";
 import { effectiveAdvanceFrom, SETTING_DEFAULTS, SETTINGS_REGISTRY, validateSettingsMap } from "./settings-registry";
 
@@ -14,7 +15,10 @@ export class SettingsService {
   private cache: Map<string, unknown> | null = null;
   private loadedAt = 0;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploads?: UploadsService,
+  ) {}
 
   async get<T>(key: string): Promise<T> {
     if (key === "payout.holdHours") {
@@ -89,12 +93,14 @@ export class SettingsService {
     }
     values = normalized;
     const batchId = randomUUID();
+    let previous: Record<string, unknown> = {};
     await this.prisma.$transaction(async (tx) => {
       const rows = await tx.systemSetting.findMany({ select: { key: true, value: true } });
       const current = {
         ...SETTING_DEFAULTS,
         ...Object.fromEntries(rows.map((row) => [row.key, row.value])),
       };
+      previous = current;
       try {
         validateSettingsMap(values, current);
       } catch (error) {
@@ -119,7 +125,21 @@ export class SettingsService {
           batchId,
         );
       }
+      if (this.uploads && "home.hero.image" in values) {
+        await this.uploads.attachAssetsInTransaction(
+          tx,
+          heroImageUrls(values["home.hero.image"]),
+        );
+      }
     });
+    if (this.uploads && "home.hero.image" in values) {
+      const nextUrls = new Set(heroImageUrls(values["home.hero.image"]));
+      for (const url of heroImageUrls(previous["home.hero.image"])) {
+        if (!nextUrls.has(url)) {
+          await this.uploads.deleteByUrl(url);
+        }
+      }
+    }
     this.invalidate();
     return this.getAll();
   }
@@ -142,4 +162,13 @@ export class SettingsService {
     this.loadedAt = Date.now();
     return map;
   }
+}
+
+/** Public URL fields stored inside the `home.hero.image` settings object. */
+function heroImageUrls(value: unknown): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const record = value as Record<string, unknown>;
+  return [record.url, record.mobileUrl].filter(
+    (entry): entry is string => typeof entry === "string" && entry.trim() !== "",
+  );
 }

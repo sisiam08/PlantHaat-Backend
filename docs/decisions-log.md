@@ -100,3 +100,23 @@
 - Legacy rows are labeled rather than backfilled: “Settled before the new wallet system”.
 - The breach fixture is a guarded, documented test-only script (planthaat_test + approved host), and
   must be restored immediately.
+
+## 2026-11-19 Home hero (Part A)
+
+- Hero is utility-first: search + category scope + chips (all linking to existing filters) and a
+  slim trust row, because Baymard's homepage research says users start with search/navigation, not
+  campaign art.
+- The decorative 2.5D composition was removed; the visual is either the admin's optional image or
+  two real popular products. Real catalogue content makes the page read as a marketplace and also
+  removes the placeholder-art / parallax JS from the LCP path.
+- Hero text is shorter and smaller (desktop ~380 px, capped ~420 px) so the first product strip
+  appears in the first mobile screen; display size no longer dominates the fold.
+- Hero settings live in the existing Settings registry (`home.hero.*`, group `home`, public where
+  needed) instead of a new CMS page: admin control is deliberately limited and the copy is cached
+  with the existing `settings` tag.
+- The optional hero image is stored as a public settings object (url, mobile url, alt, focal point)
+  and attached through `UploadsService.attachAssetsInTransaction` in the same settings transaction;
+  replaced assets are deleted only if no longer referenced.
+- The standalone trust band was removed rather than duplicated under the hero, so the promise is
+  made once per screen.
+- The hero search is a native GET form, but the Next 16 Cache Components/streaming shell reveals streamed sections with inline JS. A browser with JavaScript fully disabled never un-hides those segments; this is app-wide, not hero-specific. The form therefore works when client JS fails after HTML is present, and the e2e asserts its native GET semantics rather than claiming full no-JS rendering.
