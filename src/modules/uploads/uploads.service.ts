@@ -49,7 +49,7 @@ export class UploadsService {
     private readonly prisma: PrismaService,
   ) {
     this.logger.log(
-      `Image long edge: product=${PRODUCT_IMAGE_MAX_EDGE}px, other purposes=${DEFAULT_IMAGE_MAX_EDGE}px`,
+      `Image long edge: product=${PRODUCT_IMAGE_MAX_EDGE}px, banner=${BANNER_IMAGE_MAX_EDGE}px, other purposes=${DEFAULT_IMAGE_MAX_EDGE}px`,
     );
   }
 
