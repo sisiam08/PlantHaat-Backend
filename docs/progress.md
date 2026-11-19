@@ -444,3 +444,4 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
   (create + uploads + overlay/button/external link, public render, admin list, schedule hidden,
   duplicate, reorder, feature off/on with no section/gap, cleanup).
 - Dev settings were left at registry defaults (feature on); imported slides are real owner artwork.
+- Added `e2e/admin-highlights-ui.spec.ts` (visible browser, test stack): uploads desktop+mobile through the editor, fills bn/en overlay and button/external link, saves, verifies the home page, toggles the feature off/on and deletes the slide. 1/1 passed.
