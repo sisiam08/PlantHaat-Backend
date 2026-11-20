@@ -173,3 +173,10 @@
 - `hours` comes from the public `return.windowHours` (never a constant) and is preformatted with `formatCount` so both locales keep Latin digits. Hours are kept as hours even for 24/48/72: no day conversion was invented. If the key is missing/invalid the complaint item is omitted rather than falling back to a magic number.
 - New pure module `frontend/src/features/catalog/hero-trust.ts` plus unit tests and an extended `business-constants` guard; e2e asserts the row follows the live public setting in en and bn. Messages `trustCod`/`trustPackaging`/`trustComplaint` were replaced by `trustPay`/`trustVerified`/`trustProblem` (the old keys were unused).
 
+## 2026-11-20 Task B - Highlights autoplay
+
+- Root cause (real Chrome, admin ON, 3 slides, desktop 1440): the carousel called `EmblaCarousel(track, ...)`. Embla treats its argument as the root/viewport and `root.children[0]` as the container, so it measured the first slide wrapper as the whole track: `scrollSnapList()` returned 1 snap and `embla-carousel-autoplay` silently returned from `init` (`scrollSnapList().length <= 1`), leaving `isPlaying() === false` forever. The index stayed 0 for 20 s. Secondary causes: autoplay was gated to `(min-width: 768px)` and the whole engine was skipped under reduced motion.
+- Fix: pass the overflow-hidden root; autoplay runs at every width; the engine stays mounted under reduced motion but the plugin is not created; the component owns pause/resume (hover, keyboard `:focus-visible`, pointer interaction, hidden tab, manual pause) and the visible pause control is authoritative. Pointer focus no longer counts as keyboard focus, so a swipe restarts the timer. A manual pause survives mouseleave/focusout.
+- Evidence/tests: production build on :3002 with the :5001 test API and real Chrome, serial `highlights-autoplay.spec.ts` 8/8 (desktop/mobile advance, hover, focus, swipe, hidden tab, reduced motion, admin toggle off/on within 1.5 s); admin UI spec 1/1. Settings are read live and the admin toggle reached the home page inside the 1.5 s wait (no stale public-settings TTL involved; `/home/highlights` reads settings on every call).
+
+
