@@ -6,6 +6,7 @@ import { AppConfigService } from "../../config/app-config.service";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 import { AppException } from "../errors/app.exception";
 import { ErrorCode } from "../errors/error-codes";
+import { safeEqual } from "../utils/crypto";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -37,6 +38,16 @@ export class OriginGuard implements CanActivate {
     const hasBearer =
       typeof request.headers.authorization === "string" &&
       request.headers.authorization.startsWith("Bearer ");
+
+    // Server-to-server calls from the Next BFF carry the shared secret and no
+    // browser Origin. They still need to reach the JWT guard so an expired or
+    // missing token is a 401 (refresh/dialog), not a misleading CSRF 403.
+    const bffSecret = this.config.values.BFF_SHARED_SECRET;
+    const providedKey = request.headers["x-bff-key"];
+    const bffKey = Array.isArray(providedKey) ? providedKey[0] : providedKey;
+    if (bffSecret && typeof bffKey === "string" && safeEqual(bffKey, bffSecret)) {
+      return true;
+    }
 
     if (isPublic || hasBearer) {
       return true;

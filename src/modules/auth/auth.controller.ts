@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   Param,
   Post,
@@ -63,6 +64,15 @@ function toSessionMeta(request: Request): SessionMeta {
     userAgent: typeof userAgent === "string" ? userAgent : undefined,
     ipAddress: clientIp ?? request.ip,
   };
+}
+
+/**
+ * Only a rejected session is cleared. Rate limiting (429), 5xx and transport
+ * failures are transient; wiping the browser cookies for those turned a burst
+ * of refreshes into a forced logout.
+ */
+export function refreshErrorEndsSession(status: number): boolean {
+  return status === 401 || status === 403;
 }
 
 @ApiTags("Auth")
@@ -146,7 +156,10 @@ export class AuthController {
       }
       return { user: result.user, accessTokenExpiresAt: result.accessTokenExpiresAt };
     } catch (error) {
-      clearAuthCookies(response, this.config);
+      const status = error instanceof HttpException ? error.getStatus() : 500;
+      if (refreshErrorEndsSession(status)) {
+        clearAuthCookies(response, this.config);
+      }
       throw error;
     }
   }
