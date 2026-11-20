@@ -148,3 +148,13 @@
 - The import script uploads the owner's existing static banner files through the normal pipeline
   and tags rows with `[seed:home-highlights]`; a documented guarded removal script deletes only
   those rows/assets. It was run once on dev (3 slides), not on the test DB or production.
+
+## 2026-11-20 Real-plant hero scene
+
+- Restored only the owner-preferred left side from `f100858` (the commit before the `08443b8` marketplace hero), keeping Highlights, Settings ? Home, tokens and the server-rendered GET search. Removed the category select, chips, hero product cards and hero trust row.
+- `home.hero.chips` is now `wired:false`, `isPublic:false` and absent from the Settings UI (kept in the registry for history). `home.hero.image` still works, but now replaces the plant scene statically with no WebGL.
+- Scene uses the four owner cutouts (monstera, palm, snake, calathea) on an 11/10 desktop stage and 3/2 below `lg`, no border/card/background. Final values are the supplied composition table after the asset fix: heights 66/94/48/50, left 3/30/24/62, bottoms 4/1/0/0, pot centers 27.5/37.7/60.1/80.2%.
+- The asset builder first resizes the visible plant, then pads 6%; the earlier order (pad then resize) corrupted the aspect ratios and made the table impossible. It uses the native sharp already in `backend/node_modules` when the frontend WASM copy is incomplete; no package.json change.
+- Static `<img>` markup is the default. WebGL is an enhancement only: after idle/visibility, one canvas, premultiplied alpha, DPR <=1.5 (1 low-power), 45/30 fps cap, off-screen/hidden pause, adaptive fallback, reduced-motion/save-data/no-WebGL static.
+- Performance trade-off: the palm is now the LCP candidate (preloaded, 287/383/480/639w variants). Mobile LCP is 2904/3124 ms vs the old 2832/3044 (~2-3% later); desktop 3452/3716 vs 2968/3140 (~15% later), CLS 0, JS 332 KB. The owner explicitly asked for the real scene; if strict desktop non-regression is required, cut/scale the palm or make the scene static-only.
+- `hero-source/` is in the workspace root, outside both git repos; the owner's modified `.gitignore` was not touched. The generated WebP/JSON/TS are committed; source photos are not.
