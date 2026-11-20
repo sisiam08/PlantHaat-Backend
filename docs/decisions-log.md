@@ -78,10 +78,10 @@
 - Reused the existing earnings route as the wallet (`/seller/earnings`) and reused `Payout`-backed
   `/admin/withdrawals` rather than adding a parallel payouts model.
 - The payout destination stays masked in admin because the API never returns the full account
-  number; no fake “reveal” was added.
+  number; no fake ï¿½revealï¿½ was added.
 - Early release is shown only when the public `return.earlyRelease` setting is on and the window is
   still open; the confirm dialog names the loss of the remaining dispute window.
-- Legacy delivered orders (no `releaseAt`) show “legacy-settled” and keep the existing report link;
+- Legacy delivered orders (no `releaseAt`) show ï¿½legacy-settledï¿½ and keep the existing report link;
   no release date is invented.
 - Shared header mobile spacing/logo sizing was tightened instead of hiding navigation controls, to
   fix the 360 px overflow without breaking the 44 px target on the remaining controls.
@@ -97,7 +97,7 @@
   the current decision rather than silently posting twice.
 - Dispute seller/age/amount filtering is server-side (shop/seller name contains, age hours, order
   total range) so pagination stays correct.
-- Legacy rows are labeled rather than backfilled: “Settled before the new wallet system”.
+- Legacy rows are labeled rather than backfilled: ï¿½Settled before the new wallet systemï¿½.
 - The breach fixture is a guarded, documented test-only script (planthaat_test + approved host), and
   must be restored immediately.
 
@@ -158,3 +158,11 @@
 - Static `<img>` markup is the default. WebGL is an enhancement only: after idle/visibility, one canvas, premultiplied alpha, DPR <=1.5 (1 low-power), 45/30 fps cap, off-screen/hidden pause, adaptive fallback, reduced-motion/save-data/no-WebGL static.
 - Performance trade-off: the palm is now the LCP candidate (preloaded, 287/383/480/639w variants). Mobile LCP is 2904/3124 ms vs the old 2832/3044 (~2-3% later); desktop 3452/3716 vs 2968/3140 (~15% later), CLS 0, JS 332 KB. The owner explicitly asked for the real scene; if strict desktop non-regression is required, cut/scale the palm or make the scene static-only.
 - `hero-source/` is in the workspace root, outside both git repos; the owner's modified `.gitignore` was not touched. The generated WebP/JSON/TS are committed; source photos are not.
+
+## 2026-11-20 Hero fixes (sway, stage, clipped edge, AVIF)
+
+- Sway quality now samples **raw rAF tick deltas before the draw cap**, ignores >250 ms gaps and the first 3 s, drops DPR after sustained >28 ms for 3 s, and uses cached clip rects/ResizeObserver plus StrictMode-safe cleanup. The static fallback is 150 ms sustained for 5 s, not the suggested 40 ms/3 s: on this low-end 4x-CPU test the raw tick is 70-100 ms and 10-17 fps still animates; freezing contradicted the "still webgl after 15 s" acceptance test. 60 s real-Chrome logs on dev and prod stayed webgl with increasing frames.
+- The plants/shadows now sit in a fixed 11:10 inner box; the outer stage fits it by height on phones (300 px) and tablets (420 px), centered. This keeps pot-center/stage-height ratios within 0.14% across 360-1440 instead of the 3/2 percentage distortion. A -mt-12 on the mobile scene lifts the pot bases above the fixed bottom nav.
+- The asset builder now checks the outer 1% alpha bands for every plant and feathers clipped left/right/top edges by 4%. The bottom band is the pot base and is deliberately not feathered. Palm counts left 22/right 27/top 57/bottom 348; 2x cream crops show no visible hard vertical cut after feathering, so the supplied palm is acceptable. If the owner wants tips beyond the original canvas, supply an uncropped cutout with >=3% transparent margin on all sides and rerun the script.
+- AVIF is the primary `<picture>` source with WebP fallback for all four plants; palm visible height is 600 px (padded 672, <=680). AVIF q50 is below the suggested 55-60 because q55/58 were not smaller than WebP on this alpha-heavy source; visual edge/alpha crops were checked. The palm preload uses AVIF imagesrcset/imagesizes. Desktop scene AVIF is 136.7 KB; mobile palm 19 KB.
+- Performance: mobile LCP 2632/3040 ms (better/flat vs 2832/3044), desktop 3116-3208/3384-3904 ms vs 2968/3140, CLS 0, JS 332-358 KB. Desktop en is ~5% over, bn ~8-24% over in this noisy low-end environment; the remaining cost is render delay (the palm paints after the hero text), so the 5% goal is documented rather than cutting the owner-requested palm. If strict desktop non-regression is required, cut/scale the palm or make the scene static-only.
