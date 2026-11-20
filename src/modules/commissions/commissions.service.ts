@@ -75,6 +75,35 @@ export class CommissionsService {
     return new Prisma.Decimal(await this.settings.getNumber("commission.default"));
   }
 
+  /**
+   * The default used when no seller/category rule matches: the newest active
+   * GLOBAL rule, else the `commission.default` setting. The commission-rules
+   * page shows this value and the settings page links to it, so the displayed
+   * default always comes from the same resolver.
+   */
+  async defaultRatePercent(): Promise<{
+    settingPercent: number;
+    globalRuleId: string | null;
+    globalRatePercent: number | null;
+    effectivePercent: number;
+    source: "GLOBAL_RULE" | "SETTINGS";
+  }> {
+    const settingPercent = Number(await this.settings.getNumber("commission.default"));
+    const globalRule = await this.prisma.commissionRule.findFirst({
+      where: { scope: "GLOBAL", isActive: true, effectiveFrom: { lte: new Date() } },
+      orderBy: { effectiveFrom: "desc" },
+      select: { id: true, ratePercent: true },
+    });
+    const globalRatePercent = globalRule ? Number(globalRule.ratePercent) : null;
+    return {
+      settingPercent,
+      globalRuleId: globalRule?.id ?? null,
+      globalRatePercent,
+      effectivePercent: globalRatePercent ?? settingPercent,
+      source: globalRatePercent === null ? "SETTINGS" : "GLOBAL_RULE",
+    };
+  }
+
   async listRules(query: QueryCommissionRulesDto): Promise<PaginatedResult<unknown>> {
     const { page, limit, skip } = resolvePagination(query);
     const where: Prisma.CommissionRuleWhereInput = {

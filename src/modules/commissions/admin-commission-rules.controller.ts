@@ -44,6 +44,12 @@ export class AdminCommissionRulesController {
     return this.commissions.listRules(query);
   }
 
+  @Get("effective")
+  @ApiOperation({ summary: "Effective default commission (GLOBAL rule or setting fallback)" })
+  effective() {
+    return this.commissions.defaultRatePercent();
+  }
+
   @Post()
   @ApiOperation({ summary: "Create a commission rule" })
   @ApiEnvelopeResponse(CommissionRuleDto, { status: 201 })

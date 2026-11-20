@@ -16,6 +16,7 @@ Canonical docs for the backend repo (`feature/payments`). Documentation lives on
 | `api/realtime.md` | Socket.IO `/realtime` ticket auth, events, limits, revocation | backend | 2026-11-18 |
 | `api/home-highlights.md` | Home Highlights data model, public/admin API, validation, scripts, frontend behavior | backend | 2026-11-19 |
 | `auth/sessions.md` | Access/refresh session model, cookies, refresh flows, security settings, short-TTL testing | backend | 2026-11-18 |
+| `admin-audit.md` | Admin route inventory, duplicate/overlap findings, canonical owners, consolidation status | backend | 2026-11-20 |
 | `payments/PAYMENTS_MASTER_PROMPT.md` | Canonical payments/settings/settlement master spec | backend | 2026-11-18 |
 | `payments/design.md` | Payments design note + amendments A1–A9 + owner decisions | backend | 2026-11-18 |
 | `payments/api.md` | Manual Advance API contract, states, proof upload, jobs | backend | 2026-11-18 |

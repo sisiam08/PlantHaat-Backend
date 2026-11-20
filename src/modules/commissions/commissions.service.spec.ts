@@ -129,6 +129,38 @@ describe("CommissionsService", () => {
       expect(lastCall.where.scope).toBe("GLOBAL");
     });
 
+    it("reports the same effective default that the calculation uses", async () => {
+      const prisma = createPrismaMock();
+      prisma.commissionRule.findFirst.mockResolvedValue(null);
+      const service = createService(prisma);
+
+      const effective = await service.defaultRatePercent();
+      const calculated = await service.resolveRatePercent(input);
+
+      expect(effective).toEqual({
+        settingPercent: 5,
+        globalRuleId: null,
+        globalRatePercent: null,
+        effectivePercent: 5,
+        source: "SETTINGS",
+      });
+      expect(calculated.toString()).toBe(String(effective.effectivePercent));
+    });
+
+    it("reports an active GLOBAL rule as the effective default", async () => {
+      const prisma = createPrismaMock();
+      prisma.commissionRule.findFirst.mockResolvedValue({
+        id: "global-1",
+        ratePercent: { toString: () => "7.5", valueOf: () => 7.5 },
+      });
+      const service = createService(prisma);
+
+      const effective = await service.defaultRatePercent();
+      expect(effective.effectivePercent).toBe(7.5);
+      expect(effective.globalRuleId).toBe("global-1");
+      expect(effective.source).toBe("GLOBAL_RULE");
+    });
+
     it("falls back to the default settings value", async () => {
       const prisma = createPrismaMock();
       prisma.commissionRule.findFirst.mockResolvedValue(null);
