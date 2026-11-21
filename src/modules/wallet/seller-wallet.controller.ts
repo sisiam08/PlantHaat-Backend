@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Put, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -51,6 +52,7 @@ export class SellerWalletController {
     return this.wallet.listMine(userId, query);
   }
 
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post("withdrawals")
   @ApiOperation({ summary: "Request a withdrawal (reserves the amount immediately)" })
   request(

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -19,6 +20,7 @@ export class PaymentsController {
     return this.payments.buyerInfo(customerId, orderId);
   }
 
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post("orders/:orderId/submissions")
   @ApiOperation({ summary: "Submit a bKash/Nagad transaction ID for manual verification" })
   submit(

@@ -1,4 +1,5 @@
 import { Body, Controller, Post, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
 
@@ -17,6 +18,7 @@ import { UploadsService } from "./uploads.service";
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post("images")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_IMAGE_BYTES } }))
   @ApiConsumes("multipart/form-data")
@@ -41,6 +43,7 @@ export class UploadsController {
   }
 
   @Post("documents")
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Roles(Role.SELLER)
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
   @ApiConsumes("multipart/form-data")

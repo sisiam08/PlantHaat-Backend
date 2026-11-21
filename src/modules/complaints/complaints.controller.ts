@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -30,6 +31,7 @@ export class ComplaintsController {
     return this.complaintsService.listMine(customerId, query);
   }
 
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post()
   @ApiOperation({ summary: "Open a complaint" })
   @ApiEnvelopeResponse(SellerComplaintDetailDto, { status: 201 })

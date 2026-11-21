@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { ApiHeader, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -15,6 +16,7 @@ import { OrdersService } from "./orders.service";
 export class CheckoutController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post("checkout")
   @HttpCode(HttpStatus.OK)
   @ApiHeader({ name: "Idempotency-Key", required: true, description: "A UUID for this checkout" })

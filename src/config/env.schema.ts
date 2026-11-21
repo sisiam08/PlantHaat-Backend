@@ -88,6 +88,64 @@ export const envSchema = z.object({
   REALTIME_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(900),
   REALTIME_MAX_CONNECTIONS_PER_USER: z.coerce.number().int().positive().default(5),
 }).superRefine((value, ctx) => {
+  if (value.NODE_ENV === "production") {
+    const localOrigin = (origin: string) =>
+      /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin) ||
+      /\.local(:\d+)?$/i.test(origin);
+    const add = (path: string, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+
+    if (!value.APP_URL.startsWith("https://") || localOrigin(value.APP_URL)) {
+      add("APP_URL", "APP_URL must be a public https URL in production");
+    }
+    if (!value.API_URL.startsWith("https://") || localOrigin(value.API_URL)) {
+      add("API_URL", "API_URL must be a public https URL in production");
+    }
+    if (value.CORS_ORIGINS.length === 0) {
+      add("CORS_ORIGINS", "At least one CORS origin is required in production");
+    }
+    for (const origin of value.CORS_ORIGINS) {
+      if (!origin.startsWith("https://") || localOrigin(origin)) {
+        add("CORS_ORIGINS", `CORS origin must be a public https URL in production: ${origin}`);
+      }
+    }
+    if (/planthaat\.local$/i.test(value.MAIL_FROM)) {
+      add("MAIL_FROM", "MAIL_FROM must not use the development .local domain in production");
+    }
+    const weakSecrets = new Set([
+      "change-me",
+      "changeme",
+      "secret",
+      "test-secret",
+      "development-secret",
+      "example-secret",
+    ]);
+    if (weakSecrets.has(value.JWT_ACCESS_SECRET.toLowerCase())) {
+      add("JWT_ACCESS_SECRET", "JWT_ACCESS_SECRET must not be a development/default value");
+    }
+    if (
+      value.DATA_ENCRYPTION_KEY.length < 32 ||
+      weakSecrets.has(value.DATA_ENCRYPTION_KEY.toLowerCase())
+    ) {
+      add("DATA_ENCRYPTION_KEY", "DATA_ENCRYPTION_KEY must be at least 32 chars and not a default");
+    }
+    const weakAdminEmails = new Set([
+      "admin@teststack.local",
+      "admin@planthaat.local",
+      "admin@example.com",
+      "admin@planthaat.test",
+    ]);
+    if (
+      weakAdminEmails.has(value.ADMIN_EMAIL.toLowerCase()) ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.ADMIN_EMAIL)
+    ) {
+      add("ADMIN_EMAIL", "ADMIN_EMAIL must be a real production admin address");
+    }
+    const weakPasswords = new Set(["TestAdmin123!", "Admin123!", "password", "changeme", "admin"]);
+    if (value.ADMIN_PASSWORD.length < 12 || weakPasswords.has(value.ADMIN_PASSWORD)) {
+      add("ADMIN_PASSWORD", "ADMIN_PASSWORD must be at least 12 chars and not a default/test value");
+    }
+  }
   if (value.NODE_ENV === "production" && !value.BFF_SHARED_SECRET) {
     ctx.addIssue({
       code: "custom",

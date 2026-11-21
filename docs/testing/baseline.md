@@ -99,3 +99,36 @@ Suites were re-run with the API restarted between groups; every rerun passed.
 - Reconciliation breach fixture: `node --import tsx scripts/part4-breach-test.ts insert` then
   `restore <id>`. The script refuses unless the DB is `planthaat_test` at the approved Neon host.
   Never run it on dev; restore immediately.
+
+## 2026-11-21 trusted commands (isolated production stack)
+
+Start: `backend/scripts/test-stack.ps1 start` (builds both repos, seeds `planthaat_test`, API `:5001`, `.next-test` frontend `:3002`). Use default auth TTL for money suites.
+
+```powershell
+$env:PW_CHANNEL="chrome"
+$env:NEXT_PUBLIC_SITE_URL="http://localhost:3002"
+$env:PAYMENTS_TEST_BASE_URL="http://localhost:3002"
+$env:PAYMENTS_TEST_API_URL="http://127.0.0.1:5001"
+cd frontend
+npm run test:e2e:money
+```
+
+Result 2026-11-21: Part 4 **9/9**, `payments-advance` **12/12**, `settings` **3/3**,
+`admin-consolidation` **4/4**, admin highlights **2/2**. Order matters: the Part 4 settlement specs
+create seller balances; `part4-permissions` compares seller1/seller2 wallets and must run after them
+(it fails alone on a freshly seeded DB with both wallets at zero).
+
+Session suites need the short-TTL API (restart `:5001` with `AUTH_TEST_ACCESS_TTL_SECONDS=10` etc.):
+
+```powershell
+npm run test:e2e:sessions   # session-refresh 8/8, session-expired 8/8, collision 2/2
+```
+
+Payment-proof Cloudinary test (test prefix only, restores `.env.test`, deletes the test assets):
+`powershell -ExecutionPolicy Bypass -File backend/scripts/verify-proof-cloudinary.ps1` — 1/1.
+
+Backend single command: `npm run test:full` (unit then e2e). Any rerun needs the test stack API
+stopped first because e2e uses the same `planthaat_test` database.
+
+The 2026-11 mention of a login throttle (10/min) is still true; long serial runs must pause or
+restart the API between groups.

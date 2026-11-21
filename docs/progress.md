@@ -11,6 +11,21 @@
 - Docs consolidated into the two repos on 2026-11-18; old-root path map is in `README.md`.
 - 2026-11-19 image storage: dev now uses Cloudinary (`STORAGE_DRIVER=cloudinary`); 109 legacy local URLs migrated (98 product images, 11 categories; one avatar file was already missing); every upload flow now marks `UploadedAsset` ATTACHED and replacement/removal cleans Cloudinary safely. See `BACKEND_CONTEXT.md` and `decisions-log.md`.
 
+
+## Verified backlog (2026-11-21)
+
+| Item | Status | Evidence |
+|---|---|---|
+| P0-1 money suites | Mostly done | Part 4 all 9/9 (order matters: settlement first, permissions last); payments-advance 12/12; settings 3/3; proof upload through the Cloudinary test prefix 1/1. Full backend e2e and the whole frontend suite are still pending. |
+| P0-2 dev/prod separation | Done in code | Non-production ribbon on admin/seller/checkout/payment (real Chrome screenshot); production env validation + 9 tests; production settings baseline script (dry-run default). Not run against production (owner action). |
+| P0-3 uploads | Backfill done | 109 missing UploadedAsset rows created (11 categories, 98 product images); reconcile now 118 rows / 3 untracked (1 broken local avatar + 2 external picsum); Radix avatar fallback covers the broken URL; dispute photos/delivery proof documented as not cheap/safe. |
+| P0-4 secrets/abuse | Partly done | Secret gate passes; history leak is Cloudinary API secret in .env.example at 35675ba (rotated? owner action); throttles added for payment submit, uploads, withdrawal, complaint, checkout + metadata test 6/6. CSP/headers and reset/verify e2e still to verify. |
+| P1-1 performance | Open | Not re-measured in this pass. |
+| P1-2 seller/admin consistency | Partial | Admin duplicate audit/axe done; seller-page audit and full design-conformance extension open. |
+| P1-3 quality debt | Partial | React Compiler warnings and Date.now prerender warning still open. |
+| P2-1 pre-launch | Open | Runbooks/env/email/legal docs still to write. |
+| P2-2 merge plan | Open | Merge plan + dry-run still to do. |
+
 ## Backend/payments log
 
 ﻿# Payments implementation progress

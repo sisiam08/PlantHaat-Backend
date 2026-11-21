@@ -2,10 +2,13 @@ import { envSchema } from "./env.schema";
 
 const base = {
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
+  APP_URL: "https://planthaat.example.com",
+  API_URL: "https://api.planthaat.example.com",
+  CORS_ORIGINS: "https://planthaat.example.com",
   JWT_ACCESS_SECRET: "a".repeat(32),
-  DATA_ENCRYPTION_KEY: "k",
-  ADMIN_EMAIL: "admin@example.com",
-  ADMIN_PASSWORD: "password",
+  DATA_ENCRYPTION_KEY: "k".repeat(32),
+  ADMIN_EMAIL: "owner@planthaat.example.com",
+  ADMIN_PASSWORD: "Str0ngAdminPass1!",
 };
 
 function parsed(overrides: Record<string, string>) {
@@ -24,6 +27,38 @@ describe("storage env validation", () => {
         true,
       );
     }
+  });
+
+  it("rejects dev-looking production values", () => {
+    const cases: Array<[string, Record<string, string>]> = [
+      ["APP_URL", { APP_URL: "http://localhost:3000" }],
+      ["CORS_ORIGINS", { CORS_ORIGINS: "https://localhost:3002" }],
+      ["ADMIN_EMAIL", { ADMIN_EMAIL: "admin@teststack.local" }],
+      ["ADMIN_PASSWORD", { ADMIN_PASSWORD: "TestAdmin123!" }],
+      ["DATA_ENCRYPTION_KEY", { DATA_ENCRYPTION_KEY: "k" }],
+      ["JWT_ACCESS_SECRET", { JWT_ACCESS_SECRET: "changeme" }],
+    ];
+    for (const [path, override] of cases) {
+      const result = envSchema.safeParse({ ...base, NODE_ENV: "production", ...override });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.some((issue) => issue.path.includes(path))).toBe(true);
+      }
+    }
+  });
+
+  it("accepts a fully public production baseline", () => {
+    const result = envSchema.safeParse({
+      ...base,
+      NODE_ENV: "production",
+      STORAGE_DRIVER: "cloudinary",
+      CLOUDINARY_CLOUD_NAME: "demo",
+      CLOUDINARY_API_KEY: "key",
+      CLOUDINARY_API_SECRET: "secret",
+      CLOUDINARY_FOLDER: "planthaat/prod",
+      BFF_SHARED_SECRET: "b".repeat(32),
+    });
+    expect(result.success).toBe(true);
   });
 
   it("defaults to the auto driver", () => {
