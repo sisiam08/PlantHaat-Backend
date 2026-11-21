@@ -82,3 +82,12 @@ Permissions are unchanged: `(admin)/admin/layout.tsx` still calls `requireSessio
   hides highlights and blocks the placement. Axe on `/admin/settings`, `/admin/commission-rules`,
   `/admin/highlights`; checked at 1280 and 360 (no horizontal overflow).
 - Existing admin/settings/payments/Part 4 suites are run serially against the isolated stack.
+
+## Seller-panel overlaps (listed, not restyled)
+
+- `/seller/earnings` (wallet, ledger, withdrawal form) and `/seller/payout-accounts` (destination) are separate screens for the same money flow; the destination change cooldown is enforced server-side. Keep both but cross-link them; no data change was made.
+- `/seller/orders`, `/seller/cancellation-requests` and `/seller/complaints` show three views of the same `ShopOrder` lifecycle with different filters. They are role-specific queues, not duplicate editors.
+- `/seller/products` + `/seller/products/new` + `/seller/products/[id]` are one CRUD flow; editing and creating share the same form component. No duplication found.
+- `/seller/shop` and `/seller/delivery-zones` are separate models (shop profile vs delivery zones), both needed.
+- Admin/seller overlap: order status actions exist in admin orders and seller orders; each is permission-scoped. Complaint decisions are admin-only, seller replies only. Payouts are admin-only; sellers see their own ledger.
+- Safe future consolidation: move the withdrawal form into a dedicated seller "Withdrawals" tab next to payout accounts, and add a shared seller money summary header. Not implemented in this pass to avoid moving money UI without a design review.

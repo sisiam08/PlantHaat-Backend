@@ -211,3 +211,9 @@
 - `docs/pre-launch.md` records production env rules (enforced by the schema), health/readiness, job inventory, backup/restore rehearsal on the test DB, email/SMS scope (SMTP for auth mail only; no SMS), payment operations, CSP/realtime and OWNER ACTIONS. Policy pages now show a visible "DRAFT POLICY - REVIEW WITH A LAWYER BEFORE LAUNCH" note; no legal claim was invented.
 - Quality: removed the unused-variable warnings (BASE/addresses/priceLabel/ADMIN_*/added); the two React Compiler warnings are react-hook-form `watch()` skips, documented rather than risky refactors. A native JS-disabled check confirmed the hero search is a GET `/products` form and `/products?q=aloe` still server-renders cards. The Date.now prerender warning did not reproduce.
 - Performance remains the open item: no code was changed, so the documented 2026-11-20 medians stay authoritative; a fresh CDP run was not performed in this pass.
+
+## 2026-11-21 seller panel and padding decision
+
+- The one-row header keeps a 12 px gutter below `sm` (needed for logo/search/bell/cart/avatar at 360) while content uses 16 px; the e2e now asserts 12 at 390 and 16 at 1280. Measured and passed 4/4 after the correction; no visual regression.
+- Seller payout methods: new destinations now offer only the canonical `payout.methods` set (BKASH/NAGAD/BANK); ROCKET was selectable but not usable by withdrawals. Existing rows still render. Seller overlap list is in `admin-audit.md`.
+- Performance spot check (no code change): home LCP median 2656 ms/3240 ms at 390/1440, CLS 0.0001, script transfer 401 KB; P1-1 remains open because no median improved and the full matrix/levers were not run.
