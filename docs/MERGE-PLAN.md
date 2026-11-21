@@ -6,14 +6,14 @@ Status: **ready to fast-forward**, not merged. Nothing was pushed to `main`.
 
 | Repo | Feature branch | main state | Commits ahead | Dry-run result |
 |---|---|---|---:|---|
-| `PlantHaat-Backend` | `feature/payments` | ancestor of feature | 43 | `git merge-tree --write-tree main feature/payments` → tree `330efa17b8…`, **0 conflicts** |
-| `PlantHaat-Frontend` | `redesign/phase2` | ancestor of feature | 80 | `git merge-tree --write-tree main redesign/phase2` → tree `97b8fac12b…`, **0 conflicts** |
+| `PlantHaat-Backend` | `feature/payments` | ancestor of feature | 48 | `git merge-tree --write-tree main feature/payments` → tree `0eef620e87…`, **0 conflicts** |
+| `PlantHaat-Frontend` | `redesign/phase2` | ancestor of feature | 84 | `git merge-tree --write-tree main redesign/phase2` → tree `77c8d6de04…`, **0 conflicts** |
 
 Both merges are fast-forwards; the merged tree is identical to the tested feature tips (no merge
 commit needed). Full test evidence on those tips: backend unit **272/272**, backend e2e **23 suites,
 168 passed, 3 skipped** (known upload-key assertions), frontend Vitest **94 passed, 1 skipped**,
-money Playwright **9/9 + 12/12 + 3/3 + 4/4 + 2/2**, sessions **18/18**, proof upload through the
-Cloudinary test prefix **1/1**.
+money Playwright **9/9 + 12/12 + 3/3 + 4/4 + 2/2**, sessions **18/18**, delivery-proof/response-photo
+UI **1/1** (real Chrome), proof upload through the Cloudinary test prefix **1/1**, header/nav **5/5**.
 
 ## What is included
 
@@ -23,7 +23,8 @@ Cloudinary test prefix **1/1**.
   consolidations, upload tracking/backfill and production env hardening.
 - Frontend: the full `redesign/phase2` track (tokens, shell, home hero + Highlights, catalog/PDP,
   cart/checkout/payments, seller/admin panels, sessions + inline session-expired login, admin audit
-  consolidations, dev ribbon, production env checks).
+  consolidations, dev ribbon, production env checks, single `En | ???` header toggle, auth-aware
+  header/mobile nav, in-place notifications popover/bottom sheet).
 
 ## Migrations (additive; apply in this order to BOTH databases)
 
@@ -33,6 +34,7 @@ Cloudinary test prefix **1/1**.
 4. `20261117203000_auth_session_absolute_expiry`
 5. `20261118120000_p4_settlement_ledger`
 6. `20261119120000_home_highlights_banner_fields`
+7. `20261121120000_delivery_proof_and_response_photos`
 
 Run `npm run db:migrate:all` (dev + `planthaat_test`, guarded) and record `npm run db:status:all`.
 All are additive (new tables/columns, nullable/defaulted); no drops or rewrites. Rollback notes are in
@@ -75,9 +77,14 @@ cookie rename (old `ph_at`/`ph_rt` are read once as a fallback, then cleared).
 
 ## Owner uncommitted files (handle before merging)
 
-- Backend: `prisma/seed-demo.ts`, `package-lock.json`, `scripts/start-api.ps1` (untracked).
+- Backend: `prisma/seed-demo.ts`, `package-lock.json`, `scripts/start-api.ps1` (untracked). Decision:
+  owner work, left uncommitted; archived with checksums in
+  `E:\Development\Projects\_owner-files-archive\planthaat-item4-2026-11-21.zip`.
 - Frontend: `.gitignore`, `next.config.ts` (`instantInsights` change), banners deletions,
   `public/placeholders/plant-placeholder.webp`, about page, public layout, `category-grid.tsx`,
-  `products-list.tsx`, `tsconfig.json`, `public/fonts/Kalpurush.ttf`.
+  `products-list.tsx`, `tsconfig.json`, `public/fonts/Kalpurush.ttf` (untracked). Decision: owner UI/
+  tooling work, left uncommitted; same archive contains copies and patch files.
 - Do not stage or commit these as part of the merge; let the owner finish them first, then re-run
   `git status` and the merge dry-run. No conflicts are expected for the tracked feature work.
+  `.gitignore`/`tsconfig.json` changes are tooling-generated (new dist dirs); the banner/placeholder/
+  about changes are owner visual assets and must not be reverted.
