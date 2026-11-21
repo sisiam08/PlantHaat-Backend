@@ -493,3 +493,8 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Backend: `order.deliveryProofRequired` (default false) in Settings → Orders; delivery proofs and response photos validated for owner/deadline/decision/max, stored and ATTACHED in the same transaction; registered in the upload-reference registry so the orphan cron never sees them as orphans; buyer order page, seller order/complaint pages and admin dispute view show them. No ledger/release/commission change.
 - Storage test-mode correction: tests default to local, but an explicit `STORAGE_DRIVER=cloudinary` in a test process now selects Cloudinary (unit test added). The proof-upload script re-run is a real Cloudinary test now.
 - Tests: backend settlement evidence cases **2/2**; orders/complaints/storage/upload guards **64/64**; frontend `evidence-proof-ui` **1/1** (real Chrome, UI uploads, ATTACHED, buyer/seller/admin views, axe, 1280/360); `uploads:smoke` passed after rotation; Cloudinary test-prefix assets cleaned, `.env.test` restored to local.
+
+## 2026-11-21 Task 1 commit
+
+- Backend commit `207fb13` and frontend commit `0abf48e` (pushed). Migration applied to both DBs; `db:status:all` shows no pending migrations. Cloudinary rotation item removed from OWNER ACTIONS; `uploads:smoke` passed.
+- Dev restored: API `:5000` (new build), frontend `:3000`; test stack stopped; `:3100` off; `.next-test`, test results and test-prefix assets cleaned. Owner-uncommitted files untouched.
