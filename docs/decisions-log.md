@@ -243,3 +243,12 @@
 - **Session split reverted.** Dynamic-importing the session-expired dialog/form was expected to remove RHF/zod but Next fetched the extra chunk on load: JS +11 KB and one extra chunk, no LCP change. Reverted, and recorded so it is not retried without a chunk-avoidance design.
 - **No auth/realtime/toaster deferral.** Realtime already no-ops for guests and lazy-loads socket.io; `/auth/me` is the no-flash header source. Deferring the toaster/auth only moves code after hydration without measured wins and risks missing early user feedback.
 - **Budget guard.** `check:bundle` enforces gzip per-route limits from the build manifests; home/CLS coverage was added to the existing CLS spec. No new dependencies. `/products` API p50 356 ms is not changed without EXPLAIN-backed index evidence.
+
+## 2026-11-21 seller panel decisions
+
+- **One page shell.** Every seller route uses `PageContainer` + `PageHeader`; the shell breadcrumb is non-heading text. Detail pages keep the same header with back links. This removes the previous mix of 20px/24px ad-hoc headings and guarantees one `h1`.
+- **Payout destination canonical editor.** `/seller/payout-accounts` is the only editor. The earnings page keeps withdrawal/ledger/balance and links to it; the duplicate Payout profile tab and unused `EarningsClient` were removed. Withdrawal money logic was not moved.
+- **Approved sellers do not apply twice.** The Apply nav item is hidden for `sellerStatus=APPROVED`; `/seller/apply` still handles DRAFT/REJECTED/history and shows the approved notice with a dashboard link. The standalone route gets a back-to-home link.
+- **Destructive confirmation.** Product, delivery-zone and payout-account deletes use `AlertDialog` with a consequence sentence; the native `window.confirm` and immediate deletes were removed.
+- **Feedback and lists.** Shared `EmptyState`/`QueryError` replace bare empty/error paragraphs; skeletons and existing status/Price/FormField components remain authoritative.
+- **Kept separations.** Shop vs onboarding, earnings/withdrawals vs payout accounts, the three order lifecycle queues, and the product/variant editor are intentionally separate; they are recorded in `seller-audit.md` rather than merged. No endpoint, permission, money rule or migration changed.

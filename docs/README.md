@@ -17,6 +17,7 @@ Canonical docs for the backend repo (`feature/payments`). Documentation lives on
 | `api/home-highlights.md` | Home Highlights data model, public/admin API, validation, scripts, frontend behavior | backend | 2026-11-19 |
 | `auth/sessions.md` | Access/refresh session model, cookies, refresh flows, security settings, short-TTL testing | backend | 2026-11-18 |
 | `admin-audit.md` | Admin route inventory, duplicate/overlap findings, canonical owners, consolidation status | backend | 2026-11-20 |
+| `seller-audit.md` | Seller route inventory, duplicate/overlap findings, canonical owners, consolidation status | backend | 2026-11-21 |
 | `MERGE-PLAN.md` | Feature?main merge plan, migrations/env/rollout/rollback, dry-run result, owner files | backend | 2026-11-21 |
 | `pre-launch.md` | Production env, health/logging, jobs, backup/restore, email, payment ops, owner actions | backend | 2026-11-21 |
 | `payments/PAYMENTS_MASTER_PROMPT.md` | Canonical payments/settings/settlement master spec | backend | 2026-11-18 |
