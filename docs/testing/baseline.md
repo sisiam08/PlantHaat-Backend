@@ -132,3 +132,12 @@ stopped first because e2e uses the same `planthaat_test` database.
 
 The 2026-11 mention of a login throttle (10/min) is still true; long serial runs must pause or
 restart the API between groups.
+
+## 2026-11-21 final verification counts
+
+- Backend: unit **272/272** (37 suites); e2e **23 suites, 168 passed, 3 known skips** (catalog avatar/upload key ×2, seller-onboarding document prefix). The settings-reauth test timeout was raised to 30 s for argon2 under load; rerun 5/5.
+- Frontend: Vitest **94 passed, 1 skipped** (27 files). Money stack groups **30/30** (Part 4 9, payments 12, settings 3, admin consolidation 4, highlights 2); sessions **18/18**; proof upload **1/1** through Cloudinary `planthaat/teststack` (test assets cleaned).
+- Production frontend headers verified with `curl -I`: CSP (script/style self + inline, images Cloudinary, connect self + configured API/ws), nosniff, Referrer-Policy, X-Frame-Options DENY, Permissions-Policy. API Helmet adds HSTS + its own CSP.
+- JS-disabled: home search is a native GET `/products` form; `/products?q=aloe` server-renders cards.
+- Home consistency: 4/4 after deciding 12 px header gutter below `sm` (compact header) and 16 px content.
+- Isolation: test stack stopped, `.next-test` deleted; dev `:3000`/`:5000` running; `:3100` off.

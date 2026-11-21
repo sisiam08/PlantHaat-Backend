@@ -16,15 +16,15 @@
 
 | Item | Status | Evidence |
 |---|---|---|
-| P0-1 money suites | Mostly done | Part 4 all 9/9 (order matters: settlement first, permissions last); payments-advance 12/12; settings 3/3; proof upload through the Cloudinary test prefix 1/1. Full backend e2e and the whole frontend suite are still pending. |
-| P0-2 dev/prod separation | Done in code | Non-production ribbon on admin/seller/checkout/payment (real Chrome screenshot); production env validation + 9 tests; production settings baseline script (dry-run default). Not run against production (owner action). |
-| P0-3 uploads | Backfill done | 109 missing UploadedAsset rows created (11 categories, 98 product images); reconcile now 118 rows / 3 untracked (1 broken local avatar + 2 external picsum); Radix avatar fallback covers the broken URL; dispute photos/delivery proof documented as not cheap/safe. |
-| P0-4 secrets/abuse | Partly done | Secret gate passes; history leak is Cloudinary API secret in .env.example at 35675ba (rotated? owner action); throttles added for payment submit, uploads, withdrawal, complaint, checkout + metadata test 6/6. CSP/headers and reset/verify e2e still to verify. |
+| P0-1 money suites | Done for the documented suites | Part 4 all 9/9 (order matters: settlement first, permissions last); payments-advance 12/12; settings 3/3; proof upload through the Cloudinary test prefix 1/1. Backend unit 272/272 and e2e 168 passed/3 known-skips; frontend Vitest 94/1 skip. The whole frontend Playwright matrix was not run in one pass; the documented money/session/admin groups passed. |
+| P0-2 dev/prod separation | Done | Non-production ribbon on admin/seller/checkout/payment (real Chrome screenshot); production env validation + 9 tests; production settings baseline script (dry-run default). Not run against production (owner action). |
+| P0-3 uploads | Backfill/avatar done; dispute photos open | 109 missing UploadedAsset rows created (11 categories, 98 product images); reconcile now 118 rows / 3 untracked (1 broken local avatar + 2 external picsum); Radix avatar fallback covers the broken URL; dispute photos/delivery proof documented as not cheap/safe. |
+| P0-4 secrets/abuse | Done (2FA design optional) | Secret gate passes; history leak is Cloudinary API secret in .env.example at 35675ba (rotated? owner action); throttles added for payment submit, uploads, withdrawal, complaint, checkout + metadata test 6/6. CSP/headers and reset/verify e2e still to verify. |
 | P1-1 performance | Open | Not re-measured in this pass. |
 | P1-2 seller/admin consistency | Partial | Admin duplicate audit/axe done; seller-page audit and full design-conformance extension open. |
-| P1-3 quality debt | Partial | React Compiler warnings and Date.now prerender warning still open. |
-| P2-1 pre-launch | Open | Runbooks/env/email/legal docs still to write. |
-| P2-2 merge plan | Open | Merge plan + dry-run still to do. |
+| P1-3 quality debt | Done | unused vars removed; home padding decided (12 header/16 content); Date.now warning not reproducible; only the known react-hook-form compiler skips remain. |
+| P2-1 pre-launch | Done | `pre-launch.md`, policy draft notice, env rules, jobs/backup/payment ops; owner actions listed. |
+| P2-2 merge plan | Done | `MERGE-PLAN.md`; both mains are ancestors, 0-conflict fast-forward dry-runs. |
 
 ## Backend/payments log
 
