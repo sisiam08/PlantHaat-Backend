@@ -120,3 +120,17 @@ Group `home`, registry-driven, bilingual labels/help and `wired: true` (public w
 | `home.highlights.title` | json {bn,en} | ??????? / Highlights | yes | Section heading; empty in both locales hides it |
 
 Validation: text lengths (60/140/40), chip count and safe links, hero image URL scheme and focal 0�100, interval 4�12, maxSlides 1�10. Dev settings were not changed except these registry defaults.
+
+## 2026-11-21 admin consolidation notes
+
+- `commission.default` is the **fallback** only. The effective default is the newest active GLOBAL
+  `CommissionRule`; edit it on `/admin/commission-rules`. Settings → Wallet shows the effective value
+  (new `GET /admin/commission-rules/effective`) and the fallback read-only.
+- `payout.holdHours` is a deprecated alias of `return.windowHours` (single money hold). It is hidden
+  from the Settings UI (`wired:false`) and kept for old clients/history.
+- `wallet.deliveryChargeRecipient` is retired (`wired:false`); the delivery charge stays with the
+  seller. Kept for history.
+- Highlights on/off, autoplay and interval are edited only on `/admin/highlights`; Settings → Home
+  shows a read-only summary. `home.highlights.maxSlides` and `home.highlights.title` remain in
+  Settings because they have no duplicate editor.
+- `home.hero.chips` remains retired (`wired:false`, not public).

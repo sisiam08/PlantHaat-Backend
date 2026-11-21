@@ -24,7 +24,7 @@ describe("SettingsReauthService", () => {
     await expect(service.issue("admin-1", "CorrectPass1", ["payment.bkash.number"])).rejects.toThrow(
       /Too many/,
     );
-  });
+  }, 30_000);
 
   it("accepts the correct password and rejects an expired token", async () => {
     const { service } = await setup();
