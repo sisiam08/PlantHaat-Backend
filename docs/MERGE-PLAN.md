@@ -6,8 +6,8 @@ Status: **ready to fast-forward**, not merged. Nothing was pushed to `main`.
 
 | Repo | Feature branch | main state | Commits ahead | Dry-run result |
 |---|---|---|---:|---|
-| `PlantHaat-Backend` | `feature/payments` | ancestor of feature | 48 | `git merge-tree --write-tree main feature/payments` → tree `0eef620e87…`, **0 conflicts** |
-| `PlantHaat-Frontend` | `redesign/phase2` | ancestor of feature | 84 | `git merge-tree --write-tree main redesign/phase2` → tree `77c8d6de04…`, **0 conflicts** |
+| `PlantHaat-Backend` | `feature/payments` | ancestor of feature | 50 | `git merge-tree --write-tree main feature/payments` → tree `b3a1e7fce4�`, **0 conflicts** |
+| `PlantHaat-Frontend` | `redesign/phase2` | ancestor of feature | 86 | `git merge-tree --write-tree main redesign/phase2` → tree `f07100d9ea…`, **0 conflicts** |
 
 Both merges are fast-forwards; the merged tree is identical to the tested feature tips (no merge
 commit needed). Full test evidence on those tips: backend unit **272/272**, backend e2e **23 suites,
