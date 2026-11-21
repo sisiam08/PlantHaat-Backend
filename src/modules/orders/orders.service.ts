@@ -25,6 +25,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { PaymentsService } from "../payments/payments.service";
 import { recomputeProductAggregates } from "../products/product-aggregates";
 import { SettingsService } from "../settings/settings.service";
+import { UploadsService } from "../uploads/uploads.service";
 import { resolveDeliveryZone, type ResolvedDelivery } from "./delivery-zone.resolver";
 import type { CancelOrderDto } from "./dto/cancel-order.dto";
 import type {
@@ -72,6 +73,7 @@ export class OrdersService {
     private readonly mail: MailService,
     private readonly codRisk: CodRiskService,
     private readonly payments: PaymentsService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async checkout(customerId: string, dto: CheckoutDto, idempotencyKey: string | undefined) {
@@ -460,7 +462,7 @@ export class OrdersService {
             }
           }
 
-          await tx.orderStatusHistory.create({
+      await tx.orderStatusHistory.create({
             data: {
               shopOrderId: shopOrder.id,
               toStatus: "PENDING",
@@ -1210,6 +1212,23 @@ export class OrdersService {
       );
     }
 
+    const proofUrls = [...new Set(dto.deliveryProofUrls ?? [])];
+    if (proofUrls.length > 3) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "At most 3 delivery proofs are allowed");
+    }
+    if (proofUrls.length > 0 && to !== "DELIVERED") {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Delivery proof is only accepted when marking DELIVERED");
+    }
+    if (to === "DELIVERED") {
+      const proofRequired = await this.settings.getBoolean("order.deliveryProofRequired");
+      if (proofRequired && proofUrls.length === 0) {
+        throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "A delivery proof photo is required");
+      }
+      if (proofUrls.length > 0) {
+        await this.assertProofOwnership(proofUrls, actorId, actorRole);
+      }
+    }
+
     const cancelling = to === "CANCELLED";
     const restock = cancelling && shouldRestock(from, dto.restock);
     const deliveredAt = to === "DELIVERED" ? new Date() : null;
@@ -1231,6 +1250,9 @@ export class OrdersService {
           ...(to === "DELIVERED" && dto.deliveryNote !== undefined
             ? { deliveryNote: dto.deliveryNote }
             : {}),
+          ...(to === "DELIVERED" && proofUrls.length > 0
+            ? { deliveryProofUrl: proofUrls[0] }
+            : {}),
           ...(to === "SHIPPED"
             ? {
                 courierName: dto.courierName ?? shopOrder.courierName,
@@ -1251,6 +1273,13 @@ export class OrdersService {
             : {}),
         },
       });
+
+      if (proofUrls.length > 0) {
+        await tx.shopOrderDeliveryProof.createMany({
+          data: proofUrls.map((url) => ({ shopOrderId, url })),
+        });
+        await this.uploads.attachAssetsInTransaction(tx, proofUrls);
+      }
 
       await tx.orderStatusHistory.create({
         data: {
@@ -1451,6 +1480,23 @@ export class OrdersService {
     return (await this.attachCodRisk([shopOrder]))[0];
   }
 
+  private async assertProofOwnership(
+    urls: string[],
+    actorId: string | null,
+    actorRole: OrderActor,
+  ): Promise<void> {
+    const rows = await this.prisma.uploadedAsset.findMany({
+      where: { url: { in: urls } },
+      select: { url: true, ownerId: true },
+    });
+    if (rows.length !== urls.length) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Invalid delivery proof");
+    }
+    if (actorRole === "SELLER" && rows.some((row) => row.ownerId !== actorId)) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Invalid delivery proof");
+    }
+  }
+
   private async attachCodRisk<T extends { order: { contactPhone: string } }>(
     rows: T[],
   ): Promise<(T & { codRisk: CodRiskStatus | null })[]> {
@@ -1473,6 +1519,7 @@ const SHOP_ORDER_INCLUDE = {
   items: true,
   statusHistory: { orderBy: { createdAt: "asc" } },
   payments: true,
+  deliveryProofs: true,
   shop: { select: { id: true, name: true, slug: true } },
   order: {
     select: {
@@ -1494,6 +1541,7 @@ const ORDER_DETAIL_INCLUDE = {
       items: true,
       statusHistory: { orderBy: { createdAt: "asc" } },
       payments: true,
+      deliveryProofs: true,
       shop: { select: { id: true, name: true, slug: true } },
       parent: { select: { id: true, orderId: true, shopOrderNumber: true } },
       replacements: { select: { id: true, orderId: true, shopOrderNumber: true } },

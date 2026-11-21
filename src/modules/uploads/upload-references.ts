@@ -20,6 +20,8 @@ export const UPLOAD_SCALAR_REFERENCES: readonly UploadReference[] = [
   { model: "category", table: "Category", column: "imageUrl" },
   { model: "productImage", table: "ProductImage", column: "url" },
   { model: "shopOrder", table: "ShopOrder", column: "deliveryProofUrl" },
+  { model: "shopOrderDeliveryProof", table: "ShopOrderDeliveryProof", column: "url" },
+  { model: "complaintCommentAttachment", table: "ComplaintCommentAttachment", column: "url" },
   { model: "orderItem", table: "OrderItem", column: "imageUrl" },
   { model: "paymentSubmission", table: "PaymentSubmission", column: "proofUrl" },
   { model: "reviewImage", table: "ReviewImage", column: "url" },

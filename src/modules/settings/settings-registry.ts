@@ -41,6 +41,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "return.earlyRelease", type: "boolean", default: true, group: "orders", labelEn: "Allow early release confirmation", labelBn: "আগে রিলিজ নিশ্চিতকরণ" , isPublic: true, wired: true },
   { key: "return.photoRequired", type: "boolean", default: true, group: "orders", labelEn: "Photo required for disputes", labelBn: "বিরোধে ছবি আবশ্যক" , isPublic: true, wired: true },
   { key: "return.maxEvidencePhotos", type: "number", default: 5, group: "orders", labelEn: "Maximum dispute photos", labelBn: "বিরোধে সর্বোচ্চ ছবি" , wired: true },
+  { key: "order.deliveryProofRequired", type: "boolean", default: false, group: "orders", labelEn: "Require delivery proof photo", labelBn: "???????? ???????? ??? ???????????", helpEn: "When on, a seller must attach 1-3 photos before marking an order DELIVERED.", helpBn: "???? ????? ?????? DELIVERED ???? ??? ?????????? 1-3?? ??? ??????? ???? ????", wired: true },
   { key: "return.disputeSellerHours", type: "number", default: 48, group: "orders", labelEn: "Seller dispute response window (hours)", labelBn: "বিক্রেতার জবাবের সময় (ঘণ্টা)" , wired: true },
   { key: "commission.default", type: "number", default: 10, group: "wallet", labelEn: "Default commission (%)", labelBn: "ডিফল্ট কমিশন (%)" , isSensitive: true },
   { key: "wallet.deliveryChargeRecipient", type: "string", default: "seller", group: "wallet", labelEn: "Delivery charge recipient", labelBn: "ডেলিভারি চার্জ প্রাপক", isSensitive: true },

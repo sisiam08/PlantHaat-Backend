@@ -152,6 +152,7 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     mail,
     codRisk,
     payments,
+    { attachAssetsInTransaction: jest.fn() } as never,
   );
   return { service, commissions, settings, ledger, events, mail };
 }

@@ -11,14 +11,16 @@ import { STORAGE_SERVICE, type StorageService } from "./storage.types";
  * - `cloudinary` (or `auto` with the three Cloudinary keys present) → Cloudinary
  * - `s3` → S3-compatible
  * - `local` → local disk (tests / offline dev only; refused in production)
- * Tests always use local so unit/e2e suites never touch the network.
+ * Tests default to local so unit/e2e suites never touch the network; a test
+ * process may explicitly opt into Cloudinary with STORAGE_DRIVER=cloudinary
+ * (used by the proof-upload verification against the disposable test prefix).
  */
 export function resolveStorageDriver(config: AppConfigService): StorageService {
   const values = config.values;
   const hasCloudinary = Boolean(
     values.CLOUDINARY_CLOUD_NAME && values.CLOUDINARY_API_KEY && values.CLOUDINARY_API_SECRET,
   );
-  if (values.NODE_ENV === "test") {
+  if (values.NODE_ENV === "test" && values.STORAGE_DRIVER !== "cloudinary") {
     return new LocalStorageDriver(config);
   }
   if (values.STORAGE_DRIVER === "cloudinary" || (values.STORAGE_DRIVER === "auto" && hasCloudinary)) {

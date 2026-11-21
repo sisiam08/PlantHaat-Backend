@@ -92,8 +92,7 @@ deploying and `db:status:all` afterwards. Cookie rename rollback logs users in o
 
 ## OWNER ACTIONS
 
-1. Rotate the Cloudinary key/secret (the old value is in git history at `35675ba`); then run
-   `npm run uploads:smoke`.
+0. Cloudinary key rotation: **done** 2026-11-21; `npm run uploads:smoke` passed (public 200, private unsigned 404, signed 200, deleted 404).
 2. Supply real photos (11 categories, product 4:5, banners desktop 1920x640 / mobile 960x640) via
    admin/Cloudinary; the placeholders are byte-identical.
 3. Decide the merge (see `MERGE-PLAN.md`); nothing is pushed to `main`.

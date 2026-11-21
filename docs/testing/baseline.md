@@ -141,3 +141,8 @@ restart the API between groups.
 - JS-disabled: home search is a native GET `/products` form; `/products?q=aloe` server-renders cards.
 - Home consistency: 4/4 after deciding 12 px header gutter below `sm` (compact header) and 16 px content.
 - Isolation: test stack stopped, `.next-test` deleted; dev `:3000`/`:5000` running; `:3100` off.
+
+## 2026-11-21 evidence proof
+
+- Backend: `settlement.e2e-spec.ts -t "delivery proof|seller response"` **2/2**; `orders.service.spec complaints.service.spec storage.module upload-persistence.guard upload-references` **64/64**. Migration applied to both DBs.
+- Frontend: `evidence-proof-ui.spec.ts` **1/1** on the isolated production frontend (`:3002`) with the test API using `STORAGE_DRIVER=cloudinary` + `CLOUDINARY_FOLDER=planthaat/teststack` for this run; test-prefix assets deleted and `.env.test` restored to `local`.

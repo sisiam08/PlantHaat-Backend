@@ -134,3 +134,9 @@ Validation: text lengths (60/140/40), chip count and safe links, hero image URL 
   shows a read-only summary. `home.highlights.maxSlides` and `home.highlights.title` remain in
   Settings because they have no duplicate editor.
 - `home.hero.chips` remains retired (`wired:false`, not public).
+
+## 2026-11-21 evidence and delivery proof
+
+- `order.deliveryProofRequired` (boolean, default **false**, group orders, wired): when ON, a seller/admin must attach 1-3 delivery photos before marking a ShopOrder DELIVERED. Enforced in the transition transaction; changing it applies to new transitions only.
+- Seller dispute-response photos reuse `return.maxEvidencePhotos` (default 5); the response is accepted only before `sellerResponseDueAt` and before a decision, and each URL must belong to the seller's own `UploadedAsset` (`ownerId`).
+- New tables: `ShopOrderDeliveryProof` and `ComplaintCommentAttachment` are additive and registered in `UPLOAD_SCALAR_REFERENCES`; every URL is ATTACHED in the same transaction as the status/comment write.

@@ -4,6 +4,7 @@ import { CodRiskModule } from "../cod-risk/cod-risk.module";
 import { CommissionsModule } from "../commissions/commissions.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { PaymentsModule } from "../payments/payments.module";
+import { UploadsModule } from "../uploads/uploads.module";
 import { AdminOrdersController } from "./admin-orders.controller";
 import { AdminStuckOrdersController } from "./admin-stuck-orders.controller";
 import { CheckoutController } from "./checkout.controller";
@@ -12,7 +13,7 @@ import { OrdersService } from "./orders.service";
 import { SellerOrdersController } from "./seller-orders.controller";
 
 @Module({
-  imports: [CommissionsModule, NotificationsModule, CodRiskModule, PaymentsModule],
+  imports: [CommissionsModule, NotificationsModule, CodRiskModule, PaymentsModule, UploadsModule],
   controllers: [
     CheckoutController,
     OrdersController,

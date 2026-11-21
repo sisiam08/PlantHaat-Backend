@@ -41,6 +41,14 @@ describe("resolveStorageDriver", () => {
     );
   });
 
+  it("lets a test explicitly opt into Cloudinary", () => {
+    expect(
+      resolveStorageDriver(
+        config({ NODE_ENV: "test", STORAGE_DRIVER: "cloudinary", ...KEYS }),
+      ),
+    ).toBeInstanceOf(CloudinaryStorageDriver);
+  });
+
   it("warns when development explicitly selects local storage", () => {
     const warn = jest.spyOn(Logger, "warn").mockImplementation(() => undefined);
     expect(resolveStorageDriver(config({ STORAGE_DRIVER: "local" }))).toBeInstanceOf(

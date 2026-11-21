@@ -98,6 +98,8 @@ export class SellerShopOrderDto {
   estimatedDeliveryTo!: string | null;
   @ApiProperty({ nullable: true, type: String }) sellerNote!: string | null;
   @ApiProperty({ nullable: true, type: String }) deliveryNote!: string | null;
+  @ApiProperty({ type: [Object], description: "Delivery proof photos" })
+  deliveryProofs!: { id: string; url: string; createdAt: string }[];
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
   delayNotifiedAt!: string | null;
   @ApiProperty() stuckReminderCount!: number;

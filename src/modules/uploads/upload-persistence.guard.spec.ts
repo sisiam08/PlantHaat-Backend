@@ -10,6 +10,7 @@ const PERSISTENCE_FILES = [
   "src/modules/reviews/reviews.service.ts",
   "src/modules/complaints/complaints.service.ts",
   "src/modules/payments/payments.service.ts",
+  "src/modules/orders/orders.service.ts",
 ];
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBoolean, IsEnum, IsISO8601, IsOptional, IsString, MaxLength } from "class-validator";
+import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsISO8601, IsOptional, IsString, MaxLength } from "class-validator";
 
 import { OrderStatus } from "../../../generated/prisma/enums";
 
@@ -31,6 +31,14 @@ export class TransitionOrderDto {
   @IsString()
   @MaxLength(500)
   deliveryNote?: string;
+
+  @ApiPropertyOptional({ type: [String], maxItems: 3, description: "Delivery proof image URLs (1-3)" })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsString({ each: true })
+  @MaxLength(500, { each: true })
+  deliveryProofUrls?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

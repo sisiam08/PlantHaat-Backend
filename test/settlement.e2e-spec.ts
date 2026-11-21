@@ -206,14 +206,34 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
     return { customer, order: order.body.data, intent, admin };
   }
 
-  async function deliver(seller: Awaited<ReturnType<typeof createShop>>, shopOrderId: string) {
+  async function deliver(
+    seller: Awaited<ReturnType<typeof createShop>>,
+    shopOrderId: string,
+    deliveryProofUrls?: string[],
+  ) {
     for (const status of ["CONFIRMED", "PACKED", "SHIPPED", "DELIVERED"]) {
       await seller.agent
         .post(`${API}/seller/orders/${shopOrderId}/status`)
         .set("Origin", ORIGIN)
-        .send({ status })
+        .send({
+          status,
+          ...(status === "DELIVERED" && deliveryProofUrls ? { deliveryProofUrls } : {}),
+        })
         .expect(200);
     }
+  }
+
+  async function uploadedAsset(ownerId: string, url: string, purpose = "delivery-proof") {
+    return prisma.uploadedAsset.create({
+      data: {
+        publicId: url.replace(/^https?:\/\/[^/]+/, ""),
+        resourceType: "image",
+        url,
+        purpose,
+        ownerId,
+        status: "PENDING",
+      },
+    });
   }
 
   it("holds advance funds, releases after the window and pays a withdrawal", async () => {
@@ -594,4 +614,147 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       .send({ decision: "REJECTED", reason: "test" })
       .expect(403);
   });
+
+  it("stores delivery proof photos, enforces the required setting and scopes ownership", async () => {
+    const seller = await createShop();
+    const otherSeller = await createShop();
+    const { customer, order } = await advanceOrder([seller]);
+    const shopOrderId = order.shopOrders[0].id as string;
+    await setSettings(app, prisma, { "order.deliveryProofRequired": true });
+
+    for (const status of ["CONFIRMED", "PACKED", "SHIPPED"]) {
+      await seller.agent
+        .post(`${API}/seller/orders/${shopOrderId}/status`)
+        .set("Origin", ORIGIN)
+        .send({ status })
+        .expect(200);
+    }
+    const missing = await seller.agent
+      .post(`${API}/seller/orders/${shopOrderId}/status`)
+      .set("Origin", ORIGIN)
+      .send({ status: "DELIVERED" });
+    expect(missing.status).toBe(400);
+
+    const foreign = await uploadedAsset(
+      otherSeller.user.id,
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/delivery/foreign.webp",
+    );
+    const foreignAttempt = await seller.agent
+      .post(`${API}/seller/orders/${shopOrderId}/status`)
+      .set("Origin", ORIGIN)
+      .send({ status: "DELIVERED", deliveryProofUrls: [foreign.url] });
+    expect(foreignAttempt.status).toBe(400);
+
+    const first = await uploadedAsset(
+      seller.user.id,
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/delivery/first.webp",
+    );
+    const second = await uploadedAsset(
+      seller.user.id,
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/delivery/second.webp",
+    );
+    const delivered = await seller.agent
+      .post(`${API}/seller/orders/${shopOrderId}/status`)
+      .set("Origin", ORIGIN)
+      .send({ status: "DELIVERED", deliveryProofUrls: [first.url, second.url] })
+      .expect(200);
+    expect(delivered.body.data.deliveryProofs).toHaveLength(2);
+    expect(delivered.body.data.deliveryProofUrl).toBe(first.url);
+    const stored = await prisma.shopOrder.findUniqueOrThrow({ where: { id: shopOrderId } });
+    expect(stored.deliveryProofUrl).toBe(first.url);
+    expect(
+      (await prisma.uploadedAsset.findMany({ where: { url: { in: [first.url!, second.url!] } } })).every(
+        (asset) => asset.status === "ATTACHED",
+      ),
+    ).toBe(true);
+
+    const buyerView = await customer.agent.get(`${API}/orders/${order.id}`).expect(200);
+    expect(buyerView.body.data.shopOrders[0].deliveryProofs).toHaveLength(2);
+    const admin = await adminAgent();
+    const adminView = await admin.get(`${API}/admin/orders/${shopOrderId}`).expect(200);
+    expect(adminView.body.data.deliveryProofs).toHaveLength(2);
+    await setSettings(app, prisma, { "order.deliveryProofRequired": false });
+  });
+
+  it("accepts seller response photos only from the owner, within the deadline and the max", async () => {
+    const seller = await createShop();
+    const otherSeller = await createShop();
+    const { customer, order } = await advanceOrder([seller]);
+    const shopOrderId = order.shopOrders[0].id as string;
+    await deliver(seller, shopOrderId);
+
+    const customerAsset = await uploadedAsset(
+      customer.userId,
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/disputes/buyer.webp",
+      "complaint",
+    );
+    const complaint = await customer.agent
+      .post(`${API}/complaints`)
+      .set("Origin", ORIGIN)
+      .send({
+        shopOrderId,
+        type: "DAMAGED_PLANT",
+        description: "The leaves were broken on arrival",
+        attachments: [customerAsset.url],
+      })
+      .expect(201);
+    const complaintId = complaint.body.data.id as string;
+
+    const own = await uploadedAsset(
+      seller.user.id,
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/disputes/seller.webp",
+      "complaint",
+    );
+    const second = await uploadedAsset(
+      seller.user.id,
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/disputes/seller-2.webp",
+      "complaint",
+    );
+    const foreign = await uploadedAsset(
+      otherSeller.user.id,
+      "https://res.cloudinary.com/demo/image/upload/planthaat/test/disputes/foreign.webp",
+      "complaint",
+    );
+
+    await setSettings(app, prisma, { "return.maxEvidencePhotos": 1 });
+    await seller.agent
+      .post(`${API}/seller/complaints/${complaintId}/comments`)
+      .set("Origin", ORIGIN)
+      .send({ body: "Two photos", attachments: [own.url, second.url] })
+      .expect(400);
+
+    await setSettings(app, prisma, { "return.maxEvidencePhotos": 5 });
+    await seller.agent
+      .post(`${API}/seller/complaints/${complaintId}/comments`)
+      .set("Origin", ORIGIN)
+      .send({ body: "Foreign photo", attachments: [foreign.url] })
+      .expect(400);
+
+    const response = await seller.agent
+      .post(`${API}/seller/complaints/${complaintId}/comments`)
+      .set("Origin", ORIGIN)
+      .send({ body: "Here is the packing photo", attachments: [own.url] })
+      .expect(201);
+    expect(response.body.data.attachments).toHaveLength(1);
+    expect(
+      (await prisma.uploadedAsset.findUniqueOrThrow({ where: { id: own.id } })).status,
+    ).toBe("ATTACHED");
+
+    const buyerView = await customer.agent.get(`${API}/complaints/${complaintId}`).expect(200);
+    expect(buyerView.body.data.comments[0].attachments).toHaveLength(1);
+    const admin = await adminAgent();
+    const adminView = await admin.get(`${API}/admin/complaints/${complaintId}`).expect(200);
+    expect(adminView.body.data.comments[0].attachments).toHaveLength(1);
+
+    await prisma.complaint.update({
+      where: { id: complaintId },
+      data: { sellerResponseDueAt: new Date(Date.now() - 1000) },
+    });
+    await seller.agent
+      .post(`${API}/seller/complaints/${complaintId}/comments`)
+      .set("Origin", ORIGIN)
+      .send({ body: "Late", attachments: [own.url] })
+      .expect(400);
+  });
+
 });

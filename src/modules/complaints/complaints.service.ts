@@ -294,7 +294,7 @@ export class ComplaintsService {
       include: {
         attachments: true,
         refunds: true,
-        comments: { where: { isInternal: false }, orderBy: { createdAt: "asc" } },
+        comments: { where: { isInternal: false }, orderBy: { createdAt: "asc" }, include: { attachments: true } },
       },
     });
     if (!complaint) {
@@ -323,7 +323,7 @@ export class ComplaintsService {
       include: {
         attachments: true,
         refunds: true,
-        comments: { orderBy: { createdAt: "asc" } },
+        comments: { orderBy: { createdAt: "asc" }, include: { attachments: true } },
         shop: {
           select: {
             id: true,
@@ -345,6 +345,7 @@ export class ComplaintsService {
             releaseAt: true,
             fundsReleasedAt: true,
             order: { select: { orderNumber: true, paymentMethod: true } },
+            deliveryProofs: true,
           },
         },
       },
@@ -383,11 +384,39 @@ export class ComplaintsService {
         "This dispute has already been decided",
       );
     }
-    await this.prisma.complaint.update({
-      where: { id },
-      data: { status: "SELLER_RESPONDED", sellerRespondedAt: new Date() },
+    const attachments = [...new Set(dto.attachments ?? [])];
+    const maxPhotos = await this.settings.getNumber("return.maxEvidencePhotos");
+    if (attachments.length > maxPhotos) {
+      throw AppException.badRequest(
+        ErrorCode.VALIDATION_FAILED,
+        `At most ${maxPhotos} photos are allowed`,
+      );
+    }
+    if (attachments.length > 0) {
+      const owned = await this.prisma.uploadedAsset.count({
+        where: { url: { in: attachments }, ownerId: sellerUserId },
+      });
+      if (owned !== attachments.length) {
+        throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Invalid response photo");
+      }
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.complaint.update({
+        where: { id },
+        data: { status: "SELLER_RESPONDED", sellerRespondedAt: new Date() },
+      });
+      const comment = await this.addComment(
+        id,
+        sellerUserId,
+        "SELLER",
+        dto.body,
+        false,
+        attachments,
+        tx,
+      );
+      await this.uploads.attachAssetsInTransaction(tx, attachments);
+      return comment;
     });
-    return this.addComment(id, sellerUserId, "SELLER", dto.body, false);
   }
 
   async addAdminComment(actor: AuthenticatedUser, id: string, dto: ComplaintCommentDto) {
@@ -702,9 +731,21 @@ export class ComplaintsService {
     authorRole: Role,
     body: string,
     isInternal: boolean,
+    attachments: string[] = [],
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    return this.prisma.complaintComment.create({
-      data: { complaintId, authorId, authorRole, body, isInternal },
+    return client.complaintComment.create({
+      include: { attachments: true },
+      data: {
+        complaintId,
+        authorId,
+        authorRole,
+        body,
+        isInternal,
+        ...(attachments.length
+          ? { attachments: { create: attachments.map((url) => ({ url })) } }
+          : {}),
+      },
     });
   }
 

@@ -58,6 +58,14 @@ export class ComplaintCommentDto {
   @IsOptional()
   @IsBoolean()
   isInternal?: boolean;
+
+  @ApiPropertyOptional({ type: [String], maxItems: 20, description: "Response evidence image URLs" })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(500, { each: true })
+  attachments?: string[];
 }
 
 export class UpdateComplaintStatusDto {

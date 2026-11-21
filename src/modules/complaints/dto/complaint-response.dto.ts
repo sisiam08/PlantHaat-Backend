@@ -15,6 +15,13 @@ export class ComplaintShopRefDto {
   @ApiProperty() slug!: string;
 }
 
+export class ComplaintCommentAttachmentDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() commentId!: string;
+  @ApiProperty() url!: string;
+  @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
+}
+
 export class ComplaintCommentResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() complaintId!: string;
@@ -23,6 +30,7 @@ export class ComplaintCommentResponseDto {
   @ApiProperty() body!: string;
   @ApiProperty() isInternal!: boolean;
   @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
+  @ApiProperty({ type: [ComplaintCommentAttachmentDto] }) attachments!: ComplaintCommentAttachmentDto[];
 }
 
 export class SellerComplaintListItemDto {
@@ -73,6 +81,8 @@ export class AdminComplaintRefundRefDto {
 export class AdminComplaintListItemDto extends SellerComplaintListItemDto {}
 
 export class AdminComplaintDetailDto extends SellerComplaintDetailDto {
+  @ApiProperty({ type: Object, description: "Order context including delivery proofs" })
+  shopOrder!: Record<string, unknown>;
   @ApiProperty({ type: [AdminComplaintRefundRefDto] })
   refunds!: AdminComplaintRefundRefDto[];
   @ApiProperty({

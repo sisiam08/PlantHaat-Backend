@@ -813,6 +813,7 @@ model ShopOrder {
   fundsReleasedAt        DateTime?
   deliveryVerifiedById   String?
   deliveryProofUrl       String?
+  deliveryProofs         ShopOrderDeliveryProof[]
   cancelledAt           DateTime?
   cancelledBy           CancelledBy?
   cancelReason          String?
@@ -1331,8 +1332,31 @@ model ComplaintComment {
   createdAt   DateTime @default(now())
 
   complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  attachments ComplaintCommentAttachment[]
 
   @@index([complaintId, createdAt])
+}
+
+model ComplaintCommentAttachment {
+  id          String   @id @default(uuid())
+  commentId   String
+  url         String
+  createdAt   DateTime @default(now())
+
+  comment ComplaintComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+}
+
+model ShopOrderDeliveryProof {
+  id          String   @id @default(uuid())
+  shopOrderId String
+  url         String
+  createdAt   DateTime @default(now())
+
+  shopOrder ShopOrder @relation(fields: [shopOrderId], references: [id], onDelete: Cascade)
+
+  @@index([shopOrderId])
 }
 
 // ───────────────────────── MESSAGING (schema only — NOT implemented in v1) ─────────────────────────
