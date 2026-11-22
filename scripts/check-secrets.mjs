@@ -30,7 +30,7 @@ const patterns = [
 function placeholder(value) {
   return (
     value.length === 0 ||
-    /^(<.*>|\$\{.*\}|changeme|change-me|example|placeholder|replace.*|your.*|xxx+)$/i.test(value) ||
+    /^(<.*>|\$\{.*\}|\$[A-Za-z_(].*|changeme|change-me|example|placeholder|replace.*|your.*|xxx+)$/i.test(value) ||
     /(<|example|placeholder|replace|your-|change-|localhost|user:password|demo|test)/i.test(value)
   );
 }

@@ -25,7 +25,10 @@ function maskNumber(value: string): string {
 }
 
 function display(key: string, value: unknown): string {
-  if (key.endsWith(".number")) return maskNumber(String(value ?? ""));
+  if (key.endsWith(".number")) {
+    const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
+    return maskNumber(text);
+  }
   if (typeof value === "boolean") return value ? "ON" : "OFF";
   return JSON.stringify(value ?? null);
 }
