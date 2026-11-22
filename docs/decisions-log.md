@@ -294,3 +294,9 @@
 - **Wallet composition honesty.** The donut shows available+pending+on-hold as the balance; COD dues are a separate receivable shown with a gauge against the configured limit, not mixed into the donut total. Amounts use `<Price>`/`formatBdt`.
 - **Mobile-first strips.** Horizontal snap rails with a focusable labelled region, larger targets and no page overflow at 360; tables become cards below `md`.
 - **Known limits recorded, not hidden.** Products LCP is product-list imagery, analytics was not rebuilt, and the remaining pages without supporting series keep their existing layout rather than adding fake charts.
+
+## 2026-11-22 Dashboard server range fix
+
+- **Root cause:** with `cacheComponents: true`, Next 16 tried to prerender the `/admin` shell and rejected `new Date()` inside `presetBounds` ("blocking route"). Server pages passed a dashboard range straight into the panels prefetch, so the clock was read before any dynamic access.
+- **Fix:** Server Components now use `resolveDashboardRange()` (`src/server/dashboard-range.ts`), which calls `await connection()` before `presetBounds`; the panels helpers no longer default-evaluate a range. Client components keep `presetBounds` for their local fallback, but the server always supplies `initialRange`, so the fallback is never executed during SSR.
+- **Guard:** `tests/dashboard-server-range.test.ts` fails if an admin/seller `page.tsx` or a server analytics helper calls `presetBounds`, and asserts `connection()` precedes the clock read in the server helper.

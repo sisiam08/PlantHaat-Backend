@@ -570,3 +570,8 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Performance (same Slow 4G + 4x CPU method, 5 runs): seller orders 390 5584 -> 2728 ms, seller earnings 390 4988 -> 2368 ms, dashboard 1992/1876 ms (1440/390, within ~10% of baseline), products 4208/3800 ms, analytics 2272/5396 ms (not rebuilt; isolated dataset/noise documented). Public bundles unchanged; new seller budgets in `check:bundle`.
 - Checks actually run: frontend typecheck; full lint 0 errors (6 pre-existing warnings); Vitest 113 passed/1 skipped (30 files); production `.next-test` build; `check:bundle` green (public 373/387/403/372/360 KB; seller 366-372 KB); real-Chrome screenshots at 1280/360 for 10 seller routes; axe; isolated stack stopped; dev :3000/:5000 restored; :3100 off.
 - Remaining (honest): seller analytics page not rebuilt (existing charts); product list LCP is list imagery (~3.8-4.2 s); payout/shop/zones/questions/cancellations/apply have no new charts (no supporting series); no seller notifications page exists (shared bell only).
+
+## 2026-11-22 Dashboard server range fix (build blocker)
+
+- `/admin` failed a Next 16 Cache Components production build with "blocking route: new Date()" at `presetBounds` called from the server page. Added `src/server/dashboard-range.ts` (`await connection()` before `presetBounds`), routed admin/seller dashboard/orders/complaints pages and the server analytics strips through it, and removed the clock default from the panels helpers.
+- Added `frontend/tests/dashboard-server-range.test.ts` (3/3) so a future page cannot re-introduce the bare server-side call. Production build into `.next-check` passed; `.next-check` deleted; dev `:3000`/`:5000` left running; `:3100` off.
