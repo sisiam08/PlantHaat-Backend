@@ -284,3 +284,13 @@
 - **Shared strip, not per-page copies.** One `AnalyticsStrip` (period + KPIs + one chart) is reused on refunds/withdrawals/complaints/commission-rules; its numbers match the dashboard because both call the same read-only panels endpoint for the same instants.
 - **Performance target honesty.** The Phase 2 target (`<=2.5 s` every admin page) is not fully met on the synthetic rich-data stack; the measured before/after, the LCP element (Bengali H1 after the Hind swap, or client-rendered settings/list content) and the remaining levers are recorded in `frontend/docs/design/performance.md` rather than claimed as met.
 - **Page headers.** Admin list pages use `PageContainer` + `PageHeader`; detail components keep their own single `h1` (they already have one and their action headers are part of the detail layout). Settings uses `AnimatedTabs` with URL-synced groups; the unsaved guard, re-auth and history are unchanged.
+
+## 2026-11-22 Seller dashboard Phase 3
+
+- **Reuse the Phase 1 kit and seller panels endpoint.** No second analytics API and no new dependency; every chart has a summary, data table/CSV, keyboard focus and colour+shape/texture encoding.
+- **Server-seed the slow seller surfaces.** Seller orders (first page + panels), wallet and products are fetched on the server and seed TanStack Query; failures fall back to the existing client states. This is what moved seller orders 390 from 5.6 s to 2.7 s and wallet from 5.0 s to 2.4 s.
+- **Keep legacy counters.** Pending/stuck orders, unanswered questions, low-stock variants, unread notifications, application status, shop summary and quick links remain reachable on the dashboard; the new widgets are additive.
+- **Action queue = real statuses.** Each tile links to the already-filtered seller list (`?status=PENDING`, `/seller/questions`, `/seller/products`, `/seller/notifications`); no counters are invented.
+- **Wallet composition honesty.** The donut shows available+pending+on-hold as the balance; COD dues are a separate receivable shown with a gauge against the configured limit, not mixed into the donut total. Amounts use `<Price>`/`formatBdt`.
+- **Mobile-first strips.** Horizontal snap rails with a focusable labelled region, larger targets and no page overflow at 360; tables become cards below `md`.
+- **Known limits recorded, not hidden.** Products LCP is product-list imagery, analytics was not rebuilt, and the remaining pages without supporting series keep their existing layout rather than adding fake charts.
