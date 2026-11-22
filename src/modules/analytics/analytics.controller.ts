@@ -6,6 +6,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { ApiEnvelopeResponse } from "../../common/swagger/api-response.decorators";
 import { Role } from "../../generated/prisma/enums";
 import { AnalyticsService } from "./analytics.service";
+import { AdminPanelsDto, SellerPanelsDto } from "./dto/analytics-panels.dto";
 import {
   AdminAnalyticsOverviewDto,
   AnalyticsOverviewDto,
@@ -32,6 +33,13 @@ export class SellerAnalyticsController {
   dashboard(@CurrentUser("id") userId: string) {
     return this.analytics.sellerDashboard(userId);
   }
+
+  @Get("analytics/panels")
+  @ApiOperation({ summary: "Seller dashboard panels (read-only aggregated series)" })
+  @ApiEnvelopeResponse(SellerPanelsDto)
+  panels(@CurrentUser("id") userId: string, @Query() query: AnalyticsRangeDto) {
+    return this.analytics.sellerPanels(userId, query);
+  }
 }
 
 @ApiTags("Admin: analytics")
@@ -45,5 +53,12 @@ export class AdminAnalyticsController {
   @ApiEnvelopeResponse(AdminAnalyticsOverviewDto)
   overview(@Query() query: AnalyticsRangeDto) {
     return this.analytics.adminOverview(query);
+  }
+
+  @Get("panels")
+  @ApiOperation({ summary: "Admin dashboard panels (read-only aggregated series)" })
+  @ApiEnvelopeResponse(AdminPanelsDto)
+  panels(@Query() query: AnalyticsRangeDto) {
+    return this.analytics.adminPanels(query);
   }
 }
