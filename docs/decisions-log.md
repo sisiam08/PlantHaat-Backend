@@ -252,3 +252,11 @@
 - **Destructive confirmation.** Product, delivery-zone and payout-account deletes use `AlertDialog` with a consequence sentence; the native `window.confirm` and immediate deletes were removed.
 - **Feedback and lists.** Shared `EmptyState`/`QueryError` replace bare empty/error paragraphs; skeletons and existing status/Price/FormField components remain authoritative.
 - **Kept separations.** Shop vs onboarding, earnings/withdrawals vs payout accounts, the three order lifecycle queues, and the product/variant editor are intentionally separate; they are recorded in `seller-audit.md` rather than merged. No endpoint, permission, money rule or migration changed.
+
+## 2026-11-22 performance regression decisions
+
+- **Replay images for attribution.** The old report could not separate code from Cloudinary TTFB. All bisect/final runs record image responses once and replay them locally; document TTFB and LCP-resource TTFB remain separate metrics. This is the method for the new guard as well.
+- **Do not revert the font/priority commit on an unreproducible number.** The font/priority commit showed a catalog 1440 anomaly in its worktree, but the current tip with the same public font/priority code measured 2460/2508 ms vs the pre-commit 3064/2768. PDP/cart/checkout also returned to pre-regression ranges when image timing was controlled. No font or priority revert was kept; the earlier regression was not proven as a code cause.
+- **Cart preload kept.** Cart bn LCP is the first cart-line image. The server now `preload()`s that image from the server-rendered cart and the first line is priority; cart 390 median is 2408 bn / 2172 en with CLS unchanged. This is a presentation-only change; no cart/price logic changed.
+- **Guard thresholds.** The Playwright guard uses target + 10% margin where the owner target is exact (cart/checkout 2.75 s vs 2.5 s), 3.3 s for PDP/catalog desktop and 3.8 s for home. A later regression fails the serial suite; the margin is documented rather than silently weakening the target.
+- **Remaining known limit.** PDP desktop LCP is render-delay bound (image load 368 ms, render delay ~2.2 s), so it is near but not below the old 2408 ms en median; Bangla fonts remain 198 KB. No dependency, backend or money change was made.
