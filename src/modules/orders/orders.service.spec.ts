@@ -1181,6 +1181,59 @@ describe("OrdersService", () => {
       });
     });
 
+    it("uses the lightweight projection only when view=summary is requested", async () => {
+      const bag = createPrismaMock();
+      const row = {
+        ...(shopOrderFixture() as unknown as Record<string, unknown>),
+        order: {
+          id: "order-1",
+          orderNumber: "PH-1",
+          customerId: "c-1",
+          paymentMethod: "COD",
+          paymentStatus: "PENDING",
+          contactPhone: "01700000000",
+        },
+        items: [{ id: "item-1" }],
+      };
+      bag.prisma.shopOrder.findMany.mockResolvedValue([row]);
+      bag.prisma.shopOrder.count.mockResolvedValue(1);
+      const { service } = createService(bag);
+
+      const result = (await service.listAdminOrders({
+        view: "summary",
+        page: 1,
+        limit: 20,
+      } as never)) as { data: unknown[]; meta: { total: number } };
+
+      const findManyArgs = bag.prisma.shopOrder.findMany.mock.calls[0][0] as {
+        select?: Record<string, unknown>;
+        include?: Record<string, unknown>;
+      };
+      expect(findManyArgs.select).toBeDefined();
+      expect(findManyArgs.include).toBeUndefined();
+      expect(findManyArgs.select).not.toHaveProperty("statusHistory");
+      expect(findManyArgs.select).not.toHaveProperty("payments");
+      expect(result.meta.total).toBe(1);
+      expect(result.data).toHaveLength(1);
+    });
+
+    it("keeps the full include when no summary view is requested", async () => {
+      const bag = createPrismaMock();
+      bag.prisma.shopOrder.findMany.mockResolvedValue([shopOrderFixture()]);
+      bag.prisma.shopOrder.count.mockResolvedValue(1);
+      const { service } = createService(bag);
+
+      await service.listAdminOrders({ page: 1, limit: 20 } as never);
+
+      const findManyArgs = bag.prisma.shopOrder.findMany.mock.calls[0][0] as {
+        select?: unknown;
+        include?: Record<string, unknown>;
+      };
+      expect(findManyArgs.include).toBeDefined();
+      expect(findManyArgs.select).toBeUndefined();
+      expect(findManyArgs.include).toHaveProperty("statusHistory");
+    });
+
     it("auto-cancels stale pending orders and keeps going on failures", async () => {
       const bag = createPrismaMock();
       bag.prisma.shopOrder.findMany.mockResolvedValue([{ id: "so-1" }, { id: "so-2" }]);

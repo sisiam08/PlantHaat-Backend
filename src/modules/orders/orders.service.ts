@@ -1456,6 +1456,23 @@ export class OrdersService {
   async listAdminOrders(query: QueryOrdersDto): Promise<PaginatedResult<unknown>> {
     const { page, limit, skip } = resolvePagination(query);
     const where: Prisma.ShopOrderWhereInput = query.status ? { status: query.status } : {};
+    const summary = query.view === "summary";
+    // The admin list only needs identity, status, totals and item count.
+    // Skipping history/payments/proofs keeps the list payload small and is an
+    // additive opt-in; the detail view keeps SHOP_ORDER_INCLUDE.
+    if (summary) {
+      const [rows, total] = await this.prisma.$transaction([
+        this.prisma.shopOrder.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+          select: SHOP_ORDER_SUMMARY_SELECT,
+        }),
+        this.prisma.shopOrder.count({ where }),
+      ]);
+      return paginate(await this.attachCodRisk(rows), total, page, limit);
+    }
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.shopOrder.findMany({
         where,
@@ -1534,6 +1551,30 @@ const SHOP_ORDER_INCLUDE = {
   parent: { select: { id: true, orderId: true, shopOrderNumber: true } },
   replacements: { select: { id: true, orderId: true, shopOrderNumber: true } },
 } satisfies Prisma.ShopOrderInclude;
+
+/** Lightweight projection for the admin/paginated order list (`?view=summary`). */
+const SHOP_ORDER_SUMMARY_SELECT = {
+  id: true,
+  shopOrderNumber: true,
+  orderId: true,
+  shopId: true,
+  kind: true,
+  status: true,
+  total: true,
+  createdAt: true,
+  shop: { select: { id: true, name: true, slug: true } },
+  order: {
+    select: {
+      id: true,
+      orderNumber: true,
+      customerId: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      contactPhone: true,
+    },
+  },
+  items: { select: { id: true } },
+} satisfies Prisma.ShopOrderSelect;
 
 const ORDER_DETAIL_INCLUDE = {
   shopOrders: {
