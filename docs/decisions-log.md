@@ -300,3 +300,14 @@
 - **Root cause:** with `cacheComponents: true`, Next 16 tried to prerender the `/admin` shell and rejected `new Date()` inside `presetBounds` ("blocking route"). Server pages passed a dashboard range straight into the panels prefetch, so the clock was read before any dynamic access.
 - **Fix:** Server Components now use `resolveDashboardRange()` (`src/server/dashboard-range.ts`), which calls `await connection()` before `presetBounds`; the panels helpers no longer default-evaluate a range. Client components keep `presetBounds` for their local fallback, but the server always supplies `initialRange`, so the fallback is never executed during SSR.
 - **Guard:** `tests/dashboard-server-range.test.ts` fails if an admin/seller `page.tsx` or a server analytics helper calls `presetBounds`, and asserts `connection()` precedes the clock read in the server helper.
+
+## 2026-11-23 dashboard UI/UX polish
+
+- **Audit before edits.** The live Fernly reference and current panels were inspected in real Chrome at 1440/1280/768/390/360; the attached image was unavailable, so the brief's characteristics plus measured evidence were used. Findings and the design direction are recorded in `frontend/docs/design/dashboard-guide.md` §7.
+- **No new dependency.** The existing hand-built SVG kit and Tailwind/Radix motion are reused; `recharts` remains unimported. Motion is CSS-only (220 ms opacity chart entrance, 200 ms transform tab indicator, 300 ms scaleX progress, 200 ms sidebar colour).
+- **Tablet rail instead of a drawer at 768.** The sidebar becomes an 80 px icon rail at md with focus/hover tooltips and an 80 px offset; the drawer is <md. This keeps persistent context on tablets without a second navigation model.
+- **Mobile KPI 2-col grid, not a hidden swipe rail.** The previous swipe strip hid metrics; the new 2-col grid is discoverable and the page is shortened elsewhere by nested tabs. This is a deliberate reversal of the earlier swipe-strip choice for this dashboard.
+- **Details on demand.** Secondary analytics and top lists moved into nested tabs (URL-synced), reducing admin mobile from 7,327 to 5,018 px while keeping every chart/table one click away; recent orders are server-seeded real rows.
+- **Approved sellers get a compact status line.** The full card remains for DRAFT/PENDING/REJECTED/SUSPENDED with its notice/CTA; no status information is removed.
+- **One broken link removed.** The seller "Unread notifications" tile pointed at a non-existent `/seller/notifications` (404); it is now a non-link tile and the shared bell remains the surface.
+- **Performance trade-off recorded.** Seller dashboard LCP is +5%/+9% due to the added featured KPI/queue/recent orders; admin/orders and seller/orders improved. Public routes and bundles are unchanged.
