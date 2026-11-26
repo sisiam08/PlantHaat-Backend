@@ -165,6 +165,17 @@ describe("settings registry", () => {
     ).toThrow(/same-site|https/);
   });
 
+  it("validates delivery fallbacks as non-negative whole taka amounts", () => {
+    expect(() => validateSettingValue("delivery.fallback.insideDhaka", 0)).not.toThrow();
+    expect(() => validateSettingValue("delivery.fallback.outsideDhaka", 90)).not.toThrow();
+    expect(() => validateSettingValue("delivery.fallback.insideDhaka", -1)).toThrow(
+      /0-100000/,
+    );
+    expect(() => validateSettingValue("delivery.fallback.outsideDhaka", 12.5)).toThrow(
+      /whole taka/,
+    );
+  });
+
   it("masks sensitive values only", () => {
     const masked = maskSensitive({
       "payment.bkash.number": "01712345678",
@@ -174,3 +185,4 @@ describe("settings registry", () => {
     expect(masked["payment.cod.enabled"]).toBe(true);
   });
 });
+

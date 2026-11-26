@@ -124,7 +124,7 @@ describe("AuthService", () => {
       );
 
       const result = await service.register(
-        { email: "New@B.com", password: "Str0ngPass1", name: " New " } as never,
+        { email: "New@B.com", password: "Str0ngPass1!", name: " New " } as never,
         {},
       );
 
@@ -149,7 +149,7 @@ describe("AuthService", () => {
       const service = createService(prisma);
 
       await expect(
-        service.register({ email: "a@b.com", password: "Str0ngPass1", name: "A" } as never, {}),
+        service.register({ email: "a@b.com", password: "Str0ngPass1!", name: "A" } as never, {}),
       ).rejects.toMatchObject({ code: ErrorCode.EMAIL_ALREADY_REGISTERED });
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
@@ -163,7 +163,7 @@ describe("AuthService", () => {
 
       await expect(
         service.register(
-          { email: "a@b.com", password: "Str0ngPass1", name: "A", phone: "01712345678" } as never,
+          { email: "a@b.com", password: "Str0ngPass1!", name: "A", phone: "01712345678" } as never,
           {},
         ),
       ).rejects.toMatchObject({ code: ErrorCode.CONFLICT });
@@ -189,7 +189,7 @@ describe("AuthService", () => {
       const result = await service.registerSeller(
         {
           email: "Seller@B.com",
-          password: "Str0ngPass1",
+          password: "Str0ngPass1!",
           name: "Seller",
           businessName: "My Nursery",
           contactPhone: "01798765432",

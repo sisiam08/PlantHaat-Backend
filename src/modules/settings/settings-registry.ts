@@ -1,3 +1,5 @@
+import { ADVANCE_PROVIDERS, ADVANCE_PROVIDER_META } from "../payments/advance-providers";
+
 export type SettingType = "boolean" | "number" | "string" | "json";
 
 export interface SettingDefinition {
@@ -12,7 +14,8 @@ export interface SettingDefinition {
     | "support"
     | "platform"
     | "security"
-    | "home";
+    | "home"
+    | "delivery";
   labelEn: string;
   labelBn: string;
   helpEn?: string;
@@ -29,6 +32,10 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "payment.bkash.number", type: "string", default: "", group: "payments", labelEn: "bKash receiving number", labelBn: "বিকাশ নম্বর", isSensitive: true, wired: true },
   { key: "payment.nagad.enabled", type: "boolean", default: false, group: "payments", labelEn: "Nagad enabled", labelBn: "নগদ চালু", isPublic: true, wired: true },
   { key: "payment.nagad.number", type: "string", default: "", group: "payments", labelEn: "Nagad receiving number", labelBn: "নগদ নম্বর", isSensitive: true, wired: true },
+  { key: "payment.rocket.enabled", type: "boolean", default: false, group: "payments", labelEn: "Rocket enabled", labelBn: "রকেট চালু", isPublic: true, wired: true },
+  { key: "payment.rocket.number", type: "string", default: "", group: "payments", labelEn: "Rocket receiving number", labelBn: "রকেট রিসিভিং নম্বর", isSensitive: true, wired: true },
+  { key: "payment.upay.enabled", type: "boolean", default: false, group: "payments", labelEn: "Upay enabled", labelBn: "উপায় চালু", isPublic: true, wired: true },
+  { key: "payment.upay.number", type: "string", default: "", group: "payments", labelEn: "Upay receiving number", labelBn: "উপায় রিসিভিং নম্বর", isSensitive: true, wired: true },
   { key: "payment.instructions", type: "string", default: "Send the exact order total to the number shown and submit the transaction ID.", group: "payments", labelEn: "Payment instructions", labelBn: "পেমেন্ট নির্দেশনা", isPublic: true, wired: true },
   { key: "payment.warningText", type: "string", default: "Send from your own number and keep the receipt until the order is verified.", group: "payments", labelEn: "Payment warning", labelBn: "পেমেন্ট সতর্কতা", isPublic: true, wired: true },
   { key: "payment.accountNote", type: "string", default: "Personal", group: "payments", labelEn: "Account type note", labelBn: "অ্যাকাউন্টের ধরন", wired: true },
@@ -95,6 +102,11 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { key: "home.highlights.intervalSeconds", type: "number", default: 6, group: "home", labelEn: "Highlights interval (seconds)", labelBn: "হাইলাইট বিরতি (সেকেন্ড)", helpEn: "4-12 seconds. Autoplay is ignored when the customer prefers reduced motion.", helpBn: "৪-১২ সেকেন্ড। ক্রেতা reduced motion পছন্দ করলে অটোপ্লে চলবে না।", isPublic: true, wired: true },
   { key: "home.highlights.maxSlides", type: "number", default: 6, group: "home", labelEn: "Maximum active highlights", labelBn: "সর্বোচ্চ সক্রিয় হাইলাইট", helpEn: "1-10. Extra active slides stay in the admin list but are not sent to the home page.", helpBn: "১-১০। অতিরিক্ত সক্রিয় স্লাইড অ্যাডমিন তালিকায় থাকবে কিন্তু হোম পেজে যাবে না।", wired: true },
   { key: "home.highlights.title", type: "json", default: { bn: "হাইলাইট", en: "Highlights" }, group: "home", labelEn: "Highlights section title", labelBn: "হাইলাইট সেকশনের শিরোনাম", helpEn: "Leave both languages empty to hide the section heading.", helpBn: "শিরোনাম লুকাতে দুই ভাষাই খালি রাখুন।", isPublic: true, wired: true },
+  { key: "delivery.quote.live.enabled", type: "boolean", default: false, group: "delivery", labelEn: "Allow live Steadfast quotes", labelBn: "লাইভ স্টেডফাস্ট কোটেশন চালু", helpEn: "OFF by default. The public Steadfast quote endpoint is not an official API; keep this off until permission is confirmed. Overrides and the fallback still work.", helpBn: "ডিফল্ট বন্ধ। স্টেডফাস্টের পাবলিক কোটেশন এন্ডপয়েন্ট অফিসিয়াল API নয়; অনুমতি নিশ্চিত না হওয়া পর্যন্ত বন্ধ রাখুন। ওভাররাইড ও ফলব্যাক কাজ করবে।", wired: true },
+  { key: "delivery.fallback.insideDhaka", type: "number", default: 0, group: "delivery", labelEn: "Fallback charge inside Dhaka", labelBn: "ঢাকার ভিতরে ফলব্যাক চার্জ", helpEn: "Used only when no override, cache or live quote exists. 0 means not configured (quote unavailable instead of free).", helpBn: "ওভাররাইড, ক্যাশ বা লাইভ কোটেশন না থাকলে ব্যবহৃত হয়। 0 মানে কনফিগার করা নেই (ফ্রি নয়, কোটেশন অনুপলব্ধ)।", wired: true },
+  { key: "delivery.fallback.outsideDhaka", type: "number", default: 0, group: "delivery", labelEn: "Fallback charge outside Dhaka", labelBn: "ঢাকার বাইরে ফলব্যাক চার্জ", helpEn: "Same rules as the inside-Dhaka fallback.", helpBn: "ঢাকার ভিতরের ফলব্যাকের মতোই নিয়ম।", wired: true },
+  { key: "delivery.quote.cacheFreshHours", type: "number", default: 24, group: "delivery", labelEn: "Quote cache fresh window (hours)", labelBn: "কোটেশন ক্যাশ তাজা সময় (ঘণ্টা)", helpEn: "A live quote is reused without a network call for this long.", helpBn: "এই সময়ের মধ্যে নেটওয়ার্ক কল ছাড়াই লাইভ কোটেশন পুনরায় ব্যবহৃত হয়।", wired: true },
+  { key: "delivery.quote.staleDays", type: "number", default: 30, group: "delivery", labelEn: "Quote stale window (days)", labelBn: "কোটেশন পুরনো সময় (দিন)", helpEn: "A stale quote may be shown for this long, and is always preferred over the fallback.", helpBn: "পুরনো কোটেশন এই সময় পর্যন্ত দেখানো যায়, এবং ফ্যালব্যাকের চেয়ে সবসময় অগ্রাধিকার পায়।", wired: true },
 ];
 
 export const SETTING_DEFAULTS = Object.fromEntries(
@@ -160,10 +172,10 @@ function advanceIsLive(): boolean {
 
 export function effectiveAdvanceFrom(values: Record<string, unknown>): boolean {
   if (!advanceIsLive() || values["payment.advance.enabled"] !== true) return false;
-  return [
-    ["payment.bkash.enabled", "payment.bkash.number"],
-    ["payment.nagad.enabled", "payment.nagad.number"],
-  ].some(([enabled, number]) => values[enabled] === true && BD_MOBILE.test(stringValue(values[number])));
+  return ADVANCE_PROVIDERS.some((provider) => {
+    const meta = ADVANCE_PROVIDER_META[provider];
+    return values[meta.enabledKey] === true && BD_MOBILE.test(stringValue(values[meta.numberKey]));
+  });
 }
 
 export function validateSettingValue(key: string, value: unknown): void {
@@ -252,6 +264,26 @@ export function validateSettingValue(key: string, value: unknown): void {
     if (key === "home.highlights.maxSlides" && (value < 1 || value > 10)) {
       throw new SettingValidationError("Highlights maximum must be 1–10 slides");
     }
+    if (key === "delivery.quote.cacheFreshHours" && (value < 0 || value > 720)) {
+      throw new SettingValidationError("Quote fresh window must be 0-720 hours");
+    }
+    if (key === "delivery.quote.staleDays" && (value < 1 || value > 365)) {
+      throw new SettingValidationError("Quote stale window must be 1-365 days");
+    }
+    if (
+      (key === "delivery.fallback.insideDhaka" ||
+        key === "delivery.fallback.outsideDhaka") &&
+      (value < 0 || value > 100000)
+    ) {
+      throw new SettingValidationError("Delivery fallback must be 0-100000");
+    }
+    if (
+      (key === "delivery.fallback.insideDhaka" ||
+        key === "delivery.fallback.outsideDhaka") &&
+      !Number.isInteger(value)
+    ) {
+      throw new SettingValidationError("Delivery fallback must be a whole taka amount");
+    }
   }
 
   if (key === "home.hero.headline") {
@@ -307,9 +339,14 @@ export function validateSettingValue(key: string, value: unknown): void {
     }
   }
   if (
-    ["payment.bkash.number", "payment.nagad.number", "support.whatsapp", "support.phone"].includes(
-      key,
-    ) &&
+    [
+      "payment.bkash.number",
+      "payment.nagad.number",
+      "payment.rocket.number",
+      "payment.upay.number",
+      "support.whatsapp",
+      "support.phone",
+    ].includes(key) &&
     typeof value === "string" &&
     value.trim() !== "" &&
     !BD_MOBILE.test(value.trim())
@@ -332,10 +369,11 @@ export function validateSettingsMap(
   }
 
   const merged = { ...current, ...values };
-  const providers = [
-    { enabled: "payment.bkash.enabled", number: "payment.bkash.number", label: "bKash" },
-    { enabled: "payment.nagad.enabled", number: "payment.nagad.number", label: "Nagad" },
-  ];
+  const providers = ADVANCE_PROVIDERS.map((provider) => ({
+    enabled: ADVANCE_PROVIDER_META[provider].enabledKey,
+    number: ADVANCE_PROVIDER_META[provider].numberKey,
+    label: ADVANCE_PROVIDER_META[provider].label,
+  }));
   const readyProviders = providers.filter((provider) => {
     const number = stringValue(merged[provider.number]);
     return merged[provider.enabled] === true && BD_MOBILE.test(number);
@@ -385,3 +423,5 @@ export function maskSensitive(values: Record<string, unknown>): Record<string, u
     Object.entries(values).map(([key, value]) => [key, sensitive.has(key) ? "••••••" : value]),
   );
 }
+
+

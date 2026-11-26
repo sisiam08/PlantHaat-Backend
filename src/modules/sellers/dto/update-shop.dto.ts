@@ -1,6 +1,16 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+import {
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
 
 export class UpdateShopDto {
   @ApiPropertyOptional({ example: "Green Valley Nursery" })
@@ -40,6 +50,18 @@ export class UpdateShopDto {
   @MaxLength(100)
   district?: string;
 
+  @ApiPropertyOptional({ description: "Pickup district id (steers the courier quote)" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pickupDistrictId?: number;
+
+  @ApiPropertyOptional({ description: "Pickup thana id; required for Dhaka-district shops" })
+  @IsOptional()
+  @IsUUID()
+  pickupThanaId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -62,3 +84,5 @@ export class UpdateShopDto {
   @Max(180)
   longitude?: number;
 }
+
+

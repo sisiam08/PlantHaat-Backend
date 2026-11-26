@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { CodRiskModule } from "../cod-risk/cod-risk.module";
+import { DeliveryQuoteModule } from "../delivery-quote/delivery-quote.module";
 import { CommissionsModule } from "../commissions/commissions.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { PaymentsModule } from "../payments/payments.module";
@@ -13,7 +14,14 @@ import { OrdersService } from "./orders.service";
 import { SellerOrdersController } from "./seller-orders.controller";
 
 @Module({
-  imports: [CommissionsModule, NotificationsModule, CodRiskModule, PaymentsModule, UploadsModule],
+  imports: [
+    CommissionsModule,
+    NotificationsModule,
+    CodRiskModule,
+    DeliveryQuoteModule,
+    PaymentsModule,
+    UploadsModule,
+  ],
   controllers: [
     CheckoutController,
     OrdersController,
@@ -25,3 +33,4 @@ import { SellerOrdersController } from "./seller-orders.controller";
   exports: [OrdersService],
 })
 export class OrdersModule {}
+

@@ -11,6 +11,10 @@ import { hashPassword } from "../src/common/utils/password";
 import { AppConfigService } from "../src/config/app-config.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { resetDatabase } from "./cleanup";
+import {
+  mapDistrictToSteadfast,
+  useTestDeliveryRates,
+} from "./delivery-fixtures";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
@@ -53,11 +57,13 @@ describe("Earnings & ledger (e2e)", () => {
       data: { name: `Dhaka-${suffix()}`, nameBn: "ঢাকা", division: "Dhaka" },
     });
     districtId = district.id;
+    await useTestDeliveryRates(app, prisma);
+    await mapDistrictToSteadfast(prisma, districtId);
   });
 
   async function setupSeller(price: number) {
     const id = suffix();
-    const password = "SellerPass1";
+    const password = "SellerPass1!";
     const user = await prisma.user.create({
       data: {
         email: `seller_${id}@example.com`,
@@ -83,6 +89,7 @@ describe("Earnings & ledger (e2e)", () => {
         slug: `shop-${id}`,
         status: "ACTIVE",
         approvedAt: new Date(),
+        pickupDistrictId: districtId,
       },
     });
     await prisma.shopDeliveryZone.create({
@@ -117,7 +124,7 @@ describe("Earnings & ledger (e2e)", () => {
     const email = `cust_${suffix()}@example.com`;
     const reg = await agent
       .post(`${API}/auth/register`)
-      .send({ email, password: "Str0ngPass1", name: "Customer" })
+      .send({ email, password: "Str0ngPass1!", name: "Customer" })
       .expect(201);
     const userId = reg.body.data.user.id as string;
     await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
@@ -166,13 +173,13 @@ describe("Earnings & ledger (e2e)", () => {
       data: {
         email,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
     });
     const agent = request.agent(server);
-    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1!" }).expect(200);
     return agent;
   }
 
@@ -269,3 +276,4 @@ describe("Earnings & ledger (e2e)", () => {
     expect(Number(ledger.amount)).toBe(-50);
   });
 });
+

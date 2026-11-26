@@ -7,7 +7,8 @@ import type { AuthenticatedUser } from "../../common/types/authenticated-user";
 import type { RequestMeta } from "../../common/utils/request-meta";
 import { decryptAesGcm, encryptAesGcm } from "../../common/utils/crypto";
 import { generatePayoutNumber } from "../../common/utils/order-number";
-import { isValidBdPhone, normalizeBdPhone } from "../../common/utils/phone";
+import { normalizeBdPhone } from "../../common/utils/phone";
+import { payoutDestinationError } from "../../common/validators/payout-destination";
 import { Prisma } from "../../generated/prisma/client";
 import type { PayoutMethod } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -122,20 +123,15 @@ export class WalletService {
         "This payout method is not enabled",
       );
     }
-    let number = dto.accountNumber.replace(/[\s-]/g, "");
+    let number = dto.accountNumber.trim();
+    const invalid = payoutDestinationError(dto.method, number);
+    if (invalid) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, invalid, {
+        accountNumber: invalid,
+      });
+    }
     if (dto.method === "BKASH" || dto.method === "NAGAD") {
-      if (!isValidBdPhone(number)) {
-        throw AppException.badRequest(
-          ErrorCode.VALIDATION_FAILED,
-          "A valid Bangladesh mobile number is required",
-        );
-      }
       number = normalizeBdPhone(number).replace(/^\+88/, "");
-    } else if (!/^\d{6,20}$/.test(number)) {
-      throw AppException.badRequest(
-        ErrorCode.VALIDATION_FAILED,
-        "A valid bank account number is required",
-      );
     }
 
     const existing = await this.prisma.sellerPayoutAccount.findFirst({
@@ -245,6 +241,15 @@ export class WalletService {
       throw AppException.unprocessable(
         ErrorCode.PAYOUT_PROFILE_REQUIRED,
         "Add a payout profile before requesting a withdrawal",
+      );
+    }
+    const storedNumber = decryptAesGcm(account.accountNumberEnc, this.encryptionKey());
+    const invalidDestination = payoutDestinationError(account.method, storedNumber);
+    if (invalidDestination) {
+      throw AppException.unprocessable(
+        ErrorCode.PAYOUT_DESTINATION_INVALID,
+        "Update your payout destination before requesting a withdrawal",
+        { accountNumber: invalidDestination },
       );
     }
 

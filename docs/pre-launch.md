@@ -49,8 +49,7 @@ empties both numbers and keeps COD ON. Run it before traffic; never copy the dev
 4. Keep `*.dump` and `backups/` out of git; store encrypted off-machine. The owner currently manages
    his data; no backup verification is automated.
 
-Migration/rollback: every migration is additive; old backend code ignores new tables/columns.
-Rollback = redeploy the previous backend/frontend; do not drop data. Run `db:migrate:all` before
+Migration/rollback: every migration itend; do not drop data. Run `db:migrate:all` before
 deploying and `db:status:all` afterwards. Cookie rename rollback logs users in once (old code ignores
 `ph_web_*`); do not delete cookies server-side.
 

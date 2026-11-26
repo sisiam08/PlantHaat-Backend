@@ -14,7 +14,7 @@ import { resetDatabase } from "./cleanup";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
-const PASSWORD = "Str0ngPass1";
+const PASSWORD = "Str0ngPass1!";
 
 function suffix(): string {
   return `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;

@@ -139,6 +139,47 @@ enum AreaScope {
   OUTSIDE
 }
 
+enum DeliveryCondition {
+  INSIDE_DHAKA
+  OUTSIDE_DHAKA
+}
+
+enum DeliveryPaymentMode {
+  COD_AND_ADVANCE
+  COD_ONLY
+  ADVANCE_ONLY
+}
+
+enum SteadfastLocationKind {
+  DISTRICT
+  DHAKA_CITY
+  DHAKA_SUBURBAN
+}
+
+enum DhakaZone {
+  CITY
+  SUBURBAN
+}
+
+enum ThanaClassificationSource {
+  DEFAULT_UNVERIFIED
+  ADMIN_VERIFIED
+}
+
+enum CourierQuoteSource {
+  LIVE
+  IMPORTED
+  ADMIN
+}
+
+enum DeliveryQuoteSource {
+  LIVE
+  CACHE
+  STALE
+  OVERRIDE
+  FALLBACK
+}
+
 enum CancelledBy {
   CUSTOMER
   SELLER
@@ -411,10 +452,49 @@ model District {
   name     String @unique
   nameBn   String
   division String
+  insideDhaka Boolean @default(false)
+  // Admin-editable mapping to Steadfast's destination id. Dhaka stays null:
+  // its destination depends on the chosen thana (1 = City, 18 = Sub-Urban).
+  steadfastLocationId Int?
 
   addresses Address[]
   orders    Order[]
   zoneLinks ZoneDistrict[]
+  thanas    Thana[]
+  pickupShops Shop[]
+  steadfastLocation SteadfastLocation? @relation(fields: [steadfastLocationId], references: [id], onDelete: SetNull)
+
+  @@index([steadfastLocationId])
+}
+
+model SteadfastLocation {
+  id   Int                   @id
+  name String
+  kind SteadfastLocationKind
+  createdAt DateTime @default(now())
+
+  districts District[]
+}
+
+model Thana {
+  id                     String  @id @default(uuid())
+  steadfastPoliceStationId Int?   @unique
+  name                   String
+  nameBn                 String?
+  districtId             Int
+  dhakaZone              DhakaZone?
+  classificationSource   ThanaClassificationSource @default(DEFAULT_UNVERIFIED)
+  selectableByCustomer   Boolean @default(true)
+  isActive               Boolean @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  district District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  addresses Address[]
+  shopPickups Shop[] @relation("ShopPickupThana")
+
+  @@index([districtId])
+  @@index([dhakaZone])
 }
 
 model Address {
@@ -424,6 +504,7 @@ model Address {
   recipientName String
   phone         String
   districtId    Int
+  thanaId       String?
   area          String
   addressLine   String
   postalCode    String?
@@ -434,8 +515,10 @@ model Address {
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   district District @relation(fields: [districtId], references: [id])
+  thana    Thana?   @relation(fields: [thanaId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([thanaId])
 }
 
 // COD risk is keyed by the normalized phone (phones are unverified, so this is
@@ -530,6 +613,10 @@ model Shop {
   bannerUrl        String?
   phone            String?
   district         String?
+  // Pickup origin used for courier quotes. pickupDistrictId is preferred;
+  // legacy shops fall back to matching the free-text district name.
+  pickupDistrictId Int?
+  pickupThanaId    String?
   address          String?
   latitude         Decimal?   @db.Decimal(9, 6)
   longitude        Decimal?   @db.Decimal(9, 6)
@@ -546,6 +633,8 @@ model Shop {
   suspendedAt      DateTime?
 
   sellerProfile SellerProfile    @relation(fields: [sellerProfileId], references: [id], onDelete: Restrict)
+  pickupDistrict District?       @relation(fields: [pickupDistrictId], references: [id], onDelete: SetNull)
+  pickupThana    Thana?          @relation("ShopPickupThana", fields: [pickupThanaId], references: [id], onDelete: SetNull)
   products      Product[]
   shopOrders    ShopOrder[]
   deliveryZones ShopDeliveryZone[]
@@ -555,6 +644,8 @@ model Shop {
 
   @@index([status])
   @@index([sellerProfileId])
+  @@index([pickupDistrictId])
+  @@index([pickupThanaId])
 }
 
 model ShopDeliveryZone {
@@ -563,16 +654,22 @@ model ShopDeliveryZone {
   name              String
   isNationwide      Boolean  @default(false)
   charge            Decimal  @db.Decimal(10, 2)
+  // Seller-funded free delivery. `charge` is kept for history only and is no
+  // longer used to price a quote (the courier rate is authoritative).
+  freeDeliveryEnabled Boolean @default(false)
   freeDeliveryAbove Decimal? @db.Decimal(12, 2)
   estimatedDaysMin  Int      @default(1)
   estimatedDaysMax  Int      @default(3)
   isActive          Boolean  @default(true)
+  condition         DeliveryCondition?
+  paymentMode       DeliveryPaymentMode  @default(COD_AND_ADVANCE)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   shop      Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
   districts ZoneDistrict[]
 
+  @@unique([shopId, condition])
   @@index([shopId])
 }
 
@@ -586,6 +683,27 @@ model ZoneDistrict {
 
   @@id([zoneId, districtId])
   @@index([districtId])
+}
+
+// Cached Steadfast quotes keyed by the two location ids and the rounded weight
+// step. Admin overrides (isOverride=true) always win and are never refreshed.
+model CourierQuoteCache {
+  id              String             @id @default(uuid())
+  fromSteadfastId Int
+  toSteadfastId   Int
+  weightStep      Decimal            @db.Decimal(6, 2)
+  charge          Decimal?           @db.Decimal(10, 2)
+  available       Boolean            @default(false)
+  lane            String?
+  base            Decimal?           @db.Decimal(10, 2)
+  weightExtra     Decimal            @default(0) @db.Decimal(10, 2)
+  fetchedAt       DateTime           @default(now())
+  source          CourierQuoteSource @default(LIVE)
+  isOverride      Boolean            @default(false)
+
+  @@unique([fromSteadfastId, toSteadfastId, weightStep])
+  @@index([fromSteadfastId, toSteadfastId])
+  @@index([isOverride])
 }
 
 // ───────────────────────── CATALOG ─────────────────────────
@@ -628,6 +746,11 @@ model Product {
   matureHeightCm   Int?
   tags             String[]
   careDetails      Json?
+  // Packed weight (incl. pot/packaging) used for the courier quote. Whole-taka
+  // seller extra charge applied after a quantity threshold.
+  weightKg            Decimal?           @db.Decimal(7, 2)
+  extraChargeAfterQty Int?
+  extraChargePerUnit  Decimal?           @db.Decimal(10, 2)
   status           ProductStatus      @default(DRAFT)
   rejectionReason  String?
   publishedAt      DateTime?
@@ -797,6 +920,15 @@ model ShopOrder {
   total                 Decimal     @db.Decimal(12, 2)
   commissionAmount      Decimal     @db.Decimal(12, 2)
   sellerNetAmount       Decimal     @db.Decimal(12, 2)
+  // Delivery-quote snapshot. deliveryCharge remains the amount the customer
+  // actually paid (0 when free delivery applied).
+  courierCharge         Decimal?    @db.Decimal(12, 2)
+  sellerExtraCharge     Decimal?    @db.Decimal(12, 2)
+  parcelWeightKg        Decimal?    @db.Decimal(7, 2)
+  courierLane           String?
+  quoteSource           DeliveryQuoteSource?
+  quoteFetchedAt        DateTime?
+  freeDeliveryApplied   Boolean     @default(false)
   courierName           String?
   trackingCode          String?
   estimatedDeliveryFrom DateTime?

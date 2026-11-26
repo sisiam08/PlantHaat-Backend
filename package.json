@@ -23,9 +23,12 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:seed:demo": "tsx ./prisma/seed-demo.ts",
+    "db:fetch:thanas": "tsx ./scripts/fetch-steadfast-thanas.ts",
+    "db:seed:thanas": "tsx ./prisma/seed-thanas.ts",
     "db:seed:demo:reviews": "node scripts/db-guard.mjs && tsx ./prisma/seed-demo-reviews.ts",
     "db:seed:demo:reviews:cleanup": "node scripts/db-guard.mjs && tsx ./prisma/seed-demo-reviews-cleanup.ts",
     "db:seed:test-stack": "tsx ./prisma/seed-test-stack.ts",
+    "db:seed:delivery-test-stack": "tsx ./scripts/seed-delivery-test-stack.ts",
     "db:seed:dashboard-kit": "node scripts/db-test-guard.mjs && tsx ./scripts/seed-dashboard-kit.ts",
     "db:seed:dashboard-kit:cleanup": "node scripts/db-test-guard.mjs && tsx ./scripts/seed-dashboard-kit-cleanup.ts",
     "home:highlights:import": "node scripts/db-guard.mjs && tsx scripts/import-home-highlights.ts",
@@ -40,7 +43,9 @@
     "verify:prod": "node scripts/verify-prod.mjs",
     "postinstall": "prisma generate",
     "db:migrate:all": "node scripts/db-migrate-all.mjs deploy",
-    "db:status:all": "node scripts/db-migrate-all.mjs status"
+    "db:status:all": "node scripts/db-migrate-all.mjs status",
+    "db:seed:e2e-demo": "node scripts/db-test-guard.mjs && tsx ./scripts/seed-e2e-demo.ts",
+    "db:seed:e2e-demo:cleanup": "node scripts/db-test-guard.mjs && tsx ./scripts/seed-e2e-demo-cleanup.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",
@@ -102,3 +107,4 @@
     "typescript-eslint": "^8.71.1"
   }
 }
+

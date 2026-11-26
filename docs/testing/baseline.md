@@ -146,3 +146,96 @@ restart the API between groups.
 
 - Backend: `settlement.e2e-spec.ts -t "delivery proof|seller response"` **2/2**; `orders.service.spec complaints.service.spec storage.module upload-persistence.guard upload-references` **64/64**. Migration applied to both DBs.
 - Frontend: `evidence-proof-ui.spec.ts` **1/1** on the isolated production frontend (`:3002`) with the test API using `STORAGE_DRIVER=cloudinary` + `CLOUDINARY_FOLDER=planthaat/teststack` for this run; test-prefix assets deleted and `.env.test` restored to `local`.
+
+## 2026-11-23 regression-closure one-command suite
+
+`backend/scripts/test-stack.ps1 start` now also runs `npm run db:seed:e2e-demo` after the base seed, so
+the isolated stack has the browser-suite fixtures it needs: admin `admin@planthaat.local`, customer
+`customer1@planthaat.test`, seller `seller1@planthaat.test`, shop `demo-nursery`, product
+`money-tree-bonsai-xokk`, a cart and an address. Rows carry the `[seed:e2e-demo]` marker and are
+idempotent; cleanup is `npm run db:seed:e2e-demo:cleanup`. Test DB only; the script refuses non-test
+hosts. Do not use these credentials outside the isolated stack.
+
+```powershell
+$env:PW_CHANNEL="chrome"
+$env:NEXT_PUBLIC_SITE_URL="http://localhost:3002"
+$env:ADMIN_EMAIL="admin@planthaat.local"
+$env:ADMIN_PASSWORD="<demo fixture password>"
+cd frontend
+npx playwright test e2e/header-nav.spec.ts e2e/access-control.spec.ts e2e/auth-redirect.spec.ts e2e/session-expired.spec.ts --workers=1
+```
+
+Result 2026-11-23: header-nav **5/5**, access-control **9/9**, auth-redirect **5/5**,
+session-expired **8/8** (27/27), design-conformance **86/86** (two projects),
+performance **1/1**; short-TTL sessions **18/18** (`session-refresh` 8, `session-expired` 8,
+`session-cookie-collision` 2). Use the short-TTL API only for the session pair and restore default TTL
+afterwards. Login throttle is 10/min; serial runs only, pause or restart the API between groups.
+
+
+## 2026-11-23 cancellation, session and header verification
+
+- Backend: `npm run test:e2e -- advance-payments.e2e-spec.ts --runInBand -t "keeps the cart independent"`
+  → **2 passed, 11 skipped**. The two new tests cover unpaid-expiry, customer cancel and admin cancel;
+  the cart keeps only a line added after checkout. `npm test -- orders.service.spec.ts --runInBand`
+  → **49/49**.
+- Frontend isolated stack: `session-expired.spec.ts` → **16 passed** (8 tests × desktop/mobile);
+  `header-nav` 5/5; `design-conformance` 86/86; `a11y` + `typography` + `overflow` **130 passed,
+  2 skipped**; `cls` cart/checkout 2/2 on rerun. `session-refresh.spec.ts` → 14/16 in the full
+  serial run; the revoked-session test passed alone on both projects and a direct cookie/URL debug
+  confirmed the dialog stays at `/orders`. The suite is sensitive to the login throttle (10/min), so
+  pause between groups.
+- Dev real Chrome: `cart-persistence.spec.ts` **2/2**; a manual ADVANCE order + customer cancel kept
+  the post-checkout cart line and did not re-add the ordered variants.
+- Header latency: with `/auth/me` delayed 2.5 s on a returning session, toggle/cart x-positions and
+  the 44 px bell/avatar placeholders did not move; guest gets "Log in" immediately.
+- No runtime cancellation code changed. The tests are the regression guard against a future cart
+  restore being added.
+
+
+## 2026-11-24 role-aware auth prompt tests
+
+- Frontend isolated stack (default TTL unless noted), real Chrome: `auth-prompts.spec.ts` **6/6**
+  (`a guest can browse…no prompt`, `guest checkout → Login required → checkout with cart`,
+  `expired customer public quiet → checkout Session expired` at desktop/mobile);
+  `session-expired.spec.ts` **16/16**; `access-control.spec.ts` **16 passed, 2 skipped**;
+  `session-refresh.spec.ts` was 9/16 in the latest full 10 s-TTL run and 14/16 earlier; revoked/admin
+  pass alone. Do not treat the long serial session-refresh run as green until the throttle/cookie-jar
+  flake is fixed.
+- Dev real Chrome: `cart-persistence.spec.ts` **2/2** after moving guest-cart merge ahead of publishing
+  the user (AuthEntryGuard can no longer navigate to checkout before the merge).
+- Backend: unit **279/279**; no API/schema change in this task.
+
+
+## 2026-11-24 typography/tabs/orders/password verification
+
+- Backend: unit **281/281** (password policy 2/2); `npm run test:e2e -- auth.e2e-spec.ts
+  checkout.e2e-spec.ts --runInBand` **18/18** (includes weak-password 400 and overallStatus filter);
+  `auth-sessions.e2e-spec.ts` **8/8**.
+- Frontend: production build; Vitest **120/120** (message coverage/password policy); browser customer1 checks:
+  default Completed 1, All 6, Cancelled 5, Pending specific empty, one visible tab panel; widths
+  1440/1280/768/390/360 no page overflow. Register page at 390 showed the info popover, number+special
+  warnings for `plantHaat` and the valid line for `Str0ngPass1!`.
+- Bangla seller/products health-strip word measured before/after; no wrapping rules disabled.
+
+
+## 2026-11-24 My Orders indicator/counts
+
+- Backend checkout e2e includes `GET /orders/status-counts`; auth/checkout/sessions suites pass.
+- Browser measurements at 390/360/1280: trigger/indicator 44 px high, widths within 0.2 px, list 52 px,
+  no page overflow. Customer1 counts `{all:6, counts:{CANCELLED:5, DELIVERED:1}}`.
+
+
+## 2026-11-25 delivery/wallet/PDP verification
+
+- `db:migrate:all` applied `20261124150000_delivery_conditions`; `db:status:all` reports schema up to date.
+- Backend: checkout condition/nationwide test **3/3**; product nationwide delivery filter **1/1**; settings registry/baseline **9/9**; auth/checkout/sessions suites previously green after password changes.
+- Browser: seller CTA 1440/1280 header+footer, 390 footer; registration to apply; PDP Q&A active/content and no delivery selector/charge; seller condition cards; checkout inside/outside method availability; no page overflow.
+
+- 2026-11-25 final: backend unit **281/281**; settings 9/9; checkout condition/nationwide/filter **3/3**; products nationwide **1/1**; frontend Vitest **120/120**; both builds/typecheck/lint green; migration applied and status up to date.
+
+
+## 2026-11-25 delivery-condition backfill verification
+
+- Migration applied to dev and test; dev rows: Chattogram 100/2000/1–4, Sylhet 90/1800/2–5, Rahim 80/1500/1–3, both conditions, COD+Advance, active.
+- Backend e2e `backfills both delivery conditions idempotently...` **1/1**: first run creates two rows, second run keeps two and preserves a custom COD_ONLY charge 99.
+- Browser seller3 (Sylhet) delivery page shows both Configured cards; customer cart with district 18 shows 90, INSIDE_DHAKA, COD+Advance.

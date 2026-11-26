@@ -21,7 +21,7 @@ function suffix(): string {
 function registerPayload() {
   return {
     email: `user_${Date.now()}_${Math.random().toString(16).slice(2, 8)}@example.com`,
-    password: "Str0ngPass1",
+    password: "Str0ngPass1!",
     name: "Test User",
   };
 }
@@ -40,13 +40,13 @@ async function adminAgent(server: Server, prisma: PrismaService) {
     data: {
       email,
       name: "Admin",
-      passwordHash: await hashPassword("AdminStr0ng1"),
+      passwordHash: await hashPassword("AdminStr0ng1!"),
       role: "ADMIN",
       emailVerifiedAt: new Date(),
     },
   });
   const agent = request.agent(server);
-  await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+  await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1!" }).expect(200);
   return agent;
 }
 

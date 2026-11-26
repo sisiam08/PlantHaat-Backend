@@ -2,8 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsIn, IsOptional, IsString, Matches, MaxLength, Min, MinLength } from "class-validator";
 
-export const ADVANCE_PROVIDERS = ["BKASH", "NAGAD"] as const;
-export type AdvanceProvider = (typeof ADVANCE_PROVIDERS)[number];
+import { BD_MOBILE_MESSAGE, BD_MOBILE_REGEX } from "../../../common/validators/payout-destination";
+
+export { ADVANCE_PROVIDERS, type AdvanceProvider } from "../advance-providers";
+import { ADVANCE_PROVIDERS, type AdvanceProvider } from "../advance-providers";
 
 export class CreatePaymentSubmissionDto {
   @ApiProperty({ enum: ADVANCE_PROVIDERS })
@@ -18,7 +20,7 @@ export class CreatePaymentSubmissionDto {
   trxId!: string;
 
   @ApiProperty({ example: "01700000000" })
-  @Matches(/^(?:\+?88)?01[3-9]\d{8}$/, { message: "Enter a valid Bangladeshi mobile number" })
+  @Matches(BD_MOBILE_REGEX, { message: BD_MOBILE_MESSAGE })
   senderNumber!: string;
 
   @ApiPropertyOptional()

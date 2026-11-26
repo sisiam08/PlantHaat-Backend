@@ -39,6 +39,53 @@
         ]
       }
     },
+    "/api/v1/locations/thanas": {
+      "get": {
+        "operationId": "LocationsController_listThanas",
+        "parameters": [
+          {
+            "name": "districtId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ThanaDto"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Steadfast thanas for a district (guests too)",
+        "tags": [
+          "Locations"
+        ]
+      }
+    },
     "/api/v1/categories": {
       "get": {
         "operationId": "CategoriesController_getTree",
@@ -1325,6 +1372,55 @@
         ]
       }
     },
+    "/api/v1/seller/delivery-conditions": {
+      "get": {
+        "operationId": "SellerShopController_listConditions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List the two nationwide delivery/payment conditions",
+        "tags": [
+          "Seller shop"
+        ]
+      }
+    },
+    "/api/v1/seller/delivery-conditions/{condition}": {
+      "put": {
+        "operationId": "SellerShopController_upsertCondition",
+        "parameters": [
+          {
+            "name": "condition",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertDeliveryConditionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Create or update a nationwide delivery condition",
+        "tags": [
+          "Seller shop"
+        ]
+      }
+    },
     "/api/v1/seller/delivery-zones": {
       "get": {
         "operationId": "SellerShopController_listZones",
@@ -1479,6 +1575,351 @@
         "summary": "Delete a delivery zone",
         "tags": [
           "Seller shop"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/cache": {
+      "get": {
+        "operationId": "AdminDeliveryRatesController_listCache",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LIVE",
+                "IMPORTED",
+                "ADMIN"
+              ]
+            }
+          },
+          {
+            "name": "stale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List the courier quote cache (filterable)",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/health": {
+      "get": {
+        "operationId": "AdminDeliveryRatesController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Live quote switch, circuit state and cache counts",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/mapping": {
+      "get": {
+        "operationId": "AdminDeliveryRatesController_mapping",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "District -> Steadfast mapping",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/mapping/{districtId}": {
+      "patch": {
+        "operationId": "AdminDeliveryRatesController_updateMapping",
+        "parameters": [
+          {
+            "name": "districtId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMappingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Set or clear a district's Steadfast location",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/thanas": {
+      "get": {
+        "operationId": "AdminDeliveryRatesController_thanas",
+        "parameters": [
+          {
+            "name": "districtId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List thanas (defaults to Dhaka) for the zone editor",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/thanas/{id}": {
+      "patch": {
+        "operationId": "AdminDeliveryRatesController_updateThana",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThanaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update a Dhaka thana's City/Sub-Urban zone",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/overrides": {
+      "get": {
+        "operationId": "AdminDeliveryRatesController_overrides",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List manual override rows",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      },
+      "post": {
+        "operationId": "AdminDeliveryRatesController_upsertOverride",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create or replace a manual override row",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/overrides/{id}": {
+      "delete": {
+        "operationId": "AdminDeliveryRatesController_deleteOverride",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a manual override row",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/overrides/export": {
+      "get": {
+        "operationId": "AdminDeliveryRatesController_exportOverrides",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export override rows as CSV",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/overrides/import": {
+      "post": {
+        "operationId": "AdminDeliveryRatesController_importOverrides",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportOverridesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Validate and optionally apply override CSV rows",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/admin/delivery-rates/warm-up": {
+      "post": {
+        "operationId": "AdminDeliveryRatesController_warmUp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarmUpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Queue live quotes for a shop's pickup to every destination",
+        "tags": [
+          "Admin delivery rates"
+        ]
+      }
+    },
+    "/api/v1/delivery-quote/preview": {
+      "post": {
+        "operationId": "PublicDeliveryQuoteController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewQuoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Preview courier charges for guest cart lines (district/thana + shop variants only)",
+        "tags": [
+          "Delivery quote"
         ]
       }
     },
@@ -4493,6 +4934,15 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "thanaId",
+            "required": false,
+            "in": "query",
+            "description": "Steadfast thana id. Required when the district is Dhaka.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4979,6 +5429,35 @@
                 "FAILED_DELIVERY"
               ]
             }
+          },
+          {
+            "name": "overallStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "PACKED",
+                "SHIPPED",
+                "DELIVERED",
+                "CANCELLED",
+                "FAILED_DELIVERY",
+                "PARTIAL"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "summary"
+              ]
+            }
           }
         ],
         "responses": {
@@ -5014,6 +5493,21 @@
           }
         },
         "summary": "List the current customer's orders",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/v1/orders/status-counts": {
+      "get": {
+        "operationId": "OrdersController_statusCounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Count the current customer's orders by overall status",
         "tags": [
           "Orders"
         ]
@@ -5234,6 +5728,35 @@
                 "FAILED_DELIVERY"
               ]
             }
+          },
+          {
+            "name": "overallStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "PACKED",
+                "SHIPPED",
+                "DELIVERED",
+                "CANCELLED",
+                "FAILED_DELIVERY",
+                "PARTIAL"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "summary"
+              ]
+            }
           }
         ],
         "responses": {
@@ -5411,6 +5934,35 @@
                 "FAILED_DELIVERY"
               ]
             }
+          },
+          {
+            "name": "overallStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "PACKED",
+                "SHIPPED",
+                "DELIVERED",
+                "CANCELLED",
+                "FAILED_DELIVERY",
+                "PARTIAL"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "summary"
+              ]
+            }
           }
         ],
         "responses": {
@@ -5542,6 +6094,35 @@
                 "DELIVERED",
                 "CANCELLED",
                 "FAILED_DELIVERY"
+              ]
+            }
+          },
+          {
+            "name": "overallStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "PACKED",
+                "SHIPPED",
+                "DELIVERED",
+                "CANCELLED",
+                "FAILED_DELIVERY",
+                "PARTIAL"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "summary"
               ]
             }
           }
@@ -12166,6 +12747,14 @@
           "metro": {
             "type": "boolean",
             "description": "Metro district (city/outside scope applies)"
+          },
+          "insideDhaka": {
+            "type": "boolean",
+            "description": "Legacy inside-Dhaka pricing flag"
+          },
+          "requiresThana": {
+            "type": "boolean",
+            "description": "A thana must be chosen for this district"
           }
         },
         "required": [
@@ -12173,7 +12762,42 @@
           "name",
           "nameBn",
           "division",
-          "metro"
+          "metro",
+          "insideDhaka",
+          "requiresThana"
+        ]
+      },
+      "ThanaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameBn": {
+            "type": "string",
+            "nullable": true
+          },
+          "districtId": {
+            "type": "number"
+          },
+          "dhakaZone": {
+            "type": "string",
+            "enum": [
+              "CITY",
+              "SUBURBAN"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nameBn",
+          "districtId",
+          "dhakaZone"
         ]
       },
       "CategoryNodeDto": {
@@ -12362,6 +12986,35 @@
           }
         }
       },
+      "AddressThanaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameBn": {
+            "type": "string",
+            "nullable": true
+          },
+          "dhakaZone": {
+            "type": "string",
+            "enum": [
+              "CITY",
+              "SUBURBAN"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nameBn",
+          "dhakaZone"
+        ]
+      },
       "AddressDto": {
         "type": "object",
         "properties": {
@@ -12383,6 +13036,19 @@
           },
           "district": {
             "$ref": "#/components/schemas/DistrictDto"
+          },
+          "thanaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "thana": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AddressThanaDto"
+              }
+            ]
           },
           "area": {
             "type": "string"
@@ -12417,6 +13083,8 @@
           "phone",
           "districtId",
           "district",
+          "thanaId",
+          "thana",
           "area",
           "addressLine",
           "postalCode",
@@ -12443,6 +13111,10 @@
           "districtId": {
             "type": "number",
             "example": 1
+          },
+          "thanaId": {
+            "type": "string",
+            "description": "Steadfast thana id. Required when the district is Dhaka; optional elsewhere."
           },
           "area": {
             "type": "string",
@@ -12496,6 +13168,10 @@
           "districtId": {
             "type": "number",
             "example": 1
+          },
+          "thanaId": {
+            "type": "string",
+            "description": "Steadfast thana id. Required when the district is Dhaka; optional elsewhere."
           },
           "area": {
             "type": "string",
@@ -12886,6 +13562,10 @@
           "isDefault": {
             "type": "boolean"
           },
+          "needsUpdate": {
+            "type": "boolean",
+            "description": "Legacy destination that no longer passes validation; replace before withdrawing"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -12897,6 +13577,7 @@
           "accountName",
           "accountMasked",
           "isDefault",
+          "needsUpdate",
           "createdAt"
         ]
       },
@@ -12963,6 +13644,22 @@
             "type": "string",
             "nullable": true
           },
+          "pickupDistrictId": {
+            "type": "number",
+            "nullable": true
+          },
+          "pickupThanaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "pickupThana": {
+            "type": "object",
+            "nullable": true
+          },
+          "pickupDistrict": {
+            "type": "object",
+            "nullable": true
+          },
           "address": {
             "type": "string",
             "nullable": true
@@ -13024,6 +13721,10 @@
           "bannerUrl",
           "phone",
           "district",
+          "pickupDistrictId",
+          "pickupThanaId",
+          "pickupThana",
+          "pickupDistrict",
           "address",
           "latitude",
           "longitude",
@@ -13061,6 +13762,14 @@
             "type": "string",
             "example": "Dhaka"
           },
+          "pickupDistrictId": {
+            "type": "number",
+            "description": "Pickup district id (steers the courier quote)"
+          },
+          "pickupThanaId": {
+            "type": "string",
+            "description": "Pickup thana id; required for Dhaka-district shops"
+          },
           "address": {
             "type": "string"
           },
@@ -13086,6 +13795,47 @@
             "example": "Back after Eid"
           }
         }
+      },
+      "UpsertDeliveryConditionDto": {
+        "type": "object",
+        "properties": {
+          "charge": {
+            "type": "number",
+            "example": 60,
+            "description": "Legacy seller charge. Stored for history only; courier pricing is authoritative."
+          },
+          "freeDeliveryAbove": {
+            "type": "number",
+            "example": 1500
+          },
+          "estimatedDaysMin": {
+            "type": "number",
+            "default": 1
+          },
+          "estimatedDaysMax": {
+            "type": "number",
+            "default": 3
+          },
+          "paymentMode": {
+            "type": "string",
+            "enum": [
+              "COD_AND_ADVANCE",
+              "COD_ONLY",
+              "ADVANCE_ONLY"
+            ]
+          },
+          "freeDeliveryEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "paymentMode"
+        ]
       },
       "DistrictRefDto": {
         "type": "object",
@@ -13284,6 +14034,149 @@
           }
         }
       },
+      "UpdateMappingDto": {
+        "type": "object",
+        "properties": {
+          "steadfastLocationId": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateThanaDto": {
+        "type": "object",
+        "properties": {
+          "dhakaZone": {
+            "type": "string",
+            "enum": [
+              "CITY",
+              "SUBURBAN"
+            ],
+            "nullable": true
+          },
+          "nameBn": {
+            "type": "object",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OverrideInputDto": {
+        "type": "object",
+        "properties": {
+          "fromSteadfastId": {
+            "type": "number"
+          },
+          "toSteadfastId": {
+            "type": "number"
+          },
+          "weightStep": {
+            "type": "number",
+            "example": 0.5
+          },
+          "charge": {
+            "type": "number",
+            "example": 65
+          },
+          "available": {
+            "type": "boolean",
+            "default": true
+          },
+          "lane": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "fromSteadfastId",
+          "toSteadfastId",
+          "weightStep",
+          "charge"
+        ]
+      },
+      "ImportOverridesDto": {
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "csv"
+        ]
+      },
+      "WarmUpDto": {
+        "type": "object",
+        "properties": {
+          "shopId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "shopId"
+        ]
+      },
+      "PreviewQuoteItemDto": {
+        "type": "object",
+        "properties": {
+          "variantId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "variantId",
+          "quantity"
+        ]
+      },
+      "PreviewQuoteShopDto": {
+        "type": "object",
+        "properties": {
+          "shopId": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewQuoteItemDto"
+            }
+          }
+        },
+        "required": [
+          "shopId",
+          "items"
+        ]
+      },
+      "PreviewQuoteDto": {
+        "type": "object",
+        "properties": {
+          "districtId": {
+            "type": "number"
+          },
+          "thanaId": {
+            "type": "string"
+          },
+          "shops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewQuoteShopDto"
+            }
+          }
+        },
+        "required": [
+          "districtId",
+          "shops"
+        ]
+      },
       "SellerVariantSummaryDto": {
         "type": "object",
         "properties": {
@@ -13432,6 +14325,20 @@
             "type": "object",
             "nullable": true
           },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "Packed weight in kg"
+          },
+          "extraChargeAfterQty": {
+            "type": "number",
+            "nullable": true
+          },
+          "extraChargePerUnit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal as string"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -13525,6 +14432,9 @@
           "matureHeightCm",
           "tags",
           "careDetails",
+          "weightKg",
+          "extraChargeAfterQty",
+          "extraChargePerUnit",
           "status",
           "rejectionReason",
           "publishedAt",
@@ -13771,6 +14681,20 @@
             "type": "object",
             "nullable": true
           },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "Packed weight in kg"
+          },
+          "extraChargeAfterQty": {
+            "type": "number",
+            "nullable": true
+          },
+          "extraChargePerUnit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal as string"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -13853,6 +14777,9 @@
           "matureHeightCm",
           "tags",
           "careDetails",
+          "weightKg",
+          "extraChargeAfterQty",
+          "extraChargePerUnit",
           "status",
           "rejectionReason",
           "minPrice",
@@ -13940,6 +14867,21 @@
           },
           "careDetails": {
             "type": "object"
+          },
+          "weightKg": {
+            "type": "number",
+            "example": 1.2,
+            "description": "Packed weight incl. pot and packaging, in kg"
+          },
+          "extraChargeAfterQty": {
+            "type": "number",
+            "example": 10,
+            "description": "Quantity after which the extra charge applies"
+          },
+          "extraChargePerUnit": {
+            "type": "number",
+            "example": 10,
+            "description": "Whole-taka extra charge per additional unit"
           }
         },
         "required": [
@@ -14019,6 +14961,21 @@
           },
           "careDetails": {
             "type": "object"
+          },
+          "weightKg": {
+            "type": "number",
+            "example": 1.2,
+            "description": "Packed weight incl. pot and packaging, in kg"
+          },
+          "extraChargeAfterQty": {
+            "type": "number",
+            "example": 10,
+            "description": "Quantity after which the extra charge applies"
+          },
+          "extraChargePerUnit": {
+            "type": "number",
+            "example": 10,
+            "description": "Whole-taka extra charge per additional unit"
           }
         }
       },
@@ -15542,6 +16499,44 @@
             "type": "number",
             "nullable": true,
             "description": "Present when a zone matched"
+          },
+          "freeDeliveryEnabled": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Seller-funded free delivery enabled"
+          },
+          "courierCharge": {
+            "type": "string",
+            "nullable": true,
+            "description": "Courier portion as a decimal string"
+          },
+          "sellerExtraCharge": {
+            "type": "string",
+            "nullable": true,
+            "description": "Seller extra portion as a decimal string"
+          },
+          "deliveryQuoteSource": {
+            "type": "string",
+            "nullable": true,
+            "description": "LIVE|CACHE|STALE|OVERRIDE|FALLBACK"
+          },
+          "deliveryQuoteEstimated": {
+            "type": "boolean",
+            "description": "True when the price is stale or a fallback"
+          },
+          "deliveryReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "ADDRESS_THANA_REQUIRED|SHOP_PICKUP_INCOMPLETE|DISTRICT_UNMAPPED|NO_RATE|ROUTE_UNAVAILABLE"
+          },
+          "parcelWeightKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "Parcel weight in kg"
+          },
+          "freeDeliveryApplied": {
+            "type": "boolean",
+            "description": "Free delivery applied to this shop"
           }
         },
         "required": [
@@ -15556,7 +16551,15 @@
           "priceChanged",
           "items",
           "estimatedDaysMin",
-          "estimatedDaysMax"
+          "estimatedDaysMax",
+          "freeDeliveryEnabled",
+          "courierCharge",
+          "sellerExtraCharge",
+          "deliveryQuoteSource",
+          "deliveryQuoteEstimated",
+          "deliveryReason",
+          "parcelWeightKg",
+          "freeDeliveryApplied"
         ]
       },
       "CartViewDto": {
@@ -15843,6 +16846,11 @@
             "type": "number",
             "example": 1250.5,
             "description": "Grand total the customer saw on the cart. When it no longer matches, checkout returns 409 PRICE_CHANGED and applies nothing."
+          },
+          "expectedDeliveryTotal": {
+            "type": "number",
+            "example": 120,
+            "description": "Delivery total the customer saw on the cart. A mismatch returns 409 DELIVERY_CHARGE_CHANGED with the new amounts."
           }
         },
         "required": [
@@ -16992,7 +18000,9 @@
             "type": "string",
             "enum": [
               "BKASH",
-              "NAGAD"
+              "NAGAD",
+              "ROCKET",
+              "UPAY"
             ]
           },
           "trxId": {

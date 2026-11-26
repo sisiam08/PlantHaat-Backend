@@ -41,6 +41,8 @@ switch ($Action) {
       if ($LASTEXITCODE -ne 0) { Write-Output "Backend build failed"; exit 1 }
       & npm.cmd run db:seed:test-stack
       if ($LASTEXITCODE -ne 0) { Write-Output "Test seed failed"; exit 1 }
+      & npm.cmd run db:seed:e2e-demo
+      if ($LASTEXITCODE -ne 0) { Write-Output "E2E demo seed failed"; exit 1 }
     } finally { Pop-Location }
     Push-Location $frontend
     try {

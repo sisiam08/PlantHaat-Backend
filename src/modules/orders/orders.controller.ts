@@ -28,6 +28,12 @@ export class OrdersController {
     return this.ordersService.listCustomerOrders(customerId, query);
   }
 
+  @Get("status-counts")
+  @ApiOperation({ summary: "Count the current customer's orders by overall status" })
+  statusCounts(@CurrentUser("id") customerId: string) {
+    return this.ordersService.customerOrderStatusCounts(customerId);
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Get one of the current customer's orders" })
   @ApiEnvelopeResponse(OrderDetailDto)

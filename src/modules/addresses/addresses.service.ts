@@ -13,6 +13,7 @@ import type { UpdateAddressDto } from "./dto/update-address.dto";
 
 const ADDRESS_INCLUDE = {
   district: { select: { id: true, name: true, nameBn: true, division: true } },
+  thana: { select: { id: true, name: true, nameBn: true, dhakaZone: true } },
 } satisfies Prisma.AddressInclude;
 
 @Injectable()
@@ -33,6 +34,7 @@ export class AddressesService {
 
   async create(userId: string, dto: CreateAddressDto): Promise<AddressView> {
     const cityScope = await this.resolveCityScope(dto.districtId, dto.cityScope);
+    const thanaId = await this.resolveThana(dto.districtId, dto.thanaId ?? null);
     const count = await this.prisma.address.count({ where: { userId } });
     const isDefault = dto.isDefault ?? count === 0;
 
@@ -47,6 +49,7 @@ export class AddressesService {
           recipientName: dto.recipientName.trim(),
           phone: this.normalizePhone(dto.phone),
           districtId: dto.districtId,
+          thanaId,
           cityScope,
           area: dto.area.trim(),
           addressLine: dto.addressLine.trim(),
@@ -63,16 +66,32 @@ export class AddressesService {
     await this.assertOwned(userId, id);
 
     const data: Prisma.AddressUpdateInput = {};
-    if (dto.districtId !== undefined || dto.cityScope !== undefined) {
+    if (
+      dto.districtId !== undefined ||
+      dto.cityScope !== undefined ||
+      dto.thanaId !== undefined
+    ) {
       const current = await this.prisma.address.findFirst({
         where: { id, userId },
-        select: { districtId: true },
+        select: { districtId: true, thanaId: true },
       });
-      const districtId = dto.districtId ?? current?.districtId;
-      if (districtId === undefined) {
+      if (!current) {
         throw AppException.notFound(ErrorCode.ADDRESS_NOT_FOUND, "Address not found");
       }
-      data.cityScope = await this.resolveCityScope(districtId, dto.cityScope);
+      const districtId = dto.districtId ?? current.districtId;
+      if (dto.cityScope !== undefined) {
+        data.cityScope = await this.resolveCityScope(districtId, dto.cityScope);
+      }
+      const districtChanged =
+        dto.districtId !== undefined && dto.districtId !== current.districtId;
+      const requestedThana =
+        dto.thanaId !== undefined
+          ? dto.thanaId
+          : districtChanged
+            ? null
+            : current.thanaId;
+      const thanaId = await this.resolveThana(districtId, requestedThana);
+      data.thana = thanaId ? { connect: { id: thanaId } } : { disconnect: true };
     }
     if (dto.label !== undefined) data.label = dto.label;
     if (dto.recipientName !== undefined) data.recipientName = dto.recipientName.trim();
@@ -149,6 +168,39 @@ export class AddressesService {
     return requested === "CITY" || requested === "OUTSIDE" ? requested : "NA";
   }
 
+  private async resolveThana(
+    districtId: number,
+    thanaId: string | null,
+  ): Promise<string | null> {
+    const district = await this.prisma.district.findUnique({
+      where: { id: districtId },
+      select: { name: true },
+    });
+    if (!district) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, "Unknown district");
+    }
+    if (thanaId) {
+      const thana = await this.prisma.thana.findFirst({
+        where: { id: thanaId, districtId, isActive: true },
+        select: { id: true },
+      });
+      if (!thana) {
+        throw AppException.badRequest(
+          ErrorCode.VALIDATION_FAILED,
+          "The selected thana does not belong to this district",
+        );
+      }
+      return thana.id;
+    }
+    if (district.name === "Dhaka") {
+      throw AppException.badRequest(
+        ErrorCode.ADDRESS_THANA_REQUIRED,
+        "Choose a thana for a Dhaka address",
+      );
+    }
+    return null;
+  }
+
   private normalizePhone(phone: string): string {
     try {
       return normalizeBdPhone(phone);
@@ -157,3 +209,4 @@ export class AddressesService {
     }
   }
 }
+

@@ -54,13 +54,13 @@ describe("Home highlights (e2e)", () => {
       data: {
         email,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
     });
     admin = request.agent(server);
-    await admin.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+    await admin.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1!" }).expect(200);
   });
 
   afterEach(async () => {

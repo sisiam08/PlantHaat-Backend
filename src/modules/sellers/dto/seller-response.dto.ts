@@ -49,6 +49,10 @@ export class SellerShopDto {
   @ApiProperty({ nullable: true, type: String }) bannerUrl!: string | null;
   @ApiProperty({ nullable: true, type: String }) phone!: string | null;
   @ApiProperty({ nullable: true, type: String }) district!: string | null;
+  @ApiProperty({ nullable: true, type: Number }) pickupDistrictId!: number | null;
+  @ApiProperty({ nullable: true, type: String }) pickupThanaId!: string | null;
+  @ApiProperty({ nullable: true, type: Object }) pickupThana?: unknown;
+  @ApiProperty({ nullable: true, type: Object }) pickupDistrict?: unknown;
   @ApiProperty({ nullable: true, type: String }) address!: string | null;
   @ApiProperty({ nullable: true, type: String, description: "Decimal as string" })
   latitude!: string | null;
@@ -92,5 +96,7 @@ export class SellerPayoutAccountDto {
   @ApiProperty() accountName!: string;
   @ApiProperty() accountMasked!: string;
   @ApiProperty() isDefault!: boolean;
+  @ApiProperty({ description: "Legacy destination that no longer passes validation; replace before withdrawing" })
+  needsUpdate!: boolean;
   @ApiProperty({ type: String, format: "date-time" }) createdAt!: string;
 }

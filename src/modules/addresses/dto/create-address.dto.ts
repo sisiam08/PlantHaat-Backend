@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   Min,
@@ -36,6 +37,14 @@ export class CreateAddressDto {
   @IsInt()
   @Min(1)
   districtId!: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Steadfast thana id. Required when the district is Dhaka; optional elsewhere.",
+  })
+  @IsOptional()
+  @IsUUID()
+  thanaId?: string;
 
   @ApiProperty({ example: "Mirpur" })
   @IsString()

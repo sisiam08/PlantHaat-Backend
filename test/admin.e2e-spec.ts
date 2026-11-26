@@ -55,13 +55,13 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
       data: {
         email,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
     });
     const agent = request.agent(server);
-    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1!" }).expect(200);
     return agent;
   }
 
@@ -79,7 +79,7 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
     const reauth = await admin
       .post(`${API}/admin/settings/reauth`)
       .set("Origin", ORIGIN)
-      .send({ keys: ["commission.default"], password: "AdminStr0ng1" })
+      .send({ keys: ["commission.default"], password: "AdminStr0ng1!" })
       .expect(200);
     const after = await admin
       .patch(`${API}/admin/settings`)
@@ -172,7 +172,7 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
       data: {
         email: customerEmail,
         name: "Customer",
-        passwordHash: await hashPassword("Str0ngPass1"),
+        passwordHash: await hashPassword("Str0ngPass1!"),
         role: "CUSTOMER",
         emailVerifiedAt: new Date(),
       },
@@ -195,7 +195,7 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
     const created = await admin
       .post(`${API}/admin/users`)
       .set("Origin", ORIGIN)
-      .send({ email: `admin2_${suffix()}@example.com`, password: "Str0ngPass1", name: "Admin 2" })
+      .send({ email: `admin2_${suffix()}@example.com`, password: "Str0ngPass1!", name: "Admin 2" })
       .expect(201);
     expect(created.body.data.role).toBe("ADMIN");
 
@@ -206,7 +206,7 @@ describe("Admin, content, announcements & analytics (e2e)", () => {
       data: {
         email: `victim_${suffix()}@example.com`,
         name: "Victim",
-        passwordHash: await hashPassword("Str0ngPass1"),
+        passwordHash: await hashPassword("Str0ngPass1!"),
         role: "CUSTOMER",
       },
     });

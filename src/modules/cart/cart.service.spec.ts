@@ -15,8 +15,28 @@ function createService(item: Record<string, unknown>) {
     cartItem: { findMany: mockFn().mockResolvedValue([item]) },
   };
   const settings = { getNumber: mockFn().mockResolvedValue(20) } as unknown as SettingsService;
+  const deliveryQuote = {
+    quoteShop: mockFn().mockResolvedValue({
+      available: true,
+      courierCharge: dec(60),
+      extraCharge: dec(0),
+      total: dec(60),
+      weightKg: dec(0.5),
+      lane: "inside_dhaka",
+      source: "FALLBACK",
+      estimated: true,
+      freeDeliveryApplied: false,
+      fetchedAt: null,
+      fromSteadfastId: 1,
+      toSteadfastId: 1,
+    }),
+  };
   return {
-    service: new CartService(prisma as unknown as PrismaService, settings),
+    service: new CartService(
+      prisma as unknown as PrismaService,
+      settings,
+      deliveryQuote as never,
+    ),
     prisma,
   };
 }
@@ -85,3 +105,4 @@ describe("CartService price snapshots", () => {
     expect(second.changedLineCount).toBe(0);
   });
 });
+

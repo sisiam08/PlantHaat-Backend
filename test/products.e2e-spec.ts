@@ -16,7 +16,7 @@ const ORIGIN = "http://localhost:3000";
 function sellerPayload() {
   return {
     email: `seller_${Date.now()}_${Math.random().toString(16).slice(2, 8)}@example.com`,
-    password: "Str0ngPass1",
+    password: "Str0ngPass1!",
     name: "Seller",
     businessName: "Green Valley Nursery",
     contactPhone: "01712345678",
@@ -137,7 +137,7 @@ describe("Products (e2e)", () => {
     expect(byStock.body.data.some((p: { slug: string }) => p.slug === slug)).toBe(true);
   });
 
-  it("filters by district delivery coverage", async () => {
+  it("returns every active product for any valid district (nationwide delivery)", async () => {
     const district = await prisma.district.create({
       data: { name: "Dhaka", nameBn: "ঢাকা", division: "Dhaka" },
     });
@@ -160,7 +160,7 @@ describe("Products (e2e)", () => {
     const uncovered = await request(server)
       .get(`${API}/products?deliversTo=${otherDistrict.id}`)
       .expect(200);
-    expect(uncovered.body.data.some((p: { slug: string }) => p.slug === slug)).toBe(false);
+    expect(uncovered.body.data.some((p: { slug: string }) => p.slug === slug)).toBe(true);
   });
 
   it("guards stock against going negative", async () => {
@@ -184,7 +184,7 @@ describe("Products (e2e)", () => {
       data: {
         email: adminEmail,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
@@ -192,7 +192,7 @@ describe("Products (e2e)", () => {
     const admin = request.agent(server);
     await admin
       .post(`${API}/auth/login`)
-      .send({ email: adminEmail, password: "AdminStr0ng1" })
+      .send({ email: adminEmail, password: "AdminStr0ng1!" })
       .expect(200);
 
     await admin

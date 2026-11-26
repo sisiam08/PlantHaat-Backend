@@ -15,6 +15,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   PASSWORD_PATTERN,
+  PASSWORD_POLICY_MESSAGE,
 } from "../../../common/utils/password";
 
 export class QueryUsersDto extends PaginationQueryDto {
@@ -39,7 +40,7 @@ export class CreateAdminUserDto {
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH)
   @MaxLength(PASSWORD_MAX_LENGTH)
-  @Matches(PASSWORD_PATTERN, { message: "password must contain at least one letter and one digit" })
+  @Matches(PASSWORD_PATTERN, { message: PASSWORD_POLICY_MESSAGE })
   password!: string;
 
   @ApiProperty()

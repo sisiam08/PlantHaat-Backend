@@ -23,10 +23,15 @@ import { LedgerService } from "../ledger/ledger.service";
 import { MailService } from "../mail/mail.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PaymentsService } from "../payments/payments.service";
+import {
+  DeliveryQuoteService,
+  type DeliveryQuoteLine,
+  type ShopDeliveryQuote,
+} from "../delivery-quote/delivery-quote.service";
 import { recomputeProductAggregates } from "../products/product-aggregates";
 import { SettingsService } from "../settings/settings.service";
 import { UploadsService } from "../uploads/uploads.service";
-import { resolveDeliveryZone, type ResolvedDelivery } from "./delivery-zone.resolver";
+import { resolveDeliveryCondition, type ResolvedDeliveryCondition } from "./delivery-condition.resolver";
 import type { CancelOrderDto } from "./dto/cancel-order.dto";
 import type {
   CancellationRequestDto,
@@ -44,7 +49,9 @@ interface LineGroup {
   sellerUserId: string;
   shopName: string;
   subtotal: Prisma.Decimal;
-  delivery: ResolvedDelivery;
+  delivery: ResolvedDeliveryCondition;
+  quote: ShopDeliveryQuote | null;
+  quoteLines: DeliveryQuoteLine[];
   lines: {
     variantId: string;
     productId: string;
@@ -74,6 +81,7 @@ export class OrdersService {
     private readonly codRisk: CodRiskService,
     private readonly payments: PaymentsService,
     private readonly uploads: UploadsService,
+    private readonly deliveryQuote: DeliveryQuoteService,
   ) {}
 
   async checkout(customerId: string, dto: CheckoutDto, idempotencyKey: string | undefined) {
@@ -107,7 +115,10 @@ export class OrdersService {
 
     const address = await this.prisma.address.findFirst({
       where: { id: dto.addressId, userId: customerId },
-      include: { district: { select: { id: true, name: true } } },
+      include: {
+        district: { select: { id: true, name: true, insideDhaka: true } },
+        thana: { select: { id: true, name: true, dhakaZone: true } },
+      },
     });
     if (!address) {
       throw AppException.notFound(ErrorCode.ADDRESS_NOT_FOUND, "Address not found");
@@ -141,7 +152,12 @@ export class OrdersService {
       throw AppException.unprocessable(ErrorCode.CART_EMPTY, "Your cart is empty");
     }
 
-    const problems: { variantId: string; code: string; available?: number }[] = [];
+    const problems: {
+      variantId: string;
+      code: string;
+      available?: number;
+      reason?: string;
+    }[] = [];
     const groups = new Map<string, LineGroup>();
 
     for (const item of cart.items) {
@@ -189,7 +205,12 @@ export class OrdersService {
             freeDeliveryAbove: null,
             estimatedDaysMin: 1,
             estimatedDaysMax: 3,
+            condition: address.district.insideDhaka ? "INSIDE_DHAKA" : "OUTSIDE_DHAKA",
+            paymentMode: "COD_AND_ADVANCE",
+            freeDeliveryEnabled: false,
           },
+          quote: null,
+          quoteLines: [],
           lines: [],
         },
       );
@@ -214,18 +235,47 @@ export class OrdersService {
         commissionAmount,
       });
       group.subtotal = group.subtotal.plus(lineTotal);
+      group.quoteLines.push({
+        weightKg: product.weightKg,
+        quantity: item.quantity,
+        extraChargeAfterQty: product.extraChargeAfterQty,
+        extraChargePerUnit: product.extraChargePerUnit,
+      });
     }
 
     for (const group of groups.values()) {
-      const zone = await resolveDeliveryZone(this.prisma, group.shopId, address.districtId, address.cityScope);
-      if (!zone) {
+      const delivery = await resolveDeliveryCondition(
+        this.prisma,
+        group.shopId,
+        address.districtId,
+        address.district.insideDhaka,
+      );
+      if (!delivery) {
         problems.push({
           variantId: group.lines[0]?.variantId ?? "",
           code: "SHOP_NOT_DELIVERING_TO_DISTRICT",
         });
         continue;
       }
-      group.delivery = zone;
+      group.delivery = delivery;
+      const quote = await this.deliveryQuote.quoteShop({
+        shopId: group.shopId,
+        districtId: address.districtId,
+        thanaId: address.thanaId,
+        lines: group.quoteLines,
+        subtotal: group.subtotal,
+        freeDeliveryEnabled: delivery.freeDeliveryEnabled,
+        freeDeliveryAbove: delivery.freeDeliveryAbove,
+      });
+      if (!quote.available) {
+        problems.push({
+          variantId: group.lines[0]?.variantId ?? "",
+          code: ErrorCode.DELIVERY_QUOTE_UNAVAILABLE,
+          reason: quote.reason ?? "ROUTE_UNAVAILABLE",
+        });
+        continue;
+      }
+      group.quote = quote;
     }
 
     if (problems.length > 0) {
@@ -241,7 +291,51 @@ export class OrdersService {
       throw AppException.unprocessable(ErrorCode.CART_EMPTY, "Your cart is empty");
     }
 
+    const blocked = shopGroups.filter((group) => {
+      if (dto.paymentMethod === "COD") return group.delivery.paymentMode === "ADVANCE_ONLY";
+      return group.delivery.paymentMode === "COD_ONLY";
+    });
+    if (blocked.length > 0) {
+      throw AppException.badRequest(
+        ErrorCode.PAYMENT_METHOD_NOT_AVAILABLE,
+        "The selected payment method is not available for one or more shops",
+        {
+          shops: blocked.map((group) => ({
+            shopId: group.shopId,
+            condition: group.delivery.condition,
+            paymentMode: group.delivery.paymentMode,
+          })),
+        },
+      );
+    }
+
     const totals = cartTotals(shopGroups);
+
+    if (
+      dto.expectedDeliveryTotal !== undefined &&
+      !totals.deliveryTotal.equals(new Prisma.Decimal(dto.expectedDeliveryTotal))
+    ) {
+      throw AppException.conflict(
+        ErrorCode.DELIVERY_CHARGE_CHANGED,
+        "The delivery charge changed since you last saw your cart",
+        {
+          expectedDeliveryTotal: new Prisma.Decimal(
+            dto.expectedDeliveryTotal,
+          ).toString(),
+          deliveryTotal: totals.deliveryTotal.toString(),
+          grandTotal: totals.grandTotal.toString(),
+          shops: shopGroups.map((group) => ({
+            shopId: group.shopId,
+            deliveryCharge: group.quote?.total.toString() ?? "0",
+            courierCharge: group.quote?.courierCharge?.toString() ?? null,
+            sellerExtraCharge: group.quote?.extraCharge.toString() ?? "0",
+            freeDeliveryApplied: group.quote?.freeDeliveryApplied ?? false,
+            source: group.quote?.source ?? null,
+            reason: group.quote?.reason ?? null,
+          })),
+        },
+      );
+    }
 
     if (dto.paymentMethod === "COD") {
       const codEnabled = await this.settings.getBoolean("payment.cod.enabled");
@@ -576,10 +670,8 @@ export class OrdersService {
           const allocations: { shopOrderId: string; amount: Prisma.Decimal }[] = [];
           let index = 1;
           for (const group of groups) {
-            const free =
-              group.delivery.freeDeliveryAbove !== null &&
-              group.subtotal.gte(group.delivery.freeDeliveryAbove);
-            const deliveryCharge = free ? new Prisma.Decimal(0) : group.delivery.charge;
+            const quote = group.quote!;
+            const deliveryCharge = quote.total;
             const commissionAmount = sumMoney(group.lines.map((line) => line.commissionAmount));
             const total = money(group.subtotal.plus(deliveryCharge));
             const shopOrderNumber = toShopOrderNumber(orderNumber, index);
@@ -598,6 +690,13 @@ export class OrdersService {
                 sellerNetAmount: money(total.minus(commissionAmount)),
                 estimatedDeliveryFrom: addDays(new Date(), group.delivery.estimatedDaysMin),
                 estimatedDeliveryTo: addDays(new Date(), group.delivery.estimatedDaysMax),
+                courierCharge: quote.courierCharge,
+                sellerExtraCharge: quote.extraCharge,
+                parcelWeightKg: quote.weightKg,
+                courierLane: quote.lane,
+                quoteSource: quote.source,
+                quoteFetchedAt: quote.fetchedAt,
+                freeDeliveryApplied: quote.freeDeliveryApplied,
               },
             });
 
@@ -711,16 +810,56 @@ export class OrdersService {
     query: QueryOrdersDto,
   ): Promise<PaginatedResult<unknown>> {
     const { page, limit, skip } = resolvePagination(query);
-    const orders = await this.prisma.order.findMany({
-      where: { customerId },
-      orderBy: { placedAt: "desc" },
-      skip,
-      take: limit,
-      include: { shopOrders: { select: { status: true, shopId: true } }, payments: true },
-    });
-    const total = await this.prisma.order.count({ where: { customerId } });
+    const filter = query.overallStatus ?? query.status;
+    const where: Prisma.OrderWhereInput = {
+      customerId,
+      ...customerOverallStatusWhere(filter),
+    };
+    const [orders, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { placedAt: "desc" },
+        skip,
+        take: limit,
+        include: { shopOrders: { select: { status: true, shopId: true, kind: true, parentShopOrderId: true } }, payments: true },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
     const data = orders.map((order) => this.withOverallStatus(order));
     return paginate(data, total, page, limit);
+  }
+
+  async customerOrderStatusCounts(customerId: string) {
+    const rows = await this.prisma.$queryRaw<{ overallStatus: string; count: number }[]>`
+      SELECT overall_status AS "overallStatus", COUNT(*)::int AS count
+      FROM (
+        SELECT o.id,
+          CASE
+            WHEN bool_and(so.status = 'DELIVERED'::"OrderStatus") THEN 'DELIVERED'
+            WHEN bool_and(so.status = 'CANCELLED'::"OrderStatus") THEN 'CANCELLED'
+            WHEN bool_or(so.status = 'CANCELLED'::"OrderStatus") THEN 'PARTIAL'
+            WHEN bool_or(so.status = 'PENDING'::"OrderStatus") THEN 'PENDING'
+            WHEN bool_or(so.status = 'CONFIRMED'::"OrderStatus") THEN 'CONFIRMED'
+            WHEN bool_or(so.status = 'PACKED'::"OrderStatus") THEN 'PACKED'
+            WHEN bool_or(so.status = 'SHIPPED'::"OrderStatus") THEN 'SHIPPED'
+            WHEN bool_or(so.status = 'FAILED_DELIVERY'::"OrderStatus") THEN 'FAILED_DELIVERY'
+            ELSE 'DELIVERED'
+          END AS overall_status
+        FROM "Order" o
+        JOIN "ShopOrder" so ON so."orderId" = o.id
+        WHERE o."customerId" = ${customerId}
+        GROUP BY o.id
+      ) grouped
+      GROUP BY overall_status
+    `;
+    const counts: Record<string, number> = {};
+    let all = 0;
+    for (const row of rows) {
+      const count = Number(row.count);
+      counts[row.overallStatus] = count;
+      all += count;
+    }
+    return { all, counts };
   }
 
   async getCustomerOrder(customerId: string, orderId: string) {
@@ -1622,17 +1761,56 @@ function cartTotals(groups: LineGroup[]): {
 } {
   const subtotal = money(groups.reduce((sum, g) => sum.plus(g.subtotal), new Prisma.Decimal(0)));
   const deliveryTotal = money(
-    groups.reduce((sum, g) => {
-      const free =
-        g.delivery.freeDeliveryAbove !== null && g.subtotal.gte(g.delivery.freeDeliveryAbove);
-      return sum.plus(free ? new Prisma.Decimal(0) : g.delivery.charge);
-    }, new Prisma.Decimal(0)),
+    groups.reduce(
+      (sum, group) => sum.plus(group.quote?.total ?? new Prisma.Decimal(0)),
+      new Prisma.Decimal(0),
+    ),
   );
   return { subtotal, deliveryTotal, grandTotal: money(subtotal.plus(deliveryTotal)) };
 }
 
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+const STATUS_SEQUENCE: OrderStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "PACKED",
+  "SHIPPED",
+  "FAILED_DELIVERY",
+  "DELIVERED",
+];
+
+/**
+ * Customer list filters operate on the computed overall status, not a single
+ * shop order. Keep this in Prisma so pagination and meta.total stay accurate.
+ */
+function customerOverallStatusWhere(status: string | undefined): Prisma.OrderWhereInput {
+  if (!status) return {};
+  if (status === "DELIVERED") {
+    return { shopOrders: { every: { status: "DELIVERED" } } };
+  }
+  if (status === "CANCELLED") {
+    return { shopOrders: { every: { status: "CANCELLED" } } };
+  }
+  if (status === "PARTIAL") {
+    return {
+      AND: [
+        { shopOrders: { some: { status: "CANCELLED" } } },
+        { NOT: { shopOrders: { every: { status: "CANCELLED" } } } },
+      ],
+    };
+  }
+  const index = STATUS_SEQUENCE.indexOf(status as OrderStatus);
+  if (index < 0) return {};
+  const earlier = STATUS_SEQUENCE.slice(0, index);
+  return {
+    shopOrders: {
+      some: { status: status as OrderStatus },
+      every: { status: { notIn: [...earlier, "CANCELLED"] } },
+    },
+  };
 }
 
 function computeOverallStatus(statuses: OrderStatus[]): string {

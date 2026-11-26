@@ -86,6 +86,11 @@ export class SellerProductListItemDto {
   @ApiProperty({ nullable: true, type: Number }) matureHeightCm!: number | null;
   @ApiProperty({ type: [String] }) tags!: string[];
   @ApiProperty({ type: Object, nullable: true }) careDetails!: Record<string, unknown> | null;
+  @ApiProperty({ nullable: true, type: String, description: "Packed weight in kg" })
+  weightKg!: string | null;
+  @ApiProperty({ nullable: true, type: Number }) extraChargeAfterQty!: number | null;
+  @ApiProperty({ nullable: true, type: String, description: "Decimal as string" })
+  extraChargePerUnit!: string | null;
   @ApiProperty({ enum: Object.values(ProductStatus) }) status!: ProductStatus;
   @ApiProperty({ nullable: true, type: String }) rejectionReason!: string | null;
   @ApiProperty({ nullable: true, type: String, format: "date-time" }) publishedAt!: string | null;
@@ -127,6 +132,11 @@ export class SellerProductDetailDto {
   @ApiProperty({ nullable: true, type: Number }) matureHeightCm!: number | null;
   @ApiProperty({ type: [String] }) tags!: string[];
   @ApiProperty({ type: Object, nullable: true }) careDetails!: Record<string, unknown> | null;
+  @ApiProperty({ nullable: true, type: String, description: "Packed weight in kg" })
+  weightKg!: string | null;
+  @ApiProperty({ nullable: true, type: Number }) extraChargeAfterQty!: number | null;
+  @ApiProperty({ nullable: true, type: String, description: "Decimal as string" })
+  extraChargePerUnit!: string | null;
   @ApiProperty({ enum: Object.values(ProductStatus) }) status!: ProductStatus;
   @ApiProperty({ nullable: true, type: String }) rejectionReason!: string | null;
   @ApiProperty({ nullable: true, type: String, description: "Decimal as string" })

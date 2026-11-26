@@ -7,6 +7,7 @@ import { createPrismaClient } from "../src/prisma/prisma-client";
 import { DISTRICTS } from "./data/bd-districts";
 import { DEFAULT_CATEGORIES } from "./data/categories";
 import { DEFAULT_SETTINGS } from "./data/settings";
+import { seedSteadfastLocations, seedThanas } from "./seed-thanas";
 
 const GLOBAL_COMMISSION_RATE_PERCENT = 10;
 const WEAK_PASSWORD_MARKERS = ["change-me", "password", "12345678", "admin", "qwerty"];
@@ -112,6 +113,8 @@ async function main(): Promise<void> {
   const prisma = createPrismaClient();
   try {
     const districtCount = await seedDistricts(prisma);
+    const steadfastLocationCount = await seedSteadfastLocations(prisma);
+    const thanaCount = await seedThanas(prisma);
     const categoryCount = await seedCategories(prisma);
     const settingCount = await seedSettings(prisma);
     const adminId = await seedAdmin(prisma);
@@ -121,6 +124,8 @@ async function main(): Promise<void> {
       [
         "Seed complete:",
         `  districts: ${districtCount}`,
+        `  steadfast locations: ${steadfastLocationCount}`,
+        `  thanas: ${thanaCount}`,
         `  categories: ${categoryCount}`,
         `  settings: ${settingCount}`,
         `  admin: ${adminId}`,

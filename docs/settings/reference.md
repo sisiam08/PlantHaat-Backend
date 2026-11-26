@@ -140,3 +140,29 @@ Validation: text lengths (60/140/40), chip count and safe links, hero image URL 
 - `order.deliveryProofRequired` (boolean, default **false**, group orders, wired): when ON, a seller/admin must attach 1-3 delivery photos before marking a ShopOrder DELIVERED. Enforced in the transition transaction; changing it applies to new transitions only.
 - Seller dispute-response photos reuse `return.maxEvidencePhotos` (default 5); the response is accepted only before `sellerResponseDueAt` and before a decision, and each URL must belong to the seller's own `UploadedAsset` (`ownerId`).
 - New tables: `ShopOrderDeliveryProof` and `ComplaintCommentAttachment` are additive and registered in `UPLOAD_SCALAR_REFERENCES`; every URL is ATTACHED in the same transaction as the status/comment write.
+
+
+### 2026-11-25 Rocket and Upay (manual advance only)
+
+- `payment.rocket.enabled/number` and `payment.upay.enabled/number` were added; providers are included in the frozen intent snapshot and submission DTO. There is still no gateway SDK or webhook: PAID is reached only by admin verification of sender number + TrxID + amount. New providers default off with empty numbers; the enabled flag requires a valid BD receiving number. bKash/Nagad behavior is unchanged.
+
+## Courier delivery quotes (2026-11-26)
+
+Group `delivery`, registry-driven, `wired: true`. The live switch is **off by default** because Steadfast's
+public quote endpoint is undocumented and permission is still pending.
+
+| Key | Default | Notes |
+|---|---:|---|
+| `delivery.quote.live.enabled` | `false` | Calls `steadfast.com.bd/pricing/quote` (server-side only, 1 req/s, 3 s timeout, 5-failure/5-minute circuit breaker). Keep off until the owner confirms permission. |
+| `delivery.fallback.insideDhaka` | `0` | Used only when no override, fresh/stale cache or live quote exists. `0` means **unset** (quote unavailable, never a fake free charge). Applied when both Steadfast ids are 1 (Dhaka City ? Dhaka City). |
+| `delivery.fallback.outsideDhaka` | `0` | Same rule for every other pair. |
+| `delivery.quote.cacheFreshHours` | `24` | Fresh cache is reused without a network call. |
+| `delivery.quote.staleDays` | `30` | Stale cache is usable and always preferred over the fallback. |
+
+Limitation: `SystemSetting` stores a JSON number, so `null`/NULL cannot represent "unset".
+`0` is the sentinel for an unset fallback (a real zero-taka fallback is not supported); checkout is
+blocked with `NO_RATE` instead of charging zero. Both fallbacks must be non-negative integers.
+
+Source order: admin override ? fresh cache ? live (only when the switch is on) ? stale cache ? admin fallback.
+Never call Steadfast from the browser. The seller-entered Inside/Outside charge is kept for history but is no
+longer used to price a quote; the courier rate plus the per-product seller extra is the customer price.

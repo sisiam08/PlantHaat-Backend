@@ -2,9 +2,11 @@ import { Injectable } from "@nestjs/common";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
+import { DeliveryCondition } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { CreateDeliveryZoneDto } from "./dto/create-delivery-zone.dto";
 import type { UpdateDeliveryZoneDto } from "./dto/update-delivery-zone.dto";
+import type { UpsertDeliveryConditionDto } from "./dto/upsert-delivery-condition.dto";
 import { SellerContextService } from "./seller-context.service";
 
 const ZONE_INCLUDE = {
@@ -30,6 +32,73 @@ export class DeliveryService {
       orderBy: { createdAt: "asc" },
     });
     return zones.map(toZoneView);
+  }
+
+  async listConditions(userId: string) {
+    const { shop } = await this.sellerContext.requireShop(userId);
+    const rows = await this.prisma.shopDeliveryZone.findMany({
+      where: { shopId: shop.id, condition: { not: null } },
+      orderBy: { condition: "asc" },
+    });
+    const byCondition = new Map(rows.map((row) => [row.condition, row]));
+    const legacy = await this.prisma.shopDeliveryZone.findFirst({
+      where: { shopId: shop.id, isActive: true },
+      orderBy: { charge: "asc" },
+    });
+    return (["INSIDE_DHAKA", "OUTSIDE_DHAKA"] as const).map((condition) => {
+      const row = byCondition.get(condition);
+      return {
+        id: row?.id ?? null,
+        condition,
+        charge: row?.charge ?? legacy?.charge ?? "0",
+        freeDeliveryAbove: row?.freeDeliveryAbove ?? legacy?.freeDeliveryAbove ?? null,
+        estimatedDaysMin: row?.estimatedDaysMin ?? legacy?.estimatedDaysMin ?? 1,
+        estimatedDaysMax: row?.estimatedDaysMax ?? legacy?.estimatedDaysMax ?? 3,
+        paymentMode: row?.paymentMode ?? "COD_AND_ADVANCE",
+        freeDeliveryEnabled: row?.freeDeliveryEnabled ?? false,
+        isActive: row?.isActive ?? true,
+        configured: Boolean(row),
+      };
+    });
+  }
+
+  async upsertCondition(
+    userId: string,
+    condition: DeliveryCondition,
+    dto: UpsertDeliveryConditionDto,
+  ) {
+    const { shop } = await this.sellerContext.requireShop(userId);
+    const existing = await this.prisma.shopDeliveryZone.findFirst({
+      where: { shopId: shop.id, condition },
+    });
+    const data = {
+      name: condition === "INSIDE_DHAKA" ? "Inside Dhaka" : "Outside Dhaka",
+      isNationwide: true,
+      charge: dto.charge ?? existing?.charge ?? 0,
+      freeDeliveryAbove: dto.freeDeliveryAbove ?? null,
+      freeDeliveryEnabled: dto.freeDeliveryEnabled ?? existing?.freeDeliveryEnabled ?? false,
+      estimatedDaysMin: dto.estimatedDaysMin ?? 1,
+      estimatedDaysMax: dto.estimatedDaysMax ?? 3,
+      paymentMode: dto.paymentMode,
+      isActive: dto.isActive ?? true,
+    };
+    const row = existing
+      ? await this.prisma.shopDeliveryZone.update({ where: { id: existing.id }, data })
+      : await this.prisma.shopDeliveryZone.create({
+          data: { ...data, shopId: shop.id, condition },
+        });
+    return {
+      id: row.id,
+      condition: row.condition,
+      charge: row.charge,
+      freeDeliveryAbove: row.freeDeliveryAbove,
+      estimatedDaysMin: row.estimatedDaysMin,
+      estimatedDaysMax: row.estimatedDaysMax,
+      paymentMode: row.paymentMode,
+      freeDeliveryEnabled: row.freeDeliveryEnabled,
+      isActive: row.isActive,
+      configured: true,
+    };
   }
 
   async create(userId: string, dto: CreateDeliveryZoneDto) {
@@ -226,3 +295,4 @@ function toZoneView(zone: ZoneRow) {
     createdAt: zone.createdAt,
   };
 }
+

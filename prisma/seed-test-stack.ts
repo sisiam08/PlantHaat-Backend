@@ -73,7 +73,7 @@ async function main(): Promise<void> {
   try {
     const district = await prisma.district.upsert({
       where: { name: "Dhaka" },
-      update: {},
+      update: { insideDhaka: true, nameBn: "ঢাকা" },
       create: { name: "Dhaka", nameBn: "ঢাকা", division: "Dhaka" },
     });
     const category = await prisma.category.upsert({

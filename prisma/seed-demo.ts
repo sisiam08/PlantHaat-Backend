@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 import argon2 from "argon2";
 import sharp from "sharp";
@@ -11,8 +12,7 @@ import { AppConfigService } from "../src/config/app-config.service";
 import { validateEnv } from "../src/config/env.validation";
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 import { createPrismaClient } from "../src/prisma/prisma-client";
-import { LocalStorageDriver } from "../src/modules/uploads/storage/local-storage.driver";
-import { S3StorageDriver } from "../src/modules/uploads/storage/s3-storage.driver";
+import { resolveStorageDriver } from "../src/modules/uploads/storage/storage.module";
 import type { StorageService } from "../src/modules/uploads/storage/storage.types";
 import { DISTRICTS } from "./data/bd-districts";
 import { DEFAULT_CATEGORIES } from "./data/categories";
@@ -268,6 +268,13 @@ const MULTI_IMAGE_DIMENSIONS = [
 const SINGLE_IMAGE_DIMENSIONS = { width: 1200, height: 900 };
 const CATEGORY_IMAGE_DIMENSIONS = { width: 800, height: 600 };
 
+/** Shared storefront placeholder, reused for demo products and categories. */
+const PLANT_PLACEHOLDER_FILE = new URL(
+  "../../frontend/public/placeholders/plant-placeholder.webp",
+  import.meta.url,
+);
+let plantPlaceholderBuffer: Buffer | undefined;
+
 function requireNonProduction(): void {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Refusing to run the demo seed with NODE_ENV=production");
@@ -276,25 +283,7 @@ function requireNonProduction(): void {
 
 function createStorage(): StorageService {
   const config = new AppConfigService(validateEnv(process.env));
-  return config.values.STORAGE_DRIVER === "s3"
-    ? new S3StorageDriver(config)
-    : new LocalStorageDriver(config);
-}
-
-/** A simple, font-free SVG so sharp can rasterize it without any network access. */
-function placeholderSvg(width: number, height: number, hue: number): Buffer {
-  const plantRadius = Math.min(width, height) * 0.26;
-  const potWidth = width * 0.4;
-  const potHeight = height * 0.2;
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    `<rect width="${width}" height="${height}" fill="hsl(${hue}, 42%, 74%)"/>`,
-    `<circle cx="${width * 0.5}" cy="${height * 0.4}" r="${plantRadius}" fill="hsl(${hue}, 55%, 38%)"/>`,
-    `<circle cx="${width * 0.5}" cy="${height * 0.4}" r="${plantRadius * 0.45}" fill="hsl(${hue}, 60%, 55%)"/>`,
-    `<rect x="${(width - potWidth) / 2}" y="${height * 0.6}" width="${potWidth}" height="${potHeight}" rx="${potHeight * 0.15}" fill="hsl(${(hue + 24) % 360}, 48%, 32%)"/>`,
-    "</svg>",
-  ].join("");
-  return Buffer.from(svg);
+  return resolveStorageDriver(config);
 }
 
 async function storePlaceholder(
@@ -302,9 +291,15 @@ async function storePlaceholder(
   keyPrefix: string,
   width: number,
   height: number,
-  hue: number,
 ): Promise<string> {
-  const buffer = await sharp(placeholderSvg(width, height, hue)).webp({ quality: 80 }).toBuffer();
+  plantPlaceholderBuffer ??= await readFile(PLANT_PLACEHOLDER_FILE);
+  const buffer = await sharp(plantPlaceholderBuffer)
+    .resize(width, height, {
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .webp({ quality: 80 })
+    .toBuffer();
   const stored = await storage.put({
     key: `${keyPrefix}/${randomUUID()}.webp`,
     buffer,
@@ -312,14 +307,6 @@ async function storePlaceholder(
     visibility: "public",
   });
   return stored.url;
-}
-
-function hueFor(input: string): number {
-  let hash = 0;
-  for (const char of input) {
-    hash = (hash * 31 + char.charCodeAt(0)) % 360;
-  }
-  return hash;
 }
 
 async function ensureReferenceData(prisma: PrismaClient): Promise<void> {
@@ -339,18 +326,32 @@ async function ensureReferenceData(prisma: PrismaClient): Promise<void> {
   }
 }
 
+/** Demo-generated images live under these folders; user uploads use another path. */
+function isDemoPlaceholderUrl(url: string | null, folder: string): boolean {
+  return Boolean(url && url.includes(`/images/${folder}/`));
+}
+
+/** Local demo assets that still need to be (re)generated into the active storage driver. */
+function isLocalUploadUrl(url: string | null): boolean {
+  return Boolean(url && (url.startsWith("/uploads/") || url.includes("/uploads/")));
+}
+
 async function ensureCategoryImages(prisma: PrismaClient, storage: StorageService): Promise<void> {
   const categories = await prisma.category.findMany({
     select: { id: true, slug: true, imageUrl: true },
   });
   for (const category of categories) {
-    if (category.imageUrl) continue;
+    if (
+      category.imageUrl &&
+      !(isDemoPlaceholderUrl(category.imageUrl, "category") && isLocalUploadUrl(category.imageUrl))
+    ) {
+      continue;
+    }
     const url = await storePlaceholder(
       storage,
       `images/category/${category.slug}`,
       CATEGORY_IMAGE_DIMENSIONS.width,
       CATEGORY_IMAGE_DIMENSIONS.height,
-      hueFor(category.slug),
     );
     await prisma.category.update({ where: { id: category.id }, data: { imageUrl: url } });
   }
@@ -372,7 +373,11 @@ async function ensureProductImages(
     select: { url: true },
   });
   const needsRegeneration =
-    existing.length === 0 || existing.some((image) => image.url.includes("picsum.photos"));
+    existing.length === 0 ||
+    existing.some((image) => image.url.includes("picsum.photos")) ||
+    existing.every(
+      (image) => isDemoPlaceholderUrl(image.url, "product") && isLocalUploadUrl(image.url),
+    );
   if (!needsRegeneration) return;
 
   if (existing.length > 0) {
@@ -380,7 +385,6 @@ async function ensureProductImages(
   }
 
   const count = Math.min(Math.max(product.imageCount ?? 1, 1), 5);
-  const hue = hueFor(product.name);
   for (let index = 0; index < count; index += 1) {
     const dimensions =
       count > 1
@@ -391,7 +395,6 @@ async function ensureProductImages(
       `images/product/${productId}`,
       dimensions.width,
       dimensions.height,
-      (hue + index * 18) % 360,
     );
     await prisma.productImage.create({
       data: {
@@ -578,11 +581,15 @@ async function seedSellers(
           district: seller.district,
           status: "ACTIVE",
           approvedAt: new Date(),
-          logoUrl: await storePlaceholder(storage, `images/shop-logo/${profile.id}`, 256, 256, hueFor(seller.name)),
+          logoUrl: await storePlaceholder(storage, `images/shop-logo/${profile.id}`, 256, 256),
         },
       });
     } else {
-      await prisma.shop.update({ where: { id: shop.id }, data: { status: "ACTIVE" } });
+      const logoUrl =
+        isDemoPlaceholderUrl(shop.logoUrl, "shop-logo") && isLocalUploadUrl(shop.logoUrl)
+          ? await storePlaceholder(storage, `images/shop-logo/${profile.id}`, 256, 256)
+          : shop.logoUrl;
+      await prisma.shop.update({ where: { id: shop.id }, data: { status: "ACTIVE", logoUrl } });
     }
 
     await ensureDeliveryZones(prisma, shop.id, seller.zone, districtIds);

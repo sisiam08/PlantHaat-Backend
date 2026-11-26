@@ -303,7 +303,7 @@
 
 ## 2026-11-23 dashboard UI/UX polish
 
-- **Audit before edits.** The live Fernly reference and current panels were inspected in real Chrome at 1440/1280/768/390/360; the attached image was unavailable, so the brief's characteristics plus measured evidence were used. Findings and the design direction are recorded in `frontend/docs/design/dashboard-guide.md` §7.
+- **Audit before edits.** The live Fernly reference and current panels were inspected in real Chrome at 1440/1280/768/390/360; the attached image was unavailable, so the brief's characteristics plus measured evidence were used. Findings and the design direction are recorded in `frontend/docs/design/dashboard-guide.md` ï¿½7.
 - **No new dependency.** The existing hand-built SVG kit and Tailwind/Radix motion are reused; `recharts` remains unimported. Motion is CSS-only (220 ms opacity chart entrance, 200 ms transform tab indicator, 300 ms scaleX progress, 200 ms sidebar colour).
 - **Tablet rail instead of a drawer at 768.** The sidebar becomes an 80 px icon rail at md with focus/hover tooltips and an 80 px offset; the drawer is <md. This keeps persistent context on tablets without a second navigation model.
 - **Mobile KPI 2-col grid, not a hidden swipe rail.** The previous swipe strip hid metrics; the new 2-col grid is discoverable and the page is shortened elsewhere by nested tabs. This is a deliberate reversal of the earlier swipe-strip choice for this dashboard.
@@ -320,3 +320,108 @@
 - **Remaining list pages.** Visuals were added only where an aggregate series exists (products inventory, sellers/users growth, advance verification, refunds). Other list/detail pages keep their tables, filters, forms and actions; the checklist is ticked with that note rather than fabricating charts. Seller payout destination validation now enforces BD mobile numbers for bKash/Nagad inline; the canonical page shows API errors inline.
 - **Regression.** Money group: 24 passed in the serial run; the 3 failures were fixed (complaints filtered-query seed, canonical payout-account test path/validation, reconciliation passes on a clean test DB). Other suites: Vitest 116/116 (run after a flaky worker start), typecheck/lint/build/bundle green. Header-nav/access-control/session specs that use dev-only demo credentials/data were run on the isolated stack and produced environment failures; they are not redesign regressions and need the dev demo seed to be re-run.
 - **Public bundles** moved +1 KB (374/388/404/373/360) because the new admin/seller UI strings live in the shared locale messages; still inside the existing budgets.
+
+## 2026-11-23 regression-closure decisions
+
+- **Seed the isolated stack, do not weaken the suites.** The security specs depend on real demo accounts,
+  a shop, a product, a cart and an address. Rather than skip/mock them, `test-stack.ps1 start` now runs an
+  idempotent `[seed:e2e-demo]` fixture on the test DB only. Demo credentials stay in the repo for local
+  isolated runs; they are never used on dev or production.
+- **Validate at the write path and keep legacy rows readable.** Payout destinations are normalized and
+  validated on create/save (BD mobile or 6-34 bank digits, per-field errors). Old invalid rows are not
+  silently rewritten: they return `needsUpdate` and block withdrawal with `PAYOUT_DESTINATION_INVALID`
+  until the seller fixes the destination. No balance, ledger, commission or release rule changed.
+- **Seller mobile hides secondary analytics behind one explicit control.** "Performance & orders" is
+  collapsed by default on mobile and always visible at `lg`; the wallet snapshot keeps amounts but shows
+  its donut/gauge only at `lg`. This removed ~1,140 px (4,605 -> 3,466 at 390) without deleting a metric:
+  the trend and order breakdown stay one tap away with `aria-expanded` and keyboard support.
+- **Motion stays paint-free.** The sidebar hover/active surface is now an opacity overlay (the active
+  indicator is a static bar), the tab indicator is transform-only, and the tab trigger no longer animates
+  colour. Reduced motion keeps the instant state; a tab switch trace measured 0 layout shift and no long
+  tasks.
+
+
+## 2026-11-23 cancellation/cart, session and header decisions
+
+- **Do not add a cancellationâ†’cart path; pin the invariant.** The reported automatic restoration did not
+  exist in code, so the fix is a regression test on all three realistic cancellation paths (expiry,
+  customer, admin) rather than inventing a cart write. The cart stays independent; "buy again" remains
+  an explicit future/user action only.
+- **The session dialog is a handoff, not a second login form.** Detection/refresh/single-flight/proxy
+  behavior stays untouched; the dialog only links to the canonical login page with `returnTo` and the
+  `reason`. Login from that page clears the query cache and does a full document load, preserving the
+  old account-switch isolation without duplicating the login UI.
+- **Session hint is server-read layout data.** `ph_has_session` is read in the root locale boundary and
+  passed to `AuthProvider`; it only chooses 44 px signed-in placeholders while `/auth/me` resolves.
+  Authorization remains API-only. No arbitrary timeouts or visibility hacks.
+- **Locale switching is a soft refresh.** `useTransition` + `router.refresh()` keeps the header, URL,
+  query, hash and scroll; a full reload was the regression that made the navbar disappear on every
+  language switch.
+- **The flag is two circles, not two pills.** A 68x44 touch target contains a 36 px track and two
+  30x30 px segments, so the active state is a perfect circle at every breakpoint.
+
+
+## 2026-11-24 typography, tabs, order filters and passwords
+
+- **Taka is a currency subset, not a text family.** Leading the Bangla stacks with it caused per-glyph
+  fallback and broke conjunct shaping. Keep it scoped to the taka sign and the language label.
+- **Never carry inactive tab panels visibly.** `forceMount` keeps data/state but requires an explicit
+  `data-[state=inactive]:hidden`; otherwise old panels stack and labels look clipped. The mobile mask was
+  removed because it faded real labels at the scroll edges.
+- **Overall status filtering belongs in Prisma.** Filtering only the current page client-side would make
+  counts and pagination lie. The relation predicates mirror `computeOverallStatus`; PARTIAL is a real
+  customer-facing status.
+- **Strong passwords apply only when a password is created.** Login remains compatible with existing
+  accounts; the shared character-class rule is mirrored in frontend helper/UI and backend DTOs.
+
+
+## 2026-11-24 order count aggregate and indicator geometry
+
+- **One count query, not nine.** `/orders/status-counts` groups by the same overall-status CASE and is
+  scoped to the customer; the UI never fetches all orders or makes per-tab requests.
+- **Do not scale a rounded indicator.** `scaleX` changed the pill radius and left visible gaps; measure
+  the trigger and set its width. Observe triggers (not only the list) because badges/fonts change their
+  widths and can move later tabs.
+- **44 px trigger.** The indicator and trigger are both 44 px; the list is 52 px. This preserves labels,
+  horizontal scroll and the existing visual system while meeting the touch target.
+
+
+## 2026-11-25 delivery/wallet/seller decisions
+
+- **Two conditions, one table.** Reusing `ShopDeliveryZone` with an optional `condition` keeps legacy rows safe (multiple NULLs allowed) while new rows are unique per shop/condition. No order rows are rewritten; historical district/fee snapshots remain.
+- **Condition is server-derived.** `District.insideDhaka` is the source of truth; checkout never trusts a client-selected category. Payment mode is enforced by every shop in the cart, not just the UI.
+- **Legacy zones are a fallback only.** Old shops without conditions keep their cheapest/covered legacy fee and both methods; the seller UI writes the two conditions. No district links are exposed in the new UI.
+- **Rocket/Upay are manual wallets.** They are provider strings plus settings numbers; no fake success/auto-verification. Admin verification remains the only path to PAID.
+
+
+## 2026-11-25 delivery backfill mapping
+
+- Legacy zones are a source for a **representative** fee, not a district-by-district clone. The cheapest matching zone wins; explicit Dhaka/non-Dhaka coverage outranks nationwide for the relevant condition. This avoids inventing district-level conditions while preserving a real charge/threshold/ETA.
+- Condition rows are insert-only. `NOT EXISTS` + unique `(shopId, condition)` makes the migration rerunnable; existing seller customization is never touched.
+
+## 2026-11-26 courier delivery quote decisions
+
+- **Courier rate is the customer price.** Seller-entered condition charges are retained only for history;
+  `DeliveryQuoteService` returns courier charge + per-product seller extra. If free delivery applies, the
+  customer total is 0 and the seller bears the courier cost.
+- **Live is gated.** `delivery.quote.live.enabled` defaults false and is only read server-side. The client
+  never reaches Steadfast. A stale cache is always preferred over the admin fallback; overrides always win
+  and are never auto-refreshed.
+- **No invented price.** `delivery.fallback.* = 0` means unset. If nothing can price a route the quote is
+  unavailable with a reason (`ADDRESS_THANA_REQUIRED`, `SHOP_PICKUP_INCOMPLETE`, `DISTRICT_UNMAPPED`,
+  `NO_RATE`, `ROUTE_UNAVAILABLE`), and checkout is blocked per shop instead of showing zero.
+- **Dhaka is per-thana.** `District.steadfastLocationId` stays null for Dhaka; `Address.thanaId` and
+  `Shop.pickupThanaId` decide 1 (City) vs 18 (Sub-Urban). Every seeded Dhaka zone is
+  `DEFAULT_UNVERIFIED` and editable at `/admin/delivery-rates`.
+- **Snapshot, don't re-derive history.** The order stores `courierCharge`, `sellerExtraCharge`,
+  `parcelWeightKg`, `courierLane`, `quoteSource`, `quoteFetchedAt` and `freeDeliveryApplied`;
+  `deliveryCharge` remains the amount the customer actually paid.
+- **Charge-change guard.** Checkout accepts `expectedDeliveryTotal`; a mismatch is a 409
+  `DELIVERY_CHARGE_CHANGED` with the new totals before any write, so the same Idempotency-Key can be retried.
+
+## 2026-11-26 thana selectability and fallback sentinel
+
+- **Do not delete lookup rows.** Steadfast/Packzy includes placeholder or non-address rows. `Thana.selectableByCustomer` (default true) hides them from customer/seller selects without deleting or breaking existing references; `Zone Not Clear` (id 594) is the only one disabled now. Other suspects are listed for owner review rather than guessed.
+- **Duplicate names keep both ids.** Customer/seller selects de-duplicate by normalized name and keep the first id; the admin editor still lists every Steadfast id, so both remain resolvable and auditable.
+- **0 is the unset fallback sentinel.** The settings registry stores JSON numbers and cannot store null/NULL, so `delivery.fallback.* = 0` means unset (checkout blocked with `NO_RATE`, never a free charge). Negative and non-integer fallbacks are rejected.
+- **Settlement naming:** Prompt 2 = courier connection/booking/pickup/webhook/status; Prompt 3 = settlement/dues/reconciliation; Prompt 4 = tracking UI/manual tracking/dashboards.

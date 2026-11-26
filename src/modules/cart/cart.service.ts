@@ -4,7 +4,11 @@ import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
-import { resolveDeliveryZone } from "../orders/delivery-zone.resolver";
+import {
+  DeliveryQuoteService,
+  type DeliveryQuoteLine,
+} from "../delivery-quote/delivery-quote.service";
+import { resolveDeliveryCondition } from "../orders/delivery-condition.resolver";
 import { SettingsService } from "../settings/settings.service";
 import type { PutCartItemDto } from "./dto/put-cart-item.dto";
 
@@ -31,10 +35,11 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
+    private readonly deliveryQuote: DeliveryQuoteService,
   ) {}
 
-  async getCart(userId: string, districtId?: number) {
-    return this.buildView(userId, districtId);
+  async getCart(userId: string, districtId?: number, thanaId?: string) {
+    return this.buildView(userId, districtId, thanaId);
   }
 
   async putItem(userId: string, dto: PutCartItemDto) {
@@ -90,7 +95,7 @@ export class CartService {
     });
   }
 
-  private async buildView(userId: string, districtId?: number) {
+  private async buildView(userId: string, districtId?: number, thanaId?: string) {
     const cart = await this.getOrCreateCart(userId);
     const items = await this.prisma.cartItem.findMany({
       where: { cartId: cart.id },
@@ -126,6 +131,7 @@ export class CartService {
         items: GroupItem[];
         subtotal: Prisma.Decimal;
         priceChanged: boolean;
+        quoteLines: DeliveryQuoteLine[];
       }
     >();
 
@@ -163,6 +169,7 @@ export class CartService {
         items: [],
         subtotal: new Prisma.Decimal(0),
         priceChanged: false,
+        quoteLines: [],
       };
       group.items.push({
         variantId: variant.id,
@@ -182,31 +189,94 @@ export class CartService {
       });
       group.subtotal = group.subtotal.plus(lineTotal);
       group.priceChanged = group.priceChanged || priceChanged;
+      group.quoteLines.push({
+        weightKg: product.weightKg,
+        quantity: item.quantity,
+        extraChargeAfterQty: product.extraChargeAfterQty,
+        extraChargePerUnit: product.extraChargePerUnit,
+      });
       groups.set(shop.id, group);
     }
 
+    const selectedDistrict = districtId
+      ? await this.prisma.district.findUnique({
+          where: { id: districtId },
+          select: { insideDhaka: true, name: true },
+        })
+      : null;
+    const validThanaId =
+      districtId && thanaId
+        ? (
+            await this.prisma.thana.findFirst({
+              where: { id: thanaId, districtId },
+              select: { id: true },
+            })
+          )?.id ?? null
+        : null;
     const shops = [];
     let subtotal = new Prisma.Decimal(0);
     let deliveryTotal = new Prisma.Decimal(0);
     for (const group of groups.values()) {
       let deliveryCharge: Prisma.Decimal | null = null;
       let freeDeliveryAbove: string | null = null;
+      let freeDeliveryEnabled: boolean | null = null;
       let estimatedDaysMin: number | null = null;
       let estimatedDaysMax: number | null = null;
-      // null = no district chosen yet; false = district chosen but the shop has
-      // no active zone covering it; true = a zone matched.
+      let deliveryCondition: "INSIDE_DHAKA" | "OUTSIDE_DHAKA" | null = null;
+      let codAllowed: boolean | null = null;
+      let advanceAllowed: boolean | null = null;
+      let courierCharge: string | null = null;
+      let sellerExtraCharge: string | null = null;
+      let deliveryQuoteSource: string | null = null;
+      let deliveryQuoteEstimated = false;
+      let deliveryReason: string | null = null;
+      let parcelWeightKg: string | null = null;
+      let freeDeliveryApplied = false;
+      // null = no district chosen yet; false = no quote/route; true = priced.
       let deliverable: boolean | null = null;
       if (districtId) {
-        const zone = await resolveDeliveryZone(this.prisma, group.shopId, districtId);
-        deliverable = zone !== null;
-        if (zone) {
-          const free =
-            zone.freeDeliveryAbove !== null && group.subtotal.gte(zone.freeDeliveryAbove);
-          deliveryCharge = free ? new Prisma.Decimal(0) : zone.charge;
-          freeDeliveryAbove =
-            zone.freeDeliveryAbove === null ? null : zone.freeDeliveryAbove.toString();
-          estimatedDaysMin = zone.estimatedDaysMin;
-          estimatedDaysMax = zone.estimatedDaysMax;
+        deliverable = false;
+        if (!selectedDistrict) {
+          deliveryReason = "DISTRICT_UNMAPPED";
+        } else {
+          const delivery = await resolveDeliveryCondition(
+            this.prisma,
+            group.shopId,
+            districtId,
+            selectedDistrict.insideDhaka,
+          );
+          if (delivery) {
+            freeDeliveryAbove =
+              delivery.freeDeliveryAbove === null
+                ? null
+                : delivery.freeDeliveryAbove.toString();
+            freeDeliveryEnabled = delivery.freeDeliveryEnabled;
+            estimatedDaysMin = delivery.estimatedDaysMin;
+            estimatedDaysMax = delivery.estimatedDaysMax;
+            deliveryCondition = delivery.condition;
+            codAllowed = delivery.paymentMode !== "ADVANCE_ONLY";
+            advanceAllowed = delivery.paymentMode !== "COD_ONLY";
+            const quote = await this.deliveryQuote.quoteShop({
+              shopId: group.shopId,
+              districtId,
+              thanaId: validThanaId,
+              lines: group.quoteLines,
+              subtotal: group.subtotal,
+              freeDeliveryEnabled: delivery.freeDeliveryEnabled,
+              freeDeliveryAbove: delivery.freeDeliveryAbove,
+            });
+            deliverable = quote.available;
+            deliveryCharge = quote.available ? quote.total : null;
+            courierCharge = quote.courierCharge?.toString() ?? null;
+            sellerExtraCharge = quote.extraCharge.toString();
+            deliveryQuoteSource = quote.source;
+            deliveryQuoteEstimated = quote.estimated;
+            deliveryReason = quote.available ? null : (quote.reason ?? null);
+            parcelWeightKg = quote.weightKg.toString();
+            freeDeliveryApplied = quote.freeDeliveryApplied;
+          } else {
+            deliveryReason = "DISTRICT_UNMAPPED";
+          }
         }
       }
       shops.push({
@@ -224,8 +294,19 @@ export class CartService {
         deliverable,
         deliveryCharge,
         freeDeliveryAbove,
+        freeDeliveryEnabled,
         estimatedDaysMin,
         estimatedDaysMax,
+        deliveryCondition,
+        codAllowed,
+        advanceAllowed,
+        courierCharge,
+        sellerExtraCharge,
+        deliveryQuoteSource,
+        deliveryQuoteEstimated,
+        deliveryReason,
+        parcelWeightKg,
+        freeDeliveryApplied,
       });
       subtotal = subtotal.plus(group.subtotal);
       if (deliveryCharge) {
@@ -248,3 +329,4 @@ export class CartService {
     };
   }
 }
+

@@ -8,6 +8,10 @@ export const PRODUCTION_SETTINGS_BASELINE: Record<string, unknown> = {
   "payment.bkash.number": "",
   "payment.nagad.enabled": false,
   "payment.nagad.number": "",
+  "payment.rocket.enabled": false,
+  "payment.rocket.number": "",
+  "payment.upay.enabled": false,
+  "payment.upay.number": "",
   "payment.cod.enabled": true,
 };
 

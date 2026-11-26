@@ -7,6 +7,7 @@ export interface ResolvedDelivery {
   name: string;
   charge: Prisma.Decimal;
   freeDeliveryAbove: Prisma.Decimal | null;
+  freeDeliveryEnabled: boolean;
   estimatedDaysMin: number;
   estimatedDaysMax: number;
 }
@@ -61,6 +62,7 @@ function toResolved(zone: {
   name: string;
   charge: Prisma.Decimal;
   freeDeliveryAbove: Prisma.Decimal | null;
+  freeDeliveryEnabled: boolean;
   estimatedDaysMin: number;
   estimatedDaysMax: number;
 }): ResolvedDelivery {
@@ -69,7 +71,11 @@ function toResolved(zone: {
     name: zone.name,
     charge: zone.charge,
     freeDeliveryAbove: zone.freeDeliveryAbove,
+    freeDeliveryEnabled: zone.freeDeliveryEnabled,
     estimatedDaysMin: zone.estimatedDaysMin,
     estimatedDaysMax: zone.estimatedDaysMax,
   };
 }
+
+
+

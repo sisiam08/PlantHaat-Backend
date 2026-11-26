@@ -6,8 +6,10 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseEnumPipe,
   Patch,
   Post,
+  Put,
 } from "@nestjs/common";
 import { ApiNoContentResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
@@ -17,11 +19,12 @@ import {
   ApiEnvelopeArrayResponse,
   ApiEnvelopeResponse,
 } from "../../common/swagger/api-response.decorators";
-import { Role } from "../../generated/prisma/enums";
+import { DeliveryCondition, Role } from "../../generated/prisma/enums";
 import { CreateDeliveryZoneDto } from "./dto/create-delivery-zone.dto";
 import { DeliveryZoneDto, SellerShopDto } from "./dto/seller-response.dto";
 import { SetVacationDto } from "./dto/set-vacation.dto";
 import { UpdateDeliveryZoneDto } from "./dto/update-delivery-zone.dto";
+import { UpsertDeliveryConditionDto } from "./dto/upsert-delivery-condition.dto";
 import { UpdateShopDto } from "./dto/update-shop.dto";
 import { DeliveryService } from "./delivery.service";
 import { ShopsService } from "./shops.service";
@@ -63,6 +66,22 @@ export class SellerShopController {
   @ApiEnvelopeResponse(SellerShopDto)
   clearVacation(@CurrentUser("id") userId: string) {
     return this.shopsService.clearVacation(userId);
+  }
+
+  @Get("delivery-conditions")
+  @ApiOperation({ summary: "List the two nationwide delivery/payment conditions" })
+  listConditions(@CurrentUser("id") userId: string) {
+    return this.deliveryService.listConditions(userId);
+  }
+
+  @Put("delivery-conditions/:condition")
+  @ApiOperation({ summary: "Create or update a nationwide delivery condition" })
+  upsertCondition(
+    @CurrentUser("id") userId: string,
+    @Param("condition", new ParseEnumPipe(DeliveryCondition)) condition: DeliveryCondition,
+    @Body() dto: UpsertDeliveryConditionDto,
+  ) {
+    return this.deliveryService.upsertCondition(userId, condition, dto);
   }
 
   @Get("delivery-zones")

@@ -22,7 +22,7 @@ interface RegisterPayload {
 function buildPayload(overrides: Partial<RegisterPayload> = {}): RegisterPayload {
   return {
     email: `user_${Date.now()}_${Math.random().toString(16).slice(2, 8)}@example.com`,
-    password: "Str0ngPass1",
+    password: "Str0ngPass1!",
     name: "Test User",
     ...overrides,
   };
@@ -108,6 +108,15 @@ describe("Auth (e2e)", () => {
     await request(server).post(`${API}/auth/register`).send(payload).expect(201);
     const res = await request(server).post(`${API}/auth/register`).send(payload).expect(409);
     expect(res.body.error.code).toBe("EMAIL_ALREADY_REGISTERED");
+  });
+
+  it("rejects a password missing the strong-password classes", async () => {
+    const res = await request(server)
+      .post(`${API}/auth/register`)
+      .send(buildPayload({ password: "Str0ngPass" }))
+      .expect(400);
+    expect(res.body.error.code).toBe("VALIDATION_FAILED");
+    expect(JSON.stringify(res.body)).toMatch(/lowercase|uppercase|number|special/i);
   });
 
   it("logs in and rejects a wrong password", async () => {
@@ -221,12 +230,12 @@ describe("Auth (e2e)", () => {
 
     await request(server)
       .post(`${API}/auth/reset-password`)
-      .send({ token: resetToken, newPassword: "NewStr0ngPass1" })
+      .send({ token: resetToken, newPassword: "NewStr0ngPass1!" })
       .expect(200);
 
     await request(server)
       .post(`${API}/auth/login`)
-      .send({ email: payload.email, password: "NewStr0ngPass1" })
+      .send({ email: payload.email, password: "NewStr0ngPass1!" })
       .expect(200);
 
     await request(server)

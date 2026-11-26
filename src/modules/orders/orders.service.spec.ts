@@ -12,18 +12,18 @@ import type { MailService } from "../mail/mail.service";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { SettingsService } from "../settings/settings.service";
 
-jest.unstable_mockModule("./delivery-zone.resolver", () => ({
-  resolveDeliveryZone: jest.fn(),
+jest.unstable_mockModule("./delivery-condition.resolver", () => ({
+  resolveDeliveryCondition: jest.fn(),
 }));
 
 const { OrdersService } = (await import("./orders.service")) as {
   OrdersService: typeof import("./orders.service").OrdersService;
 };
-const { resolveDeliveryZone } = (await import("./delivery-zone.resolver")) as {
-  resolveDeliveryZone: unknown;
+const { resolveDeliveryCondition } = (await import("./delivery-condition.resolver")) as {
+  resolveDeliveryCondition: unknown;
 };
 
-const resolveDeliveryZoneMock = resolveDeliveryZone as {
+const resolveDeliveryConditionMock = resolveDeliveryCondition as {
   mock: { calls: unknown[][] };
   mockResolvedValue: (value: unknown) => void;
   mockReset: () => void;
@@ -153,6 +153,35 @@ function createService(prismaBag: ReturnType<typeof createPrismaMock>) {
     codRisk,
     payments,
     { attachAssetsInTransaction: jest.fn() } as never,
+    {
+      quoteShop: jest.fn(
+        async (params: {
+          subtotal: Prisma.Decimal;
+          freeDeliveryEnabled?: boolean;
+          freeDeliveryAbove?: Prisma.Decimal | null;
+        }) => {
+          const free = Boolean(
+            params.freeDeliveryEnabled &&
+              params.freeDeliveryAbove != null &&
+              params.subtotal.gte(params.freeDeliveryAbove),
+          );
+          return {
+            available: true,
+            courierCharge: new Prisma.Decimal(60),
+            extraCharge: new Prisma.Decimal(0),
+            total: free ? new Prisma.Decimal(0) : new Prisma.Decimal(60),
+            weightKg: new Prisma.Decimal(0.5),
+            lane: "inside_dhaka",
+            source: "FALLBACK",
+            estimated: true,
+            freeDeliveryApplied: free,
+            fetchedAt: null,
+            fromSteadfastId: 1,
+            toSteadfastId: 1,
+          };
+        },
+      ),
+    } as never,
   );
   return { service, commissions, settings, ledger, events, mail };
 }
@@ -256,7 +285,7 @@ function setupTransition(fixture: never) {
 
 describe("OrdersService", () => {
   beforeEach(() => {
-    resolveDeliveryZoneMock.mockReset();
+    resolveDeliveryConditionMock.mockReset();
   });
 
   describe("checkout", () => {
@@ -331,7 +360,7 @@ describe("OrdersService", () => {
           product: { status: "DRAFT" } as never,
         }),
       ]);
-      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      resolveDeliveryConditionMock.mockResolvedValue(zoneFixture);
 
       await expect(deps.service.checkout("u1", checkoutDto(), "idem")).rejects.toMatchObject({
         code: ErrorCode.CHECKOUT_VALIDATION_FAILED,
@@ -369,7 +398,7 @@ describe("OrdersService", () => {
 
     it("rejects insufficient stock", async () => {
       const { deps } = setupCartService([variantFixture({ stockQty: 0 })]);
-      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      resolveDeliveryConditionMock.mockResolvedValue(zoneFixture);
 
       await expect(deps.service.checkout("u1", checkoutDto(), "idem")).rejects.toMatchObject({
         details: [{ code: "INSUFFICIENT_STOCK", available: 0 }],
@@ -378,7 +407,7 @@ describe("OrdersService", () => {
 
     it("rejects when the shop does not deliver to the district", async () => {
       const { deps } = setupCartService([variantFixture()]);
-      resolveDeliveryZoneMock.mockResolvedValue(null);
+      resolveDeliveryConditionMock.mockResolvedValue(null);
 
       await expect(deps.service.checkout("u1", checkoutDto(), "idem")).rejects.toMatchObject({
         details: [{ code: "SHOP_NOT_DELIVERING_TO_DISTRICT" }],
@@ -393,7 +422,7 @@ describe("OrdersService", () => {
         id: "cart-1",
         items: [{ variant, variantId: "variant-1", quantity: 1, priceSnapshot: dec(100) }],
       });
-      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      resolveDeliveryConditionMock.mockResolvedValue(zoneFixture);
       const { service } = createService(bag);
 
       await expect(
@@ -418,7 +447,7 @@ describe("OrdersService", () => {
 
     it("places a successful COD order: totals, payment, history, stock and cart cleanup", async () => {
       const { bag, deps } = setupCartService([variantFixture({ stockQty: 3 }) as never]);
-      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      resolveDeliveryConditionMock.mockResolvedValue(zoneFixture);
       bag.prisma.productVariant.findUniqueOrThrow.mockResolvedValue({ stockQty: 2 });
       bag.prisma.productVariant.findMany.mockResolvedValue([{ price: dec(100), stockQty: 2 }]);
       bag.prisma.order.findFirst
@@ -479,8 +508,9 @@ describe("OrdersService", () => {
 
     it("makes delivery free once the group crosses the threshold", async () => {
       const { bag, deps } = setupCartService([variantFixture({ stockQty: 10 }) as never]);
-      resolveDeliveryZoneMock.mockResolvedValue({
+      resolveDeliveryConditionMock.mockResolvedValue({
         ...zoneFixture,
+        freeDeliveryEnabled: true,
         freeDeliveryAbove: dec(100),
       });
       bag.prisma.productVariant.findUniqueOrThrow.mockResolvedValue({ stockQty: 9 });
@@ -509,7 +539,7 @@ describe("OrdersService", () => {
 
     it("loses the last-unit race with INSUFFICIENT_STOCK inside the transaction", async () => {
       const { bag, deps } = setupCartService([variantFixture({ stockQty: 3 }) as never]);
-      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      resolveDeliveryConditionMock.mockResolvedValue(zoneFixture);
       bag.prisma.order.findFirst.mockResolvedValue(null);
       bag.prisma.productVariant.updateMany.mockResolvedValue({ count: 0 });
 
@@ -526,7 +556,7 @@ describe("OrdersService", () => {
         id: "cart-1",
         items: [{ variant: variantFixture({ stockQty: 3 }), quantity: 1 }],
       });
-      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      resolveDeliveryConditionMock.mockResolvedValue(zoneFixture);
       bag.prisma.productVariant.findUniqueOrThrow.mockResolvedValue({ stockQty: 2 });
       bag.prisma.productVariant.findMany.mockResolvedValue([{ price: dec(100), stockQty: 2 }]);
       bag.prisma.order.findFirst
@@ -553,7 +583,7 @@ describe("OrdersService", () => {
 
     it("retries with a new order number when the number collides", async () => {
       const { bag, deps } = setupCartService([variantFixture({ stockQty: 3 }) as never]);
-      resolveDeliveryZoneMock.mockResolvedValue(zoneFixture);
+      resolveDeliveryConditionMock.mockResolvedValue(zoneFixture);
       bag.prisma.productVariant.findUniqueOrThrow.mockResolvedValue({ stockQty: 2 });
       bag.prisma.productVariant.findMany.mockResolvedValue([{ price: dec(100), stockQty: 2 }]);
       bag.prisma.order.findFirst

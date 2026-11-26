@@ -2,8 +2,9 @@ import { Injectable } from "@nestjs/common";
 
 import { AppException } from "../../common/errors/app.exception";
 import { ErrorCode } from "../../common/errors/error-codes";
-import { encryptAesGcm } from "../../common/utils/crypto";
+import { decryptAesGcm, encryptAesGcm } from "../../common/utils/crypto";
 import { normalizeBdPhone } from "../../common/utils/phone";
+import { payoutDestinationError } from "../../common/validators/payout-destination";
 import { AppConfigService } from "../../config/app-config.service";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -117,6 +118,11 @@ export class SellersService {
     const zoneCount = shop
       ? await this.prisma.shopDeliveryZone.count({ where: { shopId: shop.id, isActive: true } })
       : 0;
+    const conditionCount = shop
+      ? await this.prisma.shopDeliveryZone.count({
+          where: { shopId: shop.id, isActive: true, condition: { not: null } },
+        })
+      : 0;
 
     const missing: string[] = [];
     if (profile.businessName.trim().length === 0) missing.push("businessName");
@@ -124,7 +130,8 @@ export class SellersService {
     if (profile.businessAddress.trim().length === 0) missing.push("businessAddress");
     if (profile.documents.length === 0) missing.push("documents");
     if (!shop) missing.push("shop");
-    if (zoneCount === 0) missing.push("deliveryZone");
+    if (zoneCount === 0 || (conditionCount > 0 && conditionCount < 2))
+      missing.push("deliveryZone");
 
     if (missing.length > 0) {
       throw AppException.unprocessable(
@@ -161,11 +168,19 @@ export class SellersService {
 
   async createPayoutAccount(userId: string, dto: CreatePayoutAccountDto) {
     const profile = await this.sellerContext.requireProfile(userId);
+    const invalid = payoutDestinationError(dto.method, dto.accountNumber);
+    if (invalid) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_FAILED, invalid, {
+        accountNumber: invalid,
+      });
+    }
+    const normalized =
+      dto.method === "BANK" ? dto.accountNumber.trim() : normalizeBdPhone(dto.accountNumber);
     const accountNumberEnc = encryptAesGcm(
-      dto.accountNumber,
+      normalized,
       this.config.values.DATA_ENCRYPTION_KEY,
     );
-    const accountMasked = maskAccountNumber(dto.accountNumber);
+    const accountMasked = maskAccountNumber(normalized);
     const isDefault = dto.isDefault ?? false;
 
     const account = await this.prisma.$transaction(async (tx) => {
@@ -205,10 +220,18 @@ export class SellersService {
     id: string;
     method: string;
     accountName: string;
+    accountNumberEnc: string;
     accountMasked: string;
     isDefault: boolean;
     createdAt: Date;
   }) {
+    let needsUpdate: boolean;
+    try {
+      const number = decryptAesGcm(account.accountNumberEnc, this.config.values.DATA_ENCRYPTION_KEY);
+      needsUpdate = payoutDestinationError(account.method, number) !== null;
+    } catch {
+      needsUpdate = true;
+    }
     return {
       id: account.id,
       method: account.method,
@@ -216,6 +239,7 @@ export class SellersService {
       accountMasked: account.accountMasked,
       isDefault: account.isDefault,
       createdAt: account.createdAt,
+      needsUpdate,
     };
   }
 

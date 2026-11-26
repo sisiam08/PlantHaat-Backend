@@ -37,4 +37,15 @@ export class CheckoutDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   expectedGrandTotal?: number;
+
+  @ApiPropertyOptional({
+    example: 120,
+    description:
+      "Delivery total the customer saw on the cart. A mismatch returns 409 DELIVERY_CHARGE_CHANGED with the new amounts.",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  expectedDeliveryTotal?: number;
 }

@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -100,4 +101,38 @@ export class CreateProductDto {
   @IsOptional()
   @IsObject()
   careDetails?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    example: 1.2,
+    description: "Packed weight incl. pot and packaging, in kg",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(600)
+  weightKg?: number;
+
+  @ApiPropertyOptional({
+    example: 10,
+    description: "Quantity after which the extra charge applies",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  extraChargeAfterQty?: number;
+
+  @ApiPropertyOptional({
+    example: 10,
+    description: "Whole-taka extra charge per additional unit",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  extraChargePerUnit?: number;
 }
+

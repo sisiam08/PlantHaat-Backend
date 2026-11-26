@@ -593,3 +593,163 @@ Branch: `redesign/phase2` (frontend); backend `feature/payments`. API `:5000`, f
 - Remaining pages: products inventory strip, sellers/users people strip, advance-payments/refunds health strips; other list/detail pages keep tables/forms/actions (checklist ticked; no fake charts). Seller mobile 4,790 -> 4,605 px; Shop/Quick links merged, trend shortened. Payout-account form validates BD mobile for bKash/Nagad inline.
 - Regression: money group 24 passed in the serial run; the 3 failures were fixed (complaints filtered seed, reconciliation clean-DB/order, canonical payout-account test path/validation). Vitest 116 passed/1 skipped (31 files; a first run had worker-start errors, immediate rerun green), typecheck/lint/build/bundle green. Header-nav/access-control/session specs that rely on dev demo credentials/data failed on the isolated stack (environmental; not redesign regressions).
 - Public bundles 374/388/404/373/360 KB (+1 KB shared locale strings), within budgets; admin/seller budgets green. Review shots saved to `E:\Development\Projects\PlantHaat\_review-shots` (20 files, outside both repos).
+
+## 2026-11-23 regression gaps closed
+
+- **Isolated-suite fixtures.** Added an idempotent, marker-tagged demo seed (`scripts/seed-e2e-demo.ts`,
+  cleanup script, `db:seed:e2e-demo` / `db:seed:e2e-demo:cleanup`) and wired it into
+  `scripts/test-stack.ps1 start`. The demo accounts/data previously existed only on dev, which is why the
+  security suites failed on `:3002`. They now pass on the isolated stack: 27/27 security (header-nav 5,
+  access-control 9, auth-redirect 5, session-expired 8), sessions 18/18 with short TTL,
+  design-conformance 86/86 (two projects), performance 1/1. Test DB only; nothing added to dev.
+- **Payout destination validation.** Added `src/common/validators/payout-destination.ts` (BD mobile
+  `01[3-9]` + 8 digits, bank 6-34 digits) and reused the mobile regex in the payment DTO. Seller payout
+  creation and wallet profile save normalize/validate; legacy invalid rows expose `needsUpdate`; withdrawal
+  is blocked with `422 PAYOUT_DESTINATION_INVALID` and a clear message. Field errors are returned per
+  `accountNumber`/`accountName`. Frontend payout editor shows the update badge and inline server errors.
+  No money/ledger/commission/release rule changed; new error code and en/bn strings only.
+- **Tests.** Validator unit **4/4**; `settlement.e2e-spec.ts` payout tests **2 passed** (11 skipped by
+  filter); backend typecheck clean. Test stack stopped for e2e (shared test DB), then restarted; dev
+  `:3000`/`:5000` restored.
+
+
+## 2026-11-23 cancellation, session dialog and navbar fixes
+
+- **Cancellation/cart root cause: none in the backend.** Every cancellation entry point
+  (customer, seller, admin, hourly stale-order cron, advance-payment expiry, late-payment
+  reinstatement) goes through `OrdersService.transition` or `PaymentsService.expireUnpaid`; neither
+  reads or writes `Cart`/`CartItem`, and there is no DB trigger, order-cart relation or event listener
+  that does. The only cart write is checkout deleting the purchased variants. The previously observed
+  cart lines were dated after the cancelled orders and came from demo/test cart activity, not from
+  cancellation. No runtime restoration code was removed because none exists; instead the invariant is
+  now pinned by e2e tests.
+- **New coverage:** `test/advance-payments.e2e-spec.ts` adds "keeps the cart independent when an
+  unpaid order expires" and "keeps the cart independent for customer and admin cancellations".
+  Both pass (2/2). A real-Chrome customer cancel left the post-checkout cart line unchanged; the
+  probe order was removed and the cart restored.
+- **Test-stack note:** the full `advance-payments` file had one pre-existing concurrent-submission
+  flake (two 201s instead of 201+409) on this run; the cart tests are deterministic and passed
+  separately with 11 filtered.
+- **Frontend verification:** session-expired spec 16/16 (8 tests x 2 projects), header-nav 5/5,
+  cart-persistence 2/2 on dev, design-conformance 86/86, a11y/typography/overflow 130 passed/2 skipped,
+  CLS cart/checkout 2/2 on rerun, session-refresh 14/16 with the revoked-session test passing alone
+  (suite-order/429 flake) plus a direct cookie debug confirming the dialog at `/orders`.
+- **Locales:** `sessionLoginAgain` added en/bn; no credentials or tokens were added to docs.
+
+
+## 2026-11-24 role-aware session expiration
+
+- **Root cause:** the session-expired provider treated every `session:expired` broadcast as a real
+  expired customer session. The browser client notified on any non-GET (including realtime/background
+  requests), had no prior-session/role context, and `/auth/me` 401s were explicitly excluded from the
+  client refresh path, so a previously authenticated customer browsing publicly was not marked expired.
+  The proxy also could not distinguish a first-time guest from an expired browser once cookies were gone.
+- **Fix:** non-sensitive role/session UX state (`ph_session_state_v1` + `ph_session_expired`) is updated
+  on login, me, refresh and logout. `refresh.ts` marks expired only when a prior session existed and
+  broadcasts the reason/role. `/auth/me` 401 records the end without refreshing. The dialog has
+  `expired` and `required` modes; guests see Login required only for actions, customers see expired
+  only on protected/action paths, and admin/seller prompt behavior is preserved. The proxy uses the
+  expired marker for same-URL rewrites after cookies are gone and clears it on a live request.
+- **Checkout:** guest cart checkout now opens Login required with `returnTo=/checkout`; the guest cart
+  merge runs before the auth cache publishes the user (fixes AuthEntryGuard navigating before merge);
+  expired customers get the checkout-specific Session expired copy. No cart or backend money logic was
+  changed.
+- **Verification:** frontend `auth-prompts.spec.ts` **6/6** (both projects), `session-expired` **16/16**
+  with the default TTL, access-control **16/16** (2 skipped), cart-persistence **2/2** on dev; frontend
+  Vitest **117/117**, backend unit **279/279**, typecheck/lint/build green. No backend schema/API change.
+  `session-refresh` is still flaky in long 10 s-TTL serial runs (9/16 latest, 14/16 earlier; revoked/admin
+  pass individually); not a functional failure.
+
+
+## 2026-11-24 typography, order tabs and password policy
+
+- **Bangla:** the 4-glyph Taka subset was removed from the general font stacks (it split words that use
+  ব/া, e.g. স্টক স্বাস্থ্য); it remains only for the currency glyph/language label. Normal Bangla uses
+  Hind Siliguri, no wrapping disabled.
+- **Orders API:** `GET /orders` now honours an additive `overallStatus` query (PENDING, CONFIRMED,
+  PACKED, SHIPPED, DELIVERED, CANCELLED, PARTIAL, FAILED_DELIVERY) by translating the same semantics as
+  `computeOverallStatus` into Prisma relation filters. Pagination and `meta.total` are accurate per tab;
+  `status` remains for seller/admin lists. `QueryOrdersDto` gained the enum; no schema/migration.
+- **Password policy:** backend now requires 8-72 chars with lowercase, uppercase, number and a special
+  character (non-alphanumeric, non-space) on register, register-seller, reset, change and admin create.
+  Login is intentionally unchanged. DTO messages are explicit; unit coverage added. Existing test
+  passwords were upgraded to include a special character; demo account logins are unaffected.
+- **Verification:** backend unit **281/281** (password policy 2/2), auth+checkout e2e **18/18** and auth-sessions **8/8**; frontend
+  Vitest **120/120**, typecheck/lint/build green; browser checks in `frontend/docs/testing/live-log.md`.
+
+
+## 2026-11-24 My Orders status counts and 44px tabs
+
+- Added `GET /orders/status-counts` (customer role): one grouped `$queryRaw` aggregate over the same
+  CASE as `computeOverallStatus`; returns `{ all, counts }` with no N+1 and no order rows, so pagination
+  is untouched. The customer is always scoped by the authenticated id. Covered by the checkout e2e case
+  `{all:1, counts:{DELIVERED:1}}`.
+- Frontend tab indicator no longer uses `scaleX` (which distorted the pill radius); it uses measured
+  `left` + `width`, and a ResizeObserver watches every trigger so count/font width changes keep the
+  background exact. Trigger height is 44 px (list 52), active pill 44; horizontal scroll retained.
+- Tab badges show real counts for non-zero statuses and the All total; active result count remains in
+  the list header. Counts invalidated on cancellation and checkout.
+
+
+## 2026-11-25 seller onboarding, delivery conditions and wallets
+
+- **Seller discoverability:** no page duplicated; the existing `/register/seller` is linked from the public header (desktop) and footer. Registration now reaches `/seller/apply` without a proxy/dashboard race; approval/verification remain unchanged.
+- **Delivery:** additive migration adds `District.insideDhaka`, `ShopDeliveryZone.condition`, `paymentMode` and the unique `(shopId, condition)` index. New seller conditions are exactly INSIDE_DHAKA/OUTSIDE_DHAKA with COD_AND_ADVANCE | COD_ONLY | ADVANCE_ONLY. Cart, checkout and the PDP quote no longer require district-level seller zones; legacy zones are kept only as a fallback/historical configuration. Checkout derives the condition from the address district and rejects a method blocked by any shop. PDP no longer calls delivery quote and shows no charge.
+- **PDP tabs:** outer Reviews/Q&A nav is URL-driven, points at the real engagement shell, and the inner tab follows `?tab=qa`; Q&A no longer shows a hardcoded zero.
+- **Wallets:** Rocket and Upay are additive settings/provider strings, included in the intent snapshot, DTO validation and admin/checkout UI. The architecture remains **manual verification only** (no gateway SDK/webhooks); numbers are sensitive/snapshotted and only admin verification can mark PAID.
+- **Verification:** typecheck/build both repos; settings unit 9/9; checkout targeted condition/filter/nationwide 3/3 + full checkout prior 7/8 then fixed test; products nationwide filter 1/1; browser checks documented in the frontend live log. `db:migrate:all`/status both applied; test DB up to date.
+
+- Final verification: backend unit **281/281**, settings 9/9, checkout condition/nationwide/filter tests 3/3, products nationwide 1/1; frontend Vitest **120/120**, typecheck/lint/build green; browser CTA/PDP/Q&A/conditions/checkout checks documented in the frontend live log. Migration `20261124150000_delivery_conditions` applied to both DBs.
+
+
+## 2026-11-25 delivery-condition backfill
+
+- New migration `20261125120000_backfill_delivery_conditions` creates missing INSIDE_DHAKA/OUTSIDE_DHAKA rows for every shop. It reads only active legacy zones (condition NULL) and never updates existing condition rows.
+- Mapping: Inside prefers an active zone explicitly covering Dhaka, then nationwide, then cheapest active zone. Outside prefers nationwide, then a zone covering any non-Dhaka district, then cheapest active. Charge/free threshold/ETA are copied; ties use lowest charge. Both methods, active, nationwide. No legacy source => charge 0, ETA 1–3, both methods.
+- Idempotent via NOT EXISTS + ON CONFLICT (shopId, condition) DO NOTHING; reruns and custom rows are unchanged. Historical orders are untouched.
+- Verified dev: Chattogram 100/2000/1–4, Sylhet 90/1800/2–5, Rahim 80/1500/1–3, both conditions each. Test DB migration applied. New e2e test executes the migration SQL twice, asserts two rows and preserves a custom COD_ONLY/99 change.
+
+## 2026-11-26 courier-based delivery charge (Prompt 1)
+
+- **Data:** migration `20261126120000_courier_delivery_quotes` (additive) adds `SteadfastLocation`, `Thana`,
+  `CourierQuoteCache`, `District.steadfastLocationId`, `Shop.pickupDistrictId/pickupThanaId`,
+  `Address.thanaId`, product weight/extra fields, `ShopDeliveryZone.freeDeliveryEnabled` and the ShopOrder
+  quote snapshot. Applied to dev + test (`db:migrate:all`); `db:status:all` clean.
+- **Seeds:** `prisma/seed-data/steadfast-districts.csv` (65 locations) and
+  `prisma/seed-data/steadfast-thanas.json` (736 thanas, fetched with the env-only Packzy lookup credentials,
+  no secrets stored). `npm run db:fetch:thanas` refreshes the JSON; `npm run db:seed:thanas` upserts
+  locations + thanas and the deterministic district mapping. All 64 districts mapped; Dhaka is mapped per
+  thana (59 seeded CITY / 9 SUBURBAN, all `DEFAULT_UNVERIFIED`).
+- **Quote engine:** `delivery-quote` module with `DeliveryQuoteService` (weight steps, seller extra, free
+  delivery, override ? fresh cache ? live ? stale ? fallback), `SteadfastQuoteClient` (server-only, UA,
+  1 req/s, 3 s timeout, Retry-After, circuit breaker, deduplicated in-flight calls) and `previewGuest` for
+  guest cart quotes. Weight = S(weightKg � qty), default 0.5 kg, rounded up to 0.5 kg, cap 600.
+- **Cart/checkout:** cart accepts `thanaId`; per shop returns courier + extra + total + source/reason +
+  free-delivery flag. Checkout recomputes everything and snapshots the quote on `ShopOrder`; a stale
+  `expectedDeliveryTotal` returns `409 DELIVERY_CHARGE_CHANGED`. Address creation requires a thana for a
+  Dhaka district (`ADDRESS_THANA_REQUIRED`); saved Dhaka addresses without one are prompted to fix it.
+- **Seller/admin:** product packed weight + threshold/extra fields with validation; pickup district/thana
+  in shop settings with a warning banner; delivery-zones UI drops the courier-charge input, keeps ETA and
+  payment mode, adds the seller-funded free-delivery toggle and the courier-pricing info card. Admin gets
+  `/admin/delivery-rates` (health, cache filters, overrides CRUD + CSV dry-run/import, Dhaka zone editor,
+  district mapping, warm-up) and order detail shows the quote snapshot.
+- **Verification:** backend typecheck/lint green; quote/order/cart/zone/client unit tests pass
+  (69 + 6 targeted this run); targeted e2e `delivery-quote` 4/4 and checkout multi-shop 1/1 pass;
+  frontend typecheck/lint (0 errors) green and Vitest 119/120 with the only failure fixed
+  (`encoding.test.ts`, a stray U+FFFD in a cart comment). Frontend build and Playwright were not completed
+  in this environment (the build exceeded the 10-minute window; browsers were not driven).
+- **Open:** live switch stays OFF in production; Dhaka City/Sub-Urban boundary is unverified; negotiated
+  merchant rates may differ and the difference is the seller's; booking/pickup/webhook/settlement/tracking
+  Prompt 2 (courier connection, booking, pickup, webhook/polling, status mapping), Prompt 3 (settlement, dues, advance totals, reconciliation) and Prompt 4 (tracking UI, manual tracking fields, dashboards) were not started.
+
+## 2026-11-26 Prompt 1B verification and tightening
+
+- **Full unit suite (sliced):** 304/304 backend unit tests pass across three slices (120 + 119 + 65), run with `--runInBand`. Slice 3 initially exposed a pre-existing registry message mismatch (`1-10` vs `1�10`); fixed the message and added a fallback-integer test (registry spec 8/8).
+- **Frontend Vitest:** all 33 test files run in slices with `--maxWorkers=1`: 121 passed, 1 skipped. A whole-suite run first hit environment worker-start timeouts (22 unhandled worker errors, 10 files/40 tests before the timeout), so the suite was finished in small slices.
+- **Frontend production build:** the isolated test-stack production build (`.next-test`) succeeded; the separate `.next-prod` throwaway build still hit `Zone Allocation failed - process out of memory` on this 8 GB machine, not a compile error.
+- **Backend e2e:** `checkout.e2e-spec` 10/10 and `delivery-quote.e2e-spec` 4/4 pass on `planthaat_test`.
+- **Browser (isolated :5001/:3002, real Chrome):** new `frontend/e2e/delivery-quote.spec.ts` 7/7 at 1280 (desktop) and 7/7 at 360 (mobile), bn/en. Covers logged-in two-shop cart with different pickup districts, guest district+thana, saved Dhaka address without thana, COD_ONLY intersection, seller product weight/extra live example, seller pickup thana and delivery-zones, admin delivery-rates, admin order snapshot. Axe is clean, no horizontal overflow and no console errors/failed requests apart from the known test-stack realtime CSP warning for `ws://localhost:5000` (documented in FRONTEND_CONTEXT).
+- **Fixes found by browser checks:** cart mobile Checkout link overflowed (full-width link in the fixed bar), long district/thana selects overflowed at 360, seller pickup-thana select did not re-apply its initial value after async options loaded, and the admin override number inputs had no labels. All fixed; `delivery-quote.spec.ts` re-run 7/7 on both projects.
+- **Prompt 1B additions:** `Thana.selectableByCustomer` (migration `20261126150000_thana_selectable`, default true; `Zone Not Clear` id 594 set false, row kept); customer/seller selects hide unselectable and duplicate names while keeping both ids resolvable; admin thana editor shows the Steadfast id and a selectable toggle; admin warning card reports live-off/unset-fallback/cache/override state; seller shop and delivery-zones show a neutral "no platform rate" note; delivery fallbacks reject negative and non-integer values and 0 is documented as the unset sentinel.
+- **Dhaka non-address review:** Zone Not Clear (594, disabled), Battery Section (667), Shah Ali Market (653), Ati Bazar (Keraniganj) (602); Kadamtali is duplicated (ids 22 and 604) and is de-duplicated in customer selects. Edge-of-city CITY thanas for owner/Steadfast review: Turag (43), Uttarkhan (45), Dakshin Khan (11), Purbachal (601), Demra (160), Azompur (162), Shyampur (40), Kamrangirchar (19).
+- **Naming:** settlement is Prompt 3, tracking UI is Prompt 4; the Prompt 1 open-items wording was corrected.

@@ -49,13 +49,13 @@ describe("Settings batch save (real DB)", () => {
       data: {
         email,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
     });
     admin = request.agent(server);
-    await admin.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+    await admin.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1!" }).expect(200);
   });
 
   afterEach(async () => {
@@ -63,7 +63,7 @@ describe("Settings batch save (real DB)", () => {
     await restoreDefaultSettings(app, prisma);
   });
 
-  function token(keys: string[], password = "AdminStr0ng1") {
+  function token(keys: string[], password = "AdminStr0ng1!") {
     return admin
       .post(`${API}/admin/settings/reauth`)
       .set("Origin", ORIGIN)

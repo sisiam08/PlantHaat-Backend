@@ -16,7 +16,7 @@ const ORIGIN = "http://localhost:3000";
 function sellerPayload() {
   return {
     email: `seller_${Date.now()}_${Math.random().toString(16).slice(2, 8)}@example.com`,
-    password: "Str0ngPass1",
+    password: "Str0ngPass1!",
     name: "Seller User",
     businessName: "Green Valley Nursery",
     contactPhone: "01712345678",
@@ -28,7 +28,7 @@ describe("Seller onboarding (e2e)", () => {
   let server: Server;
   let prisma: PrismaService;
   let adminEmail: string;
-  const adminPassword = "AdminStr0ng1";
+  const adminPassword = "AdminStr0ng1!";
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

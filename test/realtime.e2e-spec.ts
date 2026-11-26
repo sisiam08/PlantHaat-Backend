@@ -82,7 +82,7 @@ describe("Realtime gateway (e2e)", () => {
     const email = `rt_${suffix()}@example.com`;
     const res = await agent
       .post(`${API}/auth/register`)
-      .send({ email, password: "Str0ngPass1", name: "Realtime User" })
+      .send({ email, password: "Str0ngPass1!", name: "Realtime User" })
       .expect(201);
     return { agent, userId: res.body.data.user.id as string, email };
   }

@@ -15,6 +15,7 @@ import type {
   AdvanceProvider,
   CreatePaymentSubmissionDto,
 } from "./dto/payment.dto";
+import { ADVANCE_PROVIDER_META, ADVANCE_PROVIDERS } from "./advance-providers";
 
 interface ProviderAccount {
   provider: AdvanceProvider;
@@ -55,19 +56,12 @@ export class PaymentsService {
   async snapshot(): Promise<ProviderSnapshot> {
     const values = await this.settings.getAll();
     const providers: ProviderAccount[] = [];
-    if (
-      values["payment.bkash.enabled"] === true &&
-      typeof values["payment.bkash.number"] === "string" &&
-      values["payment.bkash.number"]
-    ) {
-      providers.push({ provider: "BKASH", number: values["payment.bkash.number"] });
-    }
-    if (
-      values["payment.nagad.enabled"] === true &&
-      typeof values["payment.nagad.number"] === "string" &&
-      values["payment.nagad.number"]
-    ) {
-      providers.push({ provider: "NAGAD", number: values["payment.nagad.number"] });
+    for (const provider of ADVANCE_PROVIDERS) {
+      const meta = ADVANCE_PROVIDER_META[provider];
+      const number = values[meta.numberKey];
+      if (values[meta.enabledKey] === true && typeof number === "string" && number) {
+        providers.push({ provider, number });
+      }
     }
     return {
       providers,

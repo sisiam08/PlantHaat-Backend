@@ -239,3 +239,8 @@ picked up by the release job because they have no `releaseAt`; their history sta
 4. COD dues payments are not mixed into advance conservation (no platform cash); automatic deduction
    from available books the retained cash as platform commission.
 5. The release job skips legacy delivered orders without `releaseAt` rather than guessing a date.
+
+
+### 2026-11-25 Rocket and Upay (manual advance only)
+
+- `payment.rocket.enabled/number` and `payment.upay.enabled/number` were added; providers are included in the frozen intent snapshot and submission DTO. There is still no gateway SDK or webhook: PAID is reached only by admin verification of sender number + TrxID + amount. New providers default off with empty numbers; the enabled flag requires a valid BD receiving number. bKash/Nagad behavior is unchanged.

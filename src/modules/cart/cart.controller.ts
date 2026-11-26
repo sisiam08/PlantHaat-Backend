@@ -30,7 +30,7 @@ export class CartController {
   @ApiOperation({ summary: "Get the cart grouped by shop (live prices and issues)" })
   @ApiEnvelopeResponse(CartViewDto)
   get(@CurrentUser("id") userId: string, @Query() query: CartQueryDto) {
-    return this.cartService.getCart(userId, query.districtId);
+    return this.cartService.getCart(userId, query.districtId, query.thanaId);
   }
 
   @Put("items")
@@ -57,3 +57,4 @@ export class CartController {
     return this.cartService.clear(userId);
   }
 }
+

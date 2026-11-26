@@ -640,21 +640,15 @@ export class PublicProductsService {
     }
 
     if (query.deliversTo) {
-      const shops = await this.prisma.shop.findMany({
-        where: {
-          ...PUBLIC_SHOP_FILTER,
-          OR: [
-            { deliveryZones: { some: { isActive: true, isNationwide: true } } },
-            {
-              deliveryZones: {
-                some: { isActive: true, districts: { some: { districtId: query.deliversTo } } },
-              },
-            },
-          ],
-        },
+      // Nationwide delivery: every active shop is eligible once the district is
+      // real. Unknown districts intentionally return no products.
+      const district = await this.prisma.district.findUnique({
+        where: { id: query.deliversTo },
         select: { id: true },
       });
-      and.push({ shopId: { in: shops.map((s) => s.id) } });
+      if (!district) {
+        and.push({ id: "__no_match__" });
+      }
     }
 
     if (query.category) {

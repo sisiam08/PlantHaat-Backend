@@ -45,7 +45,7 @@ describe("Search suggestions (e2e)", () => {
       data: {
         email: `seller_${suffix()}@example.com`,
         name: "Seller",
-        passwordHash: await hashPassword("SellerPass1"),
+        passwordHash: await hashPassword("SellerPass1!"),
         role: "SELLER",
         emailVerifiedAt: new Date(),
       },

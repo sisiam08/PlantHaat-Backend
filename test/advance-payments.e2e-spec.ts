@@ -13,6 +13,10 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { PaymentsService } from "../src/modules/payments/payments.service";
 import { resetDatabase } from "./cleanup";
 import { clearSettings, setSettings } from "./settings-test-helper";
+import {
+  mapDistrictToSteadfast,
+  useTestDeliveryRates,
+} from "./delivery-fixtures";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
@@ -57,6 +61,7 @@ describe("Advance payments (real DB)", () => {
       "payment.instructions": "Send the exact total.",
       "payment.warningText": "Keep the receipt.",
     });
+    await useTestDeliveryRates(app, prisma);
     const category = await prisma.category.create({
       data: { name: `Plants ${randomUUID()}`, slug: `plants-${randomUUID()}`, isActive: true },
     });
@@ -65,6 +70,7 @@ describe("Advance payments (real DB)", () => {
       data: { name: `Dhaka ${randomUUID()}`, nameBn: "ঢাকা", division: "Dhaka" },
     });
     districtId = district.id;
+    await mapDistrictToSteadfast(prisma, districtId);
   });
 
   afterEach(async () => {
@@ -75,13 +81,13 @@ describe("Advance payments (real DB)", () => {
     const id = randomUUID();
     const email = `seller_${id.slice(0, 8)}@example.com`;
     const user = await prisma.user.create({
-      data: { email, name: "Seller", passwordHash: await hashPassword("SellerPass1"), role: "SELLER", emailVerifiedAt: new Date() },
+      data: { email, name: "Seller", passwordHash: await hashPassword("SellerPass1!"), role: "SELLER", emailVerifiedAt: new Date() },
     });
     const profile = await prisma.sellerProfile.create({
       data: { userId: user.id, businessName: `Shop ${id}`, contactPhone: "01712345678", businessAddress: "addr", status: "APPROVED" },
     });
     const shop = await prisma.shop.create({
-      data: { sellerProfileId: profile.id, name: `Shop ${id}`, slug: `shop-${id}`, status: "ACTIVE", approvedAt: new Date(), district: "Dhaka" },
+      data: { sellerProfileId: profile.id, name: `Shop ${id}`, slug: `shop-${id}`, status: "ACTIVE", approvedAt: new Date(), district: "Dhaka", pickupDistrictId: districtId },
     });
     await prisma.shopDeliveryZone.create({
       data: { shopId: shop.id, name: "Zone", charge, districts: { create: [{ districtId }] } },
@@ -93,14 +99,14 @@ describe("Advance payments (real DB)", () => {
       data: { productId: product.id, name: "Standard", price, stockQty: stock },
     });
     const agent = request.agent(server);
-    await agent.post(`${API}/auth/login`).send({ email, password: "SellerPass1" }).expect(200);
+    await agent.post(`${API}/auth/login`).send({ email, password: "SellerPass1!" }).expect(200);
     return { shop, product, variant, agent, userId: user.id };
   }
 
   async function createCustomer() {
     const agent = request.agent(server);
     const email = `cust_${randomUUID().slice(0, 12)}@example.com`;
-    const reg = await agent.post(`${API}/auth/register`).send({ email, password: "Str0ngPass1", name: "Customer" }).expect(201);
+    const reg = await agent.post(`${API}/auth/register`).send({ email, password: "Str0ngPass1!", name: "Customer" }).expect(201);
     const userId = reg.body.data.user.id as string;
     await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
     const address = await prisma.address.create({
@@ -111,9 +117,9 @@ describe("Advance payments (real DB)", () => {
 
   async function adminAgent() {
     const email = `admin_${randomUUID().slice(0, 8)}@example.com`;
-    await prisma.user.create({ data: { email, name: "Admin", passwordHash: await hashPassword("AdminStr0ng1"), role: "ADMIN", emailVerifiedAt: new Date() } });
+    await prisma.user.create({ data: { email, name: "Admin", passwordHash: await hashPassword("AdminStr0ng1!"), role: "ADMIN", emailVerifiedAt: new Date() } });
     const agent = request.agent(server);
-    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1!" }).expect(200);
     return agent;
   }
 
@@ -266,6 +272,83 @@ describe("Advance payments (real DB)", () => {
     expect((await prisma.paymentIntent.findUniqueOrThrow({ where: { id: intent2.id } })).status).toBe("PENDING_VERIFICATION");
   });
 
+  it("keeps the cart independent when an unpaid order expires", async () => {
+    const shopA = await createShop();
+    const shopB = await createShop();
+    const customer = await createCustomer();
+    const order = await placeAdvance(customer, [shopA], [2]);
+
+    // Checkout removed the purchased line. A line added afterwards must be the
+    // only thing left when expiry cancels the order.
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shopB.variant.id, quantity: 3 })
+      .expect(200);
+    await prisma.paymentIntent.update({
+      where: { orderId: order.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    expect(await payments.expireUnpaid()).toBe(1);
+    expect((await prisma.shopOrder.findFirstOrThrow()).status).toBe("CANCELLED");
+
+    const cart = await customer.agent.get(`${API}/cart`).expect(200);
+    const lines = cart.body.data.shops.flatMap(
+      (shop: { items: { variantId: string; quantity: number }[] }) =>
+        shop.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+    );
+    expect(lines).toEqual([{ variantId: shopB.variant.id, quantity: 3 }]);
+    expect(lines.some((line: { variantId: string }) => line.variantId === shopA.variant.id)).toBe(
+      false,
+    );
+  });
+
+  it("keeps the cart independent for customer and admin cancellations", async () => {
+    const shopA = await createShop();
+    const shopB = await createShop();
+    const customer = await createCustomer();
+    const order = await placeAdvance(customer, [shopA], [1]);
+
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shopB.variant.id, quantity: 2 })
+      .expect(200);
+
+    await customer.agent
+      .post(`${API}/orders/shop-orders/${order.shopOrders[0].id}/cancel`)
+      .set("Origin", ORIGIN)
+      .send({})
+      .expect(200);
+    let cart = await customer.agent.get(`${API}/cart`).expect(200);
+    expect(
+      cart.body.data.shops.flatMap((shop: { items: { variantId: string }[] }) =>
+        shop.items.map((item) => item.variantId),
+      ),
+    ).toEqual([shopB.variant.id]);
+
+    const order2 = await placeAdvance(customer, [shopA], [1]);
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shopB.variant.id, quantity: 2 })
+      .expect(200);
+
+    const admin = await adminAgent();
+    await admin
+      .post(`${API}/admin/orders/${order2.shopOrders[0].id}/status`)
+      .set("Origin", ORIGIN)
+      .send({ status: "CANCELLED" })
+      .expect(200);
+    cart = await customer.agent.get(`${API}/cart`).expect(200);
+    expect(
+      cart.body.data.shops.flatMap((shop: { items: { variantId: string }[] }) =>
+        shop.items.map((item) => item.variantId),
+      ),
+    ).toEqual([shopB.variant.id]);
+  });
+
   it("reinstate a late-paid cancelled order when stock exists, else refund required", async () => {
     const shop = await createShop(100, 2);
     const customer = await createCustomer();
@@ -362,3 +445,4 @@ describe("Advance payments (real DB)", () => {
     await admin.get(`${API}/advance-payments/orders/${order.id}`).expect(403);
   });
 });
+

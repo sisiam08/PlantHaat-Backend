@@ -79,6 +79,9 @@ export class SellerProductsService {
         matureHeightCm: dto.matureHeightCm ?? null,
         tags: dto.tags ?? [],
         careDetails: (dto.careDetails ?? undefined) as Prisma.InputJsonValue | undefined,
+        weightKg: dto.weightKg ?? null,
+        extraChargeAfterQty: dto.extraChargeAfterQty ?? null,
+        extraChargePerUnit: dto.extraChargePerUnit ?? null,
         slug: await this.generateUniqueSlug(dto.name),
         status: "DRAFT",
       },
@@ -108,6 +111,11 @@ export class SellerProductsService {
     if (dto.isPetSafe !== undefined) data.isPetSafe = dto.isPetSafe;
     if (dto.matureHeightCm !== undefined) data.matureHeightCm = dto.matureHeightCm;
     if (dto.tags !== undefined) data.tags = dto.tags;
+    if (dto.weightKg !== undefined) data.weightKg = dto.weightKg;
+    if (dto.extraChargeAfterQty !== undefined)
+      data.extraChargeAfterQty = dto.extraChargeAfterQty;
+    if (dto.extraChargePerUnit !== undefined)
+      data.extraChargePerUnit = dto.extraChargePerUnit;
     if (dto.careDetails !== undefined) {
       data.careDetails = dto.careDetails as Prisma.InputJsonValue;
     }
@@ -514,6 +522,9 @@ export class SellerProductsService {
     matureHeightCm: number | null;
     tags: string[];
     careDetails: unknown;
+    weightKg: unknown;
+    extraChargeAfterQty: number | null;
+    extraChargePerUnit: unknown;
     status: string;
     rejectionReason: string | null;
     minPrice: unknown;
@@ -545,6 +556,9 @@ export class SellerProductsService {
       matureHeightCm: product.matureHeightCm,
       tags: product.tags,
       careDetails: product.careDetails,
+      weightKg: product.weightKg,
+      extraChargeAfterQty: product.extraChargeAfterQty,
+      extraChargePerUnit: product.extraChargePerUnit,
       status: product.status,
       rejectionReason: product.rejectionReason,
       minPrice: product.minPrice,
@@ -562,3 +576,5 @@ export class SellerProductsService {
     };
   }
 }
+
+

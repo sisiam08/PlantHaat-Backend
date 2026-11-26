@@ -22,7 +22,15 @@ export class SellerContextService {
     return this.prisma.sellerProfile.findUnique({
       where: { userId },
       include: {
-        shops: { orderBy: { createdAt: "asc" } },
+        shops: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            pickupThana: {
+              select: { id: true, name: true, nameBn: true, dhakaZone: true },
+            },
+            pickupDistrict: { select: { id: true, name: true } },
+          },
+        },
         documents: { orderBy: { createdAt: "asc" } },
       },
     });
@@ -68,3 +76,4 @@ export class SellerContextService {
     };
   }
 }
+

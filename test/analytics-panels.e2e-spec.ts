@@ -97,7 +97,7 @@ describe("Dashboard analytics panels (e2e)", () => {
       data: {
         email: `admin-${id}@example.com`,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
@@ -106,13 +106,13 @@ describe("Dashboard analytics panels (e2e)", () => {
     sellerA = request.agent(server);
     await sellerA
       .post(`${API}/auth/login`)
-      .send({ email: `seller-alpha-${id}@example.com`, password: "SellerPass1" })
+      .send({ email: `seller-alpha-${id}@example.com`, password: "SellerPass1!" })
       .expect(200);
 
     admin = request.agent(server);
     await admin
       .post(`${API}/auth/login`)
-      .send({ email: adminUser.email, password: "AdminStr0ng1" })
+      .send({ email: adminUser.email, password: "AdminStr0ng1!" })
       .expect(200);
   });
 
@@ -121,7 +121,7 @@ describe("Dashboard analytics panels (e2e)", () => {
       data: {
         email: `seller-${tag}-${id}@example.com`,
         name: `Seller ${tag}`,
-        passwordHash: await hashPassword("SellerPass1"),
+        passwordHash: await hashPassword("SellerPass1!"),
         role: "SELLER",
         emailVerifiedAt: new Date(),
       },

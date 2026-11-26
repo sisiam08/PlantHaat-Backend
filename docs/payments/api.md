@@ -152,7 +152,8 @@ legacy rows have `account: null`.
 { "method": "BKASH", "accountNumber": "01712345678", "accountName": "Rahim Uddin" }
 ```
 
-`200` on success. bKash/Nagad require a valid BD mobile; bank requires 6–20 digits. The account is
+`200` on success. bKash/Nagad require a valid BD mobile; bank requires
+6-34 digits. Invalid input returns `422` with field errors `accountNumber`/`accountName`. The account is
 encrypted at rest and only the mask is returned. A change inside `payout.cooldownHours` returns
 `422 PAYOUT_PROFILE_COOLDOWN` and sends a notification. A method outside `payout.methods` returns
 `422 PAYOUT_METHOD_NOT_ALLOWED`.
@@ -187,7 +188,9 @@ Header `Idempotency-Key` is strongly recommended (same key returns the existing 
 
 `201` with the withdrawal row. Errors:
 `422 PAYOUT_BELOW_MINIMUM`, `422 PAYOUT_EXCEEDS_AVAILABLE`, `422 PAYOUT_TOO_MANY_PENDING`,
-`422 PAYOUT_COD_DUES_BLOCKED`, `422 PAYOUT_PROFILE_REQUIRED`, `422 PAYOUT_METHOD_NOT_ALLOWED`.
+`422 PAYOUT_COD_DUES_BLOCKED`, `422 PAYOUT_PROFILE_REQUIRED`, `422 PAYOUT_METHOD_NOT_ALLOWED`,
+`422 PAYOUT_DESTINATION_INVALID`. The last one blocks withdrawal when a legacy stored destination is
+still invalid; the seller fixes it on `/seller/payout-accounts` (list responses expose `needsUpdate`).
 The amount is reserved immediately (`SELLER_AVAILABLE -> SELLER_WITHDRAWAL_RESERVED`), so parallel
 requests can never overdraw.
 
@@ -361,5 +364,5 @@ The token is short-lived and single-use (a second reveal returns `400 VALIDATION
 is limited to 5 requests/minute, returns `Cache-Control: no-store`, and writes the audit entry
 `withdrawal.destination_revealed` with admin/withdrawal/time/IP but **never** the account number.
 `404 NOT_FOUND` for a non-seller/manual payout, `422 WITHDRAWAL_DESTINATION_UNAVAILABLE` when the
-seller has no matching payout account. UI: masked list value + “Show payout details” ? password
+seller has no matching payout account. UI: masked list value + ï¿½Show payout detailsï¿½ ? password
 re-auth ? copy ? auto-hide after 60 seconds or navigation; the value is not put in a query cache.

@@ -13,6 +13,10 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { SettingsService } from "../src/modules/settings/settings.service";
 import { resetDatabase } from "./cleanup";
 import { clearSettings, setSettings, testPrefix } from "./settings-test-helper";
+import {
+  mapDistrictToSteadfast,
+  useTestDeliveryRates,
+} from "./delivery-fixtures";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
@@ -52,6 +56,7 @@ describe("COD settings (real DB)", () => {
       "payment.advance.enabled": false,
       "order.codMaxAmount": 0,
     });
+    await useTestDeliveryRates(app, prisma);
     const category = await prisma.category.create({
       data: { name: `Plants ${prefix}`, slug: `plants-${prefix}-${randomUUID()}`, isActive: true },
     });
@@ -64,6 +69,7 @@ describe("COD settings (real DB)", () => {
       },
     });
     districtId = district.id;
+    await mapDistrictToSteadfast(prisma, districtId);
   });
 
   afterEach(async () => {
@@ -76,7 +82,7 @@ describe("COD settings (real DB)", () => {
       data: {
         email: `seller_${id.slice(0, 8)}@example.com`,
         name: "Seller",
-        passwordHash: await hashPassword("SellerPass1"),
+        passwordHash: await hashPassword("SellerPass1!"),
         role: "SELLER",
         emailVerifiedAt: new Date(),
       },
@@ -98,6 +104,7 @@ describe("COD settings (real DB)", () => {
         status: "ACTIVE",
         approvedAt: new Date(),
         district: "Dhaka",
+        pickupDistrictId: districtId,
       },
     });
     await prisma.shopDeliveryZone.create({
@@ -133,7 +140,7 @@ describe("COD settings (real DB)", () => {
     const email = `cust_${randomUUID().slice(0, 18)}@example.com`;
     const reg = await agent
       .post(`${API}/auth/register`)
-      .send({ email, password: "Str0ngPass1", name: "Customer" })
+      .send({ email, password: "Str0ngPass1!", name: "Customer" })
       .expect(201);
     const userId = reg.body.data.user.id as string;
     await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
@@ -230,7 +237,7 @@ describe("COD settings (real DB)", () => {
       data: {
         email: `admin_${randomUUID().slice(0, 8)}@example.com`,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
@@ -275,3 +282,4 @@ describe("COD settings (real DB)", () => {
     expect(order.body.error.code).toBe("PAYMENT_METHOD_NOT_AVAILABLE");
   });
 });
+

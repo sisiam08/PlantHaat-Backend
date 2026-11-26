@@ -1,9 +1,11 @@
-import { Controller, Get } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Controller, Get, ParseIntPipe, Query } from "@nestjs/common";
+import { ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 
 import { Public } from "../../common/decorators/public.decorator";
-import { ApiEnvelopeArrayResponse } from "../../common/swagger/api-response.decorators";
-import { DistrictDto } from "./dto/district.dto";
+import {
+  ApiEnvelopeArrayResponse,
+} from "../../common/swagger/api-response.decorators";
+import { DistrictDto, ThanaDto } from "./dto/district.dto";
 import { LocationsService } from "./locations.service";
 
 @ApiTags("Locations")
@@ -18,4 +20,14 @@ export class LocationsController {
   listDistricts() {
     return this.locationsService.listDistricts();
   }
+
+  @Public()
+  @Get("thanas")
+  @ApiQuery({ name: "districtId", required: true, type: Number })
+  @ApiOperation({ summary: "List Steadfast thanas for a district (guests too)" })
+  @ApiEnvelopeArrayResponse(ThanaDto)
+  listThanas(@Query("districtId", ParseIntPipe) districtId: number) {
+    return this.locationsService.listThanas(districtId);
+  }
 }
+

@@ -7,6 +7,7 @@ import request from "supertest";
 
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
+import { encryptAesGcm } from "../src/common/utils/crypto";
 import { hashPassword } from "../src/common/utils/password";
 import { AppConfigService } from "../src/config/app-config.service";
 import { Prisma } from "../src/generated/prisma/client";
@@ -14,6 +15,10 @@ import { LedgerService } from "../src/modules/ledger/ledger.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { resetDatabase } from "./cleanup";
 import { clearSettings, setSettings } from "./settings-test-helper";
+import {
+  mapDistrictToSteadfast,
+  useTestDeliveryRates,
+} from "./delivery-fixtures";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
@@ -64,6 +69,7 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       "payout.maxPendingRequests": 3,
       "payout.methods": ["BKASH", "NAGAD", "BANK"],
     });
+    await useTestDeliveryRates(app, prisma);
     const category = await prisma.category.create({
       data: { name: `Plants ${randomUUID()}`, slug: `plants-${randomUUID()}`, isActive: true },
     });
@@ -72,6 +78,7 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       data: { name: `Dhaka ${randomUUID()}`, nameBn: "ঢাকা", division: "Dhaka" },
     });
     districtId = district.id;
+    await mapDistrictToSteadfast(prisma, districtId);
   });
 
   afterEach(async () => {
@@ -85,7 +92,7 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       data: {
         email,
         name: "Seller",
-        passwordHash: await hashPassword("SellerPass1"),
+        passwordHash: await hashPassword("SellerPass1!"),
         role: "SELLER",
         emailVerifiedAt: new Date(),
       },
@@ -107,6 +114,7 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
         status: "ACTIVE",
         approvedAt: new Date(),
         district: "Dhaka",
+        pickupDistrictId: districtId,
       },
     });
     await prisma.shopDeliveryZone.create({
@@ -130,7 +138,7 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       data: { productId: product.id, name: "Standard", price, stockQty: stock },
     });
     const agent = request.agent(server);
-    await agent.post(`${API}/auth/login`).send({ email, password: "SellerPass1" }).expect(200);
+    await agent.post(`${API}/auth/login`).send({ email, password: "SellerPass1!" }).expect(200);
     return { user, profile, shop, product, variant, agent };
   }
 
@@ -139,7 +147,7 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
     const email = `cust_${randomUUID().slice(0, 12)}@example.com`;
     const reg = await agent
       .post(`${API}/auth/register`)
-      .send({ email, password: "Str0ngPass1", name: "Customer" })
+      .send({ email, password: "Str0ngPass1!", name: "Customer" })
       .expect(201);
     const userId = reg.body.data.user.id as string;
     await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
@@ -163,13 +171,13 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       data: {
         email,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
     });
     const agent = request.agent(server);
-    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1" }).expect(200);
+    await agent.post(`${API}/auth/login`).send({ email, password: "AdminStr0ng1!" }).expect(200);
     return agent;
   }
 
@@ -299,7 +307,7 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       .set("Origin", ORIGIN)
       .send({
         keys: [`withdrawal.destination:${revealId}`],
-        password: "AdminStr0ng1",
+        password: "AdminStr0ng1!",
       })
       .expect(200);
     const revealed = await admin
@@ -757,4 +765,81 @@ describe("Settlement ledger, release, disputes and withdrawals (real DB)", () =>
       .expect(400);
   });
 
+  describe("payout destination validation", () => {
+    it("accepts valid mobile and bank destinations and rejects invalid ones", async () => {
+      const seller = await createShop();
+      const customer = await createCustomer();
+
+      const validMobile = await seller.agent
+        .post(`${API}/seller/payout-accounts`)
+        .set("Origin", ORIGIN)
+        .send({ method: "BKASH", accountName: "Seller", accountNumber: "01712345678" })
+        .expect(201);
+      expect(validMobile.body.data.accountMasked).toBe("****5678");
+      expect(validMobile.body.data.needsUpdate).toBe(false);
+
+      const validBank = await seller.agent
+        .post(`${API}/seller/payout-accounts`)
+        .set("Origin", ORIGIN)
+        .send({ method: "BANK", accountName: "Seller", accountNumber: "1234-5678-9012" })
+        .expect(201);
+      expect(validBank.body.data.needsUpdate).toBe(false);
+
+      const invalidBkash = await seller.agent
+        .post(`${API}/seller/payout-accounts`)
+        .set("Origin", ORIGIN)
+        .send({ method: "BKASH", accountName: "Seller", accountNumber: "123456" })
+        .expect(400);
+      expect(invalidBkash.body.error.code).toBe("VALIDATION_FAILED");
+      expect(invalidBkash.body.error.details.accountNumber).toMatch(/mobile/i);
+
+      await seller.agent
+        .post(`${API}/seller/payout-accounts`)
+        .set("Origin", ORIGIN)
+        .send({ method: "NAGAD", accountName: "Seller", accountNumber: "0180000000" })
+        .expect(400);
+
+      await seller.agent
+        .post(`${API}/seller/payout-accounts`)
+        .set("Origin", ORIGIN)
+        .send({ method: "BANK", accountName: "Seller", accountNumber: "12ab" })
+        .expect(400);
+
+      await customer.agent
+        .post(`${API}/seller/payout-accounts`)
+        .set("Origin", ORIGIN)
+        .send({ method: "BKASH", accountName: "Customer", accountNumber: "01712345678" })
+        .expect(403);
+    });
+
+    it("flags a legacy invalid destination and blocks withdrawals until it is replaced", async () => {
+      const seller = await createShop();
+      const key = app.get(AppConfigService).values.DATA_ENCRYPTION_KEY;
+      await prisma.sellerPayoutAccount.create({
+        data: {
+          sellerProfileId: seller.profile.id,
+          method: "BKASH",
+          accountName: "Legacy",
+          accountNumberEnc: encryptAesGcm("123456", key),
+          accountMasked: "****3456",
+          isDefault: true,
+        },
+      });
+
+      const list = await seller.agent.get(`${API}/seller/payout-accounts`).expect(200);
+      expect(list.body.data[0].needsUpdate).toBe(true);
+
+      const blocked = await seller.agent
+        .post(`${API}/seller/wallet/withdrawals`)
+        .set("Origin", ORIGIN)
+        .set("Idempotency-Key", randomUUID())
+        .send({ amount: 500 })
+        .expect(422);
+      expect(blocked.body.error.code).toBe("PAYOUT_DESTINATION_INVALID");
+      expect(blocked.body.error.details.accountNumber).toMatch(/mobile/i);
+      expect(await prisma.payout.count({ where: { sellerProfileId: seller.profile.id } })).toBe(0);
+    });
+  });
 });
+
+

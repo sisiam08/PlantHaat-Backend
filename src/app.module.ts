@@ -26,6 +26,7 @@ import { CategoriesModule } from "./modules/categories/categories.module";
 import { CommissionsModule } from "./modules/commissions/commissions.module";
 import { ComplaintsModule } from "./modules/complaints/complaints.module";
 import { ContentModule } from "./modules/content/content.module";
+import { DeliveryQuoteModule } from "./modules/delivery-quote/delivery-quote.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { LocationsModule } from "./modules/locations/locations.module";
@@ -81,6 +82,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     ProductsModule,
     QaModule,
     SearchModule,
+    DeliveryQuoteModule,
     CartModule,
     CodRiskModule,
     OrdersModule,
@@ -122,3 +124,4 @@ import { PrismaModule } from "./prisma/prisma.module";
   ],
 })
 export class AppModule {}
+

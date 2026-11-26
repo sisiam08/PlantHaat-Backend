@@ -81,6 +81,26 @@ export class CartShopGroupDto {
   estimatedDaysMin!: number | null;
   @ApiProperty({ nullable: true, type: Number, description: "Present when a zone matched" })
   estimatedDaysMax!: number | null;
+  @ApiProperty({ nullable: true, type: Boolean, description: "Seller-funded free delivery enabled" })
+  freeDeliveryEnabled!: boolean | null;
+  @ApiProperty({ nullable: true, type: String, description: "Courier portion as a decimal string" })
+  courierCharge!: string | null;
+  @ApiProperty({ nullable: true, type: String, description: "Seller extra portion as a decimal string" })
+  sellerExtraCharge!: string | null;
+  @ApiProperty({ nullable: true, type: String, description: "LIVE|CACHE|STALE|OVERRIDE|FALLBACK" })
+  deliveryQuoteSource!: string | null;
+  @ApiProperty({ description: "True when the price is stale or a fallback" })
+  deliveryQuoteEstimated!: boolean;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: "ADDRESS_THANA_REQUIRED|SHOP_PICKUP_INCOMPLETE|DISTRICT_UNMAPPED|NO_RATE|ROUTE_UNAVAILABLE",
+  })
+  deliveryReason!: string | null;
+  @ApiProperty({ nullable: true, type: String, description: "Parcel weight in kg" })
+  parcelWeightKg!: string | null;
+  @ApiProperty({ description: "Free delivery applied to this shop" })
+  freeDeliveryApplied!: boolean;
 }
 
 export class CartViewDto {

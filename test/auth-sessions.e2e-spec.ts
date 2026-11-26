@@ -13,7 +13,7 @@ import { resetDatabase } from "./cleanup";
 import { clearSettings, setSettings } from "./settings-test-helper";
 
 const API = "/api/v1";
-const PASSWORD = "Str0ngPass1";
+const PASSWORD = "Str0ngPass1!";
 
 function responseCookies(response: request.Response): string[] {
   const header: string | string[] | undefined = response.headers["set-cookie"];
@@ -212,7 +212,7 @@ describe("Auth sessions (e2e)", () => {
     await request(server)
       .post(`${API}/auth/change-password`)
       .set("Authorization", `Bearer ${first.access}`)
-      .send({ currentPassword: PASSWORD, newPassword: "NewStr0ngPass1" })
+      .send({ currentPassword: PASSWORD, newPassword: "NewStr0ngPass1!" })
       .expect(200);
 
     await refreshWith(first.refresh).expect(401);

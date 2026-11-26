@@ -83,13 +83,14 @@ expiry: the session lifetime. **The session ends when the refresh session ends**
 - `lib/auth/refresh.ts` is single-flight and serializes tabs with the Web Locks API (localStorage
   lock fallback + recent-refresh check). Transient failures are not cached as “logged out”.
 - Proactive refresh runs about 60 s before expiry and on focus after a long idle. A dead session opens
-  the session-expired dialog on the current page (or quietly updates the header on public pages);
-  the cart, form state, scroll and page data are kept.
-- `BroadcastChannel` plus a same-tab local event sync the dialog and login/account switch across
-  tabs. A different account does a full reload; the same account resumes in place.
-
-### Server Components
-
+  a role-aware prompt on the current page: admin/seller see it immediately (including from a public
+  background request); an authenticated customer sees it only for an action/protected route; a guest
+  gets “Login required” only when an action needs authentication. Public customer browsing stays quiet.
+  The prompt only hands off to `/login?returnTo=<current path>&reason=session-expired|auth-required`;
+  it has no login form, so a password is never entered inside a modal.
+- `ph_has_session`/`ph_session_expired` are non-sensitive UX cookies. The latter lets the proxy render
+  the expired prompt at the same URL after a reload; it is cleared on login/logout and is never used
+  for authorization. Login on the page clears the query cache and does a full load back to `returnTo`.
 - `getSession()` reads the web cookie (legacy fallback) and calls `/auth/me` once. It **never
   refreshes/rotates the refresh token**: a Server Component cannot write the rotated cookie, so a
   silent rotation left the browser on a stale token and later triggered reuse detection. The proxy,
@@ -115,14 +116,15 @@ expiry: the session lifetime. **The session ends when the refresh session ends**
 
 ### Session-expired UX
 
-- An auth-error refresh shows a modal at the current URL: “Your session has expired. Log in again to
-  continue.” / “আপনার সেশনের মেয়াদ শেষ হয়েছে। চালিয়ে যেতে আবার লগইন করুন।” with an inline email +
-  password form (same validation/rate-limit messages, disabled until hydrated, focus-trapped,
-  labelled), a “Go to home” link, a dismiss option only on public pages, and the full login page as a
-  fallback link carrying `returnTo`.
-- No non-idempotent mutation is replayed automatically; after login the page refreshes and tells the
-  user “You're back, please try again.”.
-
+- An auth-error refresh/rejected probe shows a modal at the current URL. The “expired” variant is
+  used for a real prior session; the “required” variant is used for a first-time guest action. Both
+  carry a primary link to the existing login page with the right `returnTo`/`reason`, a “Go to home”
+  link and a public-only dismiss. There is no email/password form; the dialog is focus-trapped and
+  axe-clean.
+- Checkout: a guest’s cart button opens “Login required” (login page carries `returnTo=/checkout`);
+  a previously authenticated customer gets “Your session has expired… continue with checkout”. The
+  guest cart is merged before the auth cache publishes the user, so the return to checkout already
+  sees the cart. No non-idempotent mutation is replayed automatically.
 
 ## Settings keys (admin → Settings → Security & Sessions)
 

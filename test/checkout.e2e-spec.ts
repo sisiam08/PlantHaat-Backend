@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
@@ -12,6 +14,10 @@ import { AppConfigService } from "../src/config/app-config.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { resetDatabase } from "./cleanup";
 import { clearSettings } from "./settings-test-helper";
+import {
+  mapDistrictToSteadfast,
+  useTestDeliveryRates,
+} from "./delivery-fixtures";
 
 const API = "/api/v1";
 const ORIGIN = "http://localhost:3000";
@@ -55,6 +61,8 @@ describe("Checkout & orders (e2e)", () => {
       data: { name: `Dhaka-${suffix()}`, nameBn: "ঢাকা", division: "Dhaka" },
     });
     districtId = district.id;
+    await useTestDeliveryRates(app, prisma);
+    await mapDistrictToSteadfast(prisma, districtId);
   });
 
   async function createShopWithProduct(price: number, stock: number) {
@@ -63,7 +71,7 @@ describe("Checkout & orders (e2e)", () => {
       data: {
         email: `seller_${id}@example.com`,
         name: "Seller",
-        passwordHash: await hashPassword("SellerPass1"),
+        passwordHash: await hashPassword("SellerPass1!"),
         role: "SELLER",
         emailVerifiedAt: new Date(),
       },
@@ -85,6 +93,7 @@ describe("Checkout & orders (e2e)", () => {
         status: "ACTIVE",
         approvedAt: new Date(),
         district: "Dhaka",
+        pickupDistrictId: districtId,
       },
     });
     await prisma.shopDeliveryZone.create({
@@ -123,7 +132,7 @@ describe("Checkout & orders (e2e)", () => {
     const email = `cust_${suffix()}@example.com`;
     const reg = await agent
       .post(`${API}/auth/register`)
-      .send({ email, password: "Str0ngPass1", name: "Customer" })
+      .send({ email, password: "Str0ngPass1!", name: "Customer" })
       .expect(201);
     const userId = reg.body.data.user.id as string;
     await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
@@ -183,6 +192,42 @@ describe("Checkout & orders (e2e)", () => {
     expect(cart.body.data.shops).toHaveLength(0);
   });
 
+  it("filters the customer order list by computed overall status", async () => {
+    const shop = await createShopWithProduct(500, 5);
+    const customer = await createCustomer();
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shop.variant.id, quantity: 1 })
+      .expect(200);
+    const order = await customer.agent
+      .post(`${API}/checkout`)
+      .set("Origin", ORIGIN)
+      .set("Idempotency-Key", randomUUID())
+      .send({ addressId: customer.addressId, paymentMethod: "COD" })
+      .expect(200);
+
+    const shopOrderId = order.body.data.shopOrders[0].id as string;
+    await prisma.shopOrder.update({ where: { id: shopOrderId }, data: { status: "DELIVERED" } });
+
+    const delivered = await customer.agent
+      .get(`${API}/orders?overallStatus=DELIVERED`)
+      .expect(200);
+    expect(delivered.body.meta.total).toBe(1);
+    expect(delivered.body.data[0].id).toBe(order.body.data.id);
+
+    const pending = await customer.agent
+      .get(`${API}/orders?overallStatus=PENDING`)
+      .expect(200);
+    expect(pending.body.meta.total).toBe(0);
+
+    const all = await customer.agent.get(`${API}/orders`).expect(200);
+    expect(all.body.meta.total).toBe(1);
+
+    const counts = await customer.agent.get(`${API}/orders/status-counts`).expect(200);
+    expect(counts.body.data).toEqual({ all: 1, counts: { DELIVERED: 1 } });
+  });
+
   it("clears purchased lines atomically and an idempotent retry never clears newer lines", async () => {
     const shopA = await createShopWithProduct(850, 5);
     const shopB = await createShopWithProduct(500, 5);
@@ -233,7 +278,7 @@ describe("Checkout & orders (e2e)", () => {
     const shop = await createShopWithProduct(300, 10);
     await prisma.shopDeliveryZone.updateMany({
       where: { shopId: shop.shop.id },
-      data: { freeDeliveryAbove: 1000 },
+      data: { freeDeliveryEnabled: true, freeDeliveryAbove: 1000 },
     });
     const customer = await createCustomer();
 
@@ -293,7 +338,7 @@ describe("Checkout & orders (e2e)", () => {
     expect(noDistrict.body.data.shops[0].deliveryCharge).toBeNull();
   });
 
-  it("marks a shop not deliverable for a district outside its zones", async () => {
+  it("delivers nationwide with both payment methods when a shop has legacy zones", async () => {
     const shop = await createShopWithProduct(300, 10);
     const customer = await createCustomer();
     await customer.agent
@@ -303,18 +348,119 @@ describe("Checkout & orders (e2e)", () => {
       .expect(200);
 
     const otherDistrict = await prisma.district.create({
-      data: { name: `Sylhet-${suffix()}`, nameBn: "সিলেট", division: "Sylhet" },
+      data: { name: `Sylhet-${suffix()}`, nameBn: "?????", division: "Sylhet" },
     });
+    await mapDistrictToSteadfast(prisma, otherDistrict.id, 2);
 
     const res = await customer.agent
       .get(`${API}/cart?districtId=${otherDistrict.id}`)
       .set("Origin", ORIGIN)
       .expect(200);
     const group = res.body.data.shops[0];
-    expect(group.deliverable).toBe(false);
-    expect(group.deliveryCharge).toBeNull();
-    expect(group.freeDeliveryAbove).toBeNull();
-    expect(Number(res.body.data.deliveryTotal)).toBe(0);
+    expect(group.deliverable).toBe(true);
+    expect(Number(group.deliveryCharge)).toBe(60);
+    expect(group.codAllowed).toBe(true);
+    expect(group.advanceAllowed).toBe(true);
+    expect(Number(res.body.data.deliveryTotal)).toBe(60);
+  });
+
+  it("enforces inside/outside Dhaka payment conditions", async () => {
+    const shop = await createShopWithProduct(300, 10);
+    const customer = await createCustomer();
+    await prisma.district.update({ where: { id: districtId }, data: { insideDhaka: true } });
+    await prisma.shopDeliveryZone.create({
+      data: {
+        shopId: shop.shop.id,
+        name: "Inside Dhaka",
+        isNationwide: true,
+        charge: 80,
+        condition: "INSIDE_DHAKA",
+        paymentMode: "COD_ONLY",
+      },
+    });
+    await prisma.shopDeliveryZone.create({
+      data: {
+        shopId: shop.shop.id,
+        name: "Outside Dhaka",
+        isNationwide: true,
+        charge: 120,
+        condition: "OUTSIDE_DHAKA",
+        paymentMode: "ADVANCE_ONLY",
+      },
+    });
+
+    await customer.agent
+      .put(`${API}/cart/items`)
+      .set("Origin", ORIGIN)
+      .send({ variantId: shop.variant.id, quantity: 1 })
+      .expect(200);
+    let cart = await customer.agent
+      .get(`${API}/cart?districtId=${districtId}`)
+      .expect(200);
+    expect(cart.body.data.shops[0]).toMatchObject({
+      deliveryCondition: "INSIDE_DHAKA",
+      codAllowed: true,
+      advanceAllowed: false,
+    });
+
+    await customer.agent
+      .post(`${API}/checkout`)
+      .set("Origin", ORIGIN)
+      .set("Idempotency-Key", randomUUID())
+      .send({ addressId: customer.addressId, paymentMethod: "ADVANCE" })
+      .expect(400);
+
+    await prisma.district.update({ where: { id: districtId }, data: { insideDhaka: false } });
+    cart = await customer.agent
+      .get(`${API}/cart?districtId=${districtId}`)
+      .expect(200);
+    expect(cart.body.data.shops[0]).toMatchObject({
+      deliveryCondition: "OUTSIDE_DHAKA",
+      codAllowed: false,
+      advanceAllowed: true,
+    });
+    await customer.agent
+      .post(`${API}/checkout`)
+      .set("Origin", ORIGIN)
+      .set("Idempotency-Key", randomUUID())
+      .send({ addressId: customer.addressId, paymentMethod: "COD" })
+      .expect(400);
+  });
+
+  it("backfills both delivery conditions idempotently without overwriting custom values", async () => {
+    const shop = await createShopWithProduct(300, 10);
+    const sql = readFileSync(
+      resolve(
+        process.cwd(),
+        "prisma/migrations/20261125120000_backfill_delivery_conditions/migration.sql",
+      ),
+      "utf8",
+    );
+    await prisma.$executeRawUnsafe(sql);
+    let conditions = await prisma.shopDeliveryZone.findMany({
+      where: { shopId: shop.shop.id, condition: { not: null } },
+      orderBy: { condition: "asc" },
+    });
+    expect(conditions).toHaveLength(2);
+    expect(conditions.map((row) => row.condition)).toEqual([
+      "INSIDE_DHAKA",
+      "OUTSIDE_DHAKA",
+    ]);
+    expect(Number(conditions[0]?.charge)).toBe(60);
+    expect(conditions.every((row) => row.paymentMode === "COD_AND_ADVANCE")).toBe(true);
+
+    await prisma.shopDeliveryZone.update({
+      where: { id: conditions[0]!.id },
+      data: { charge: 99, paymentMode: "COD_ONLY" },
+    });
+    await prisma.$executeRawUnsafe(sql);
+    conditions = await prisma.shopDeliveryZone.findMany({
+      where: { shopId: shop.shop.id, condition: { not: null } },
+      orderBy: { condition: "asc" },
+    });
+    expect(conditions).toHaveLength(2);
+    expect(Number(conditions[0]?.charge)).toBe(99);
+    expect(conditions[0]?.paymentMode).toBe("COD_ONLY");
   });
 
   it("is idempotent for the same Idempotency-Key", async () => {
@@ -365,7 +511,7 @@ describe("Checkout & orders (e2e)", () => {
       data: {
         email: adminEmail,
         name: "Admin",
-        passwordHash: await hashPassword("AdminStr0ng1"),
+        passwordHash: await hashPassword("AdminStr0ng1!"),
         role: "ADMIN",
         emailVerifiedAt: new Date(),
       },
@@ -373,7 +519,7 @@ describe("Checkout & orders (e2e)", () => {
     const admin = request.agent(server);
     await admin
       .post(`${API}/auth/login`)
-      .send({ email: adminEmail, password: "AdminStr0ng1" })
+      .send({ email: adminEmail, password: "AdminStr0ng1!" })
       .expect(200);
 
     const list = await admin.get(`${API}/admin/payments?order=${orderNumber}`).expect(200);
@@ -423,3 +569,5 @@ describe("Checkout & orders (e2e)", () => {
     expect(await prisma.order.count()).toBe(1);
   });
 });
+
+

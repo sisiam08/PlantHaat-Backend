@@ -68,7 +68,7 @@ describe("Trusted client IP behind the BFF (e2e)", () => {
       .post(`${API}/auth/register`)
       .set("X-BFF-Key", bffKey)
       .set("X-Forwarded-For", "203.0.113.7")
-      .send({ email, password: "Str0ngPass1", name: "BFF User" })
+      .send({ email, password: "Str0ngPass1!", name: "BFF User" })
       .expect(201);
 
     expect(await lastSessionIp(email)).toBe("203.0.113.7");
@@ -79,7 +79,7 @@ describe("Trusted client IP behind the BFF (e2e)", () => {
     await request(server)
       .post(`${API}/auth/register`)
       .set("X-Forwarded-For", "203.0.113.9")
-      .send({ email, password: "Str0ngPass1", name: "BFF User" })
+      .send({ email, password: "Str0ngPass1!", name: "BFF User" })
       .expect(201);
 
     const ip = await lastSessionIp(email);
@@ -91,7 +91,7 @@ describe("Trusted client IP behind the BFF (e2e)", () => {
     const email = `bff_${suffix()}@example.com`;
     const registered = await request(server)
       .post(`${API}/auth/register`)
-      .send({ email, password: "Str0ngPass1", name: "BFF User" })
+      .send({ email, password: "Str0ngPass1!", name: "BFF User" })
       .expect(201);
     const accessToken = responseCookie(registered, "ph_at");
     expect(accessToken).toBeDefined();
@@ -107,7 +107,7 @@ describe("Trusted client IP behind the BFF (e2e)", () => {
     const agent = request.agent(server);
     await agent
       .post(`${API}/auth/register`)
-      .send({ email: `bff_${suffix()}@example.com`, password: "Str0ngPass1", name: "BFF User" })
+      .send({ email: `bff_${suffix()}@example.com`, password: "Str0ngPass1!", name: "BFF User" })
       .expect(201);
 
     const res = await agent.patch(`${API}/users/me`).send({ name: "Nope" }).expect(403);
